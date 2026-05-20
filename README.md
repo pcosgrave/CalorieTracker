@@ -72,35 +72,73 @@ Format Terraform files:
 terraform fmt -recursive infra/terraform
 ```
 
-### Web App
+## Testing Locally
 
-Start the Next.js development server:
+### Preview The Web App
+
+From the repo root, start the Next.js dev server:
 
 ```bash
 npm run dev --workspace @calorie-tracker/web
 ```
 
-The web app should be available at `http://localhost:3000`.
+Then open:
 
-### API
-
-The API package currently contains Lambda handlers and shared request validation. It is not wired to a local API server yet.
-
-Run its typecheck directly:
-
-```bash
-npm run typecheck --workspace @calorie-tracker/api
+```text
+http://localhost:3000
 ```
 
-### Android App
+The current web app is a static shell for the Phase 1 workflow. It shows daily totals, a sample logged food, and the manual label-entry form. The form is not connected to the API yet.
 
-Open `apps/android` in Android Studio. The temporary Android package name is:
+If port `3000` is busy, choose another port:
+
+```bash
+npm run dev --workspace @calorie-tracker/web -- -p 3001
+```
+
+Build the web app:
+
+```bash
+npm run build --workspace @calorie-tracker/web
+```
+
+### Test The Android App
+
+Open `apps/android` in Android Studio, let Gradle sync, then run the `app` configuration on an emulator or device.
+
+The current Android app is also a static shell. It includes the temporary package name and declares the ML Kit barcode scanning dependency, but the camera scanner and persistence are not wired yet.
+
+The temporary Android package name is:
 
 ```text
 com.philipcosgrave.calorietracker
 ```
 
-Android barcode scanning is planned around Google ML Kit.
+If running Gradle from the command line on macOS, use Android Studio's bundled JDK:
+
+```bash
+cd apps/android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
+```
+
+If Gradle cannot write to the default home cache in a restricted environment, keep the Gradle cache inside the project:
+
+```bash
+cd apps/android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+GRADLE_USER_HOME="$PWD/.gradle-user-home" \
+./gradlew :app:assembleDebug
+```
+
+### Test The API
+
+Run API typechecks:
+
+```bash
+npm run typecheck --workspace @calorie-tracker/api
+```
+
+The API currently contains Lambda handlers, validation, and DynamoDB store code. It does not have a local HTTP runner yet.
 
 ### Terraform
 

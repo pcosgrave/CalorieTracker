@@ -5,9 +5,12 @@ build/
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tsbuildinfo
 .DS_Store
 .env
 .env.local
 local.properties
 .gradle/
+.gradle-user-home/
+.idea/
 *.iml
