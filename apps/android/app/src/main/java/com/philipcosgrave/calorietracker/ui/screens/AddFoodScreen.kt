@@ -88,13 +88,12 @@ fun AddFoodScreen(
                     Button(onClick = { }) { Text("Barcode") }
                 }
                 OutlinedTextField(search, { search = it }, label = { Text("Search ingredients or recipes") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(barcode, { barcode = it }, label = { Text("Barcode") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FoodKind.entries.forEach { kind ->
                         FilterChip(
                             selected = activeKind == kind,
                             onClick = { activeKind = kind },
-                            label = { Text(if (kind == FoodKind.Ingredient) "Ingredients" else "Recipes") },
+                            label = { Text(kind.name) },
                             modifier = Modifier.weight(1f),
                         )
                     }
