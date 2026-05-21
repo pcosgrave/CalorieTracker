@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,8 @@ fun LogFoodScreen(
     onBack: () -> Unit,
     onLog: (Meal, LocalDate, FoodItem, Double, Boolean) -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
+    val isDarkTheme = colorScheme.background.luminance() < 0.5f
     var amount by remember(food.id) { mutableStateOf(formatNumber(food.servingQuantity)) }
     var unit by remember(food.id) { mutableStateOf(food.servingUnit) }
     var meal by remember { mutableStateOf(Meal.Breakfast) }
@@ -79,21 +82,21 @@ fun LogFoodScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         TextButton(onClick = onBack) { Text("< Back") }
-        Text(food.name, style = MaterialTheme.typography.headlineSmall, color = Color(0xFFF5F1E8))
-        Text("NUTRITION FACTS", color = Color(0xFF00D1FF), fontWeight = FontWeight.Bold)
+        Text(food.name, style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
+        Text("NUTRITION FACTS", color = colorScheme.primary, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Serving size", color = Color.White)
+            Text("Serving size", color = colorScheme.onBackground)
             OutlinedTextField(amount, { amount = it }, modifier = Modifier.weight(1f))
             UnitPicker(unit, { unit = it }, Modifier.weight(1f))
-            Text("${formatNumber(adjusted.calories)} cals.", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("${formatNumber(adjusted.calories)} cals.", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Meal & Snacks Time", style = MaterialTheme.typography.titleLarge, color = Color.White)
-            MealPicker(meal, { meal = it }, darkMode = true)
+            Text("Meal & Snacks Time", style = MaterialTheme.typography.titleLarge, color = colorScheme.onBackground)
+            MealPicker(meal, { meal = it }, darkMode = isDarkTheme)
         }
         if (components.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Recipe ingredients", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Recipe ingredients", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
                 components.forEachIndexed { index, component ->
                     EditableRecipeLogComponent(
                         component = component,
@@ -103,7 +106,7 @@ fun LogFoodScreen(
                 }
             }
         }
-        DateStepper(selectedDate, { selectedDate = it }, darkMode = true)
+        DateStepper(selectedDate, { selectedDate = it }, darkMode = isDarkTheme)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, true) }, modifier = Modifier.weight(1f)) {
                 Text("Log & add more")
@@ -136,10 +139,10 @@ private fun EditableRecipeLogComponent(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(component.item.name, color = Color(0xFFD5D0C7), fontWeight = FontWeight.Bold)
+            Text(component.item.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
             Text(
                 component.item.brand.ifBlank { component.item.servingUnit },
-                color = Color(0xFFA6A19A),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
