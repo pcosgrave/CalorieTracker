@@ -45,6 +45,7 @@ import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.screens.AddFoodScreen
+import com.philipcosgrave.calorietracker.ui.screens.BarcodeScannerScreen
 import com.philipcosgrave.calorietracker.ui.screens.DiaryScreen
 import com.philipcosgrave.calorietracker.ui.screens.LogFoodScreen
 import com.philipcosgrave.calorietracker.ui.screens.NewIngredientScreen
@@ -215,6 +216,14 @@ fun CalorieTrackerApp() {
         )
     }
 
+    suspend fun findFoodByBarcode(barcode: String): FoodItem? {
+        localStore.foodRepository.getByBarcode(barcode)?.food?.let { return it }
+        localStore.barcodeAliasRepository.getByBarcode(barcode)?.let { alias ->
+            localStore.foodRepository.getById(alias.productId)?.food?.let { return it }
+        }
+        return seedFoods.firstOrNull { it.barcode == barcode }
+    }
+
     LaunchedEffect(Unit) {
         localStore.migrateLegacyIfNeeded(
             readLegacyFoods = ::readFoodItems,
@@ -270,6 +279,9 @@ fun CalorieTrackerApp() {
                     screen = AppScreen.SyncSettings
                 },
                 onQuickCalories = { screen = AppScreen.QuickCalories },
+                onScanBarcode = {
+                    screen = AppScreen.BarcodeScanner
+                },
                 onAddIngredient = {
                     editingFood = null
                     screen = AppScreen.NewIngredient
@@ -304,6 +316,31 @@ fun CalorieTrackerApp() {
                     } else {
                         editingFood = item
                         screen = AppScreen.NewIngredient
+                    }
+                },
+            )
+
+            AppScreen.BarcodeScanner -> BarcodeScannerScreen(
+                onBack = { screen = AppScreen.AddFood },
+                onBarcodeDetected = { barcode ->
+                    scope.launch {
+                        val found = findFoodByBarcode(barcode)
+                        if (found != null) {
+                            selectedFood = found
+                            screen = AppScreen.LogFood
+                        } else {
+                            editingFood = FoodItem(
+                                id = createId("custom"),
+                                kind = FoodKind.Ingredient,
+                                name = "",
+                                brand = "",
+                                barcode = barcode,
+                                servingQuantity = 1.0,
+                                servingUnit = "serving",
+                                nutrients = Nutrients(calories = 0.0),
+                            )
+                            screen = AppScreen.NewIngredient
+                        }
                     }
                 },
             )

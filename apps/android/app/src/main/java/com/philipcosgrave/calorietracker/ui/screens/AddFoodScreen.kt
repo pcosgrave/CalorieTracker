@@ -41,6 +41,7 @@ fun AddFoodScreen(
     onBack: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onQuickCalories: () -> Unit,
+    onScanBarcode: () -> Unit,
     onAddIngredient: () -> Unit,
     onAddRecipe: () -> Unit,
     onSelectFood: (FoodItem) -> Unit,
@@ -85,7 +86,7 @@ fun AddFoodScreen(
                     Text("Search foods", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     Button(onClick = onQuickCalories, modifier = Modifier.size(48.dp)) { Text("123") }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { }) { Text("Barcode") }
+                    Button(onClick = onScanBarcode) { Text("Barcode") }
                 }
                 OutlinedTextField(search, { search = it }, label = { Text("Search ingredients or recipes") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -132,6 +133,7 @@ private fun AddFoodScreenPreview() {
             onBack = {},
             onOpenSyncSettings = {},
             onQuickCalories = {},
+            onScanBarcode = {},
             onAddIngredient = {},
             onAddRecipe = {},
             onSelectFood = {},

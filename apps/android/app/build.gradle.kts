@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+val cameraXVersion = "1.4.1"
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -35,9 +37,26 @@ kotlin {
     }
 }
 
+configurations.configureEach {
+    resolutionStrategy {
+        force(
+            "androidx.camera:camera-camera2:$cameraXVersion",
+            "androidx.camera:camera-core:$cameraXVersion",
+            "androidx.camera:camera-lifecycle:$cameraXVersion",
+            "androidx.camera:camera-view:$cameraXVersion",
+            "androidx.camera:camera-video:$cameraXVersion",
+            "androidx.camera:camera-camera2-pipe:$cameraXVersion",
+        )
+    }
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
     implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.camera:camera-camera2:$cameraXVersion")
+    implementation("androidx.camera:camera-core:$cameraXVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraXVersion")
+    implementation("androidx.camera:camera-view:$cameraXVersion")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

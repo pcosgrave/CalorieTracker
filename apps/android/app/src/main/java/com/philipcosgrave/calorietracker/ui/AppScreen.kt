@@ -8,4 +8,5 @@ enum class AppScreen {
     NewIngredient,
     RecipeBuilder,
     LogFood,
+    BarcodeScanner,
 }
