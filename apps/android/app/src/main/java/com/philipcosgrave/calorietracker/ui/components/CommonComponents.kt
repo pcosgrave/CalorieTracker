@@ -62,15 +62,20 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun Header() {
+fun Header(onOpenSyncSettings: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("CalorieTracker", style = MaterialTheme.typography.headlineMedium)
         Text(
             "Manual labels, private barcode shortcuts, cloud sync when signed in.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = { }) {
-            Text("Sign in with Google")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = { }) {
+                Text("Sign in with Google")
+            }
+            TextButton(onClick = onOpenSyncSettings) {
+                Text("Sync")
+            }
         }
     }
 }

@@ -6,6 +6,12 @@ import type {
   CreateFoodProductRequest,
   DiaryEntry,
   FoodProduct,
+  SyncChange,
+  SyncCursor,
+  SyncPullRequest,
+  SyncPullResponse,
+  SyncPushRequest,
+  SyncPushResponse,
 } from "@calorie-tracker/shared";
 import { randomUUID } from "node:crypto";
 
@@ -14,6 +20,7 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const productsTableName = requiredEnv("PRODUCTS_TABLE_NAME");
 const barcodeAliasesTableName = requiredEnv("BARCODE_ALIASES_TABLE_NAME");
 const diaryEntriesTableName = requiredEnv("DIARY_ENTRIES_TABLE_NAME");
+const syncChangesTableName = requiredEnv("SYNC_CHANGES_TABLE_NAME");
 
 export async function lookupBarcode(userId: string, barcode: string): Promise<BarcodeLookupResponse> {
   const alias = await client.send(
@@ -123,6 +130,78 @@ export async function createDiaryEntry(
   return entry;
 }
 
+export async function pushSyncChanges(userId: string, request: SyncPushRequest): Promise<SyncPushResponse> {
+  const acceptedChangeIds: string[] = [];
+
+  for (const change of request.changes) {
+    await client.send(
+      new PutCommand({
+        TableName: syncChangesTableName,
+        Item: {
+          ownerUserId: userId,
+          sortKey: toSyncSortKey(change.changedAt, change.changeId),
+          changeId: change.changeId,
+          entityType: change.entityType,
+          recordId: change.recordId,
+          operation: change.operation,
+          changedAt: change.changedAt,
+          deviceId: change.deviceId,
+          baseVersion: change.baseVersion,
+          payload: change.payload,
+        },
+      }),
+    );
+    acceptedChangeIds.push(change.changeId);
+  }
+
+  return {
+    cursor: {
+      deviceId: request.deviceId,
+      lastPulledAt: request.changes.at(-1)?.changedAt ?? request.cursor?.lastPulledAt,
+      lastAcknowledgedChangeId: acceptedChangeIds.at(-1) ?? request.cursor?.lastAcknowledgedChangeId,
+    },
+    acceptedChangeIds,
+    rejectedChanges: [],
+  };
+}
+
+export async function pullSyncChanges(userId: string, request: SyncPullRequest): Promise<SyncPullResponse> {
+  const changedAfter = request.cursor?.lastPulledAt ?? "";
+  const result = await client.send(
+    new QueryCommand({
+      TableName: syncChangesTableName,
+      KeyConditionExpression: "ownerUserId = :ownerUserId AND sortKey > :sortKey",
+      ExpressionAttributeValues: {
+        ":ownerUserId": userId,
+        ":sortKey": toSyncSortKey(changedAfter, request.cursor?.lastAcknowledgedChangeId ?? ""),
+      },
+      Limit: 200,
+      ScanIndexForward: true,
+    }),
+  );
+
+  const changes = (result.Items ?? []).map((item) => ({
+    changeId: item.changeId,
+    entityType: item.entityType,
+    recordId: item.recordId,
+    operation: item.operation,
+    changedAt: item.changedAt,
+    deviceId: item.deviceId,
+    baseVersion: item.baseVersion,
+    payload: item.payload,
+  })) as SyncChange[];
+
+  const lastChange = changes.at(-1);
+  return {
+    cursor: {
+      deviceId: request.deviceId,
+      lastPulledAt: lastChange?.changedAt ?? request.cursor?.lastPulledAt,
+      lastAcknowledgedChangeId: lastChange?.changeId ?? request.cursor?.lastAcknowledgedChangeId,
+    },
+    changes,
+  };
+}
+
 async function getProduct(userId: string, productId: string): Promise<FoodProduct | undefined> {
   const result = await client.send(
     new GetCommand({
@@ -143,4 +222,8 @@ function requiredEnv(name: string): string {
     throw new Error(`Missing environment variable ${name}`);
   }
   return value;
+}
+
+function toSyncSortKey(changedAt: string, changeId: string): string {
+  return `${changedAt}#${changeId}`;
 }

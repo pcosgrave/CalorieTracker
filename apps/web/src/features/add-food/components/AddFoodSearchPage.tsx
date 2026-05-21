@@ -60,9 +60,14 @@ export function AddFoodSearchPage({
               {formatDateHeading(date)} - {date}
             </p>
           </div>
-          <Link className={styles.textButton} href={`/?date=${date}`}>
-            Back to diary
-          </Link>
+          <div className={styles.headerActions}>
+            <Link className={styles.textButton} href="/settings">
+              Sync
+            </Link>
+            <Link className={styles.textButton} href={`/?date=${date}`}>
+              Back to diary
+            </Link>
+          </div>
         </header>
 
         {savedEntryName ? <p className={styles.success}>Saved {savedEntryName}.</p> : null}

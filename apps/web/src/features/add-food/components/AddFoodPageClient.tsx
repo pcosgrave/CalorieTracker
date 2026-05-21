@@ -1,10 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import { AddFoodSearchPage } from "./AddFoodSearchPage";
 import { SelectedFoodDetail } from "./SelectedFoodDetail";
 import { useAddFoodPage } from "../hooks/useAddFoodPage";
+import { maybeAutoSync } from "@/lib/sync/service";
 
 export function AddFoodPageClient() {
+  useEffect(() => {
+    void maybeAutoSync();
+  }, []);
+
   const {
     activeTab,
     barcode,

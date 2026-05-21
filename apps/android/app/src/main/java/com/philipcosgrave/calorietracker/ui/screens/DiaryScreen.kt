@@ -39,6 +39,7 @@ fun DiaryScreen(
     entries: List<DiaryEntry>,
     onDateChange: (LocalDate) -> Unit,
     onAddFood: () -> Unit,
+    onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onUpdateEntry: (DiaryEntry) -> Unit,
 ) {
@@ -46,7 +47,7 @@ fun DiaryScreen(
     var editingEntry by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Page {
-        Header()
+        Header(onOpenSyncSettings)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

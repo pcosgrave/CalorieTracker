@@ -37,6 +37,7 @@ fun AddFoodScreen(
     date: LocalDate,
     foods: List<FoodItem>,
     onBack: () -> Unit,
+    onOpenSyncSettings: () -> Unit,
     onQuickCalories: () -> Unit,
     onAddIngredient: () -> Unit,
     onAddRecipe: () -> Unit,
@@ -72,6 +73,7 @@ fun AddFoodScreen(
                 Text("Add Food", style = MaterialTheme.typography.headlineMedium)
                 Text(date.format(DateTimeFormatter.ISO_LOCAL_DATE))
             }
+            TextButton(onClick = onOpenSyncSettings) { Text("Sync") }
             TextButton(onClick = onBack) { Text("Back") }
         }
 

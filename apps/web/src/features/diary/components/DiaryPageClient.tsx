@@ -1,13 +1,20 @@
 "use client";
 
 import styles from "@/app/page.module.css";
+import Link from "next/link";
+import { useEffect } from "react";
 import { DateNavigator } from "./DateNavigator";
 import { DaySummaryPanel } from "./DaySummaryPanel";
 import { EditEntryPanel } from "./EditEntryPanel";
 import { MealSections } from "./MealSections";
 import { useDiaryPage } from "../hooks/useDiaryPage";
+import { maybeAutoSync } from "@/lib/sync/service";
 
 export function DiaryPageClient() {
+  useEffect(() => {
+    void maybeAutoSync();
+  }, []);
+
   const {
     dateOptions,
     editForm,
@@ -34,7 +41,12 @@ export function DiaryPageClient() {
             <h1>CalorieTracker</h1>
             <p>Manual labels, private barcode shortcuts, cloud sync when signed in.</p>
           </div>
-          <button type="button">Sign in with Google</button>
+          <div className={styles.headerActions}>
+            <Link className={styles.textButton} href="/settings">
+              Sync
+            </Link>
+            <button type="button">Sign in with Google</button>
+          </div>
         </header>
 
         <DateNavigator dateOptions={dateOptions} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />

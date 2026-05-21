@@ -33,3 +33,105 @@ export const createDiaryEntrySchema = z.object({
 });
 
 export const emptySchema = z.object({});
+
+const syncMetadataSchema = z.object({
+  recordId: z.string().min(1),
+  version: z.number().int().positive(),
+  updatedAt: z.string().datetime(),
+  deletedAt: z.string().datetime().optional(),
+  originDeviceId: z.string().min(1),
+  lastSyncedAt: z.string().datetime().optional(),
+  syncStatus: z.enum(["local_only", "pending_push", "synced", "sync_error"]),
+});
+
+const foodProductRecordSchema = z.object({
+  product: z.object({
+    productId: z.string().min(1),
+    ownerUserId: z.string().min(1),
+    visibility: z.enum(["private", "shared", "global"]),
+    barcode: z.string().optional(),
+    name: z.string().min(1),
+    brand: z.string().optional(),
+    serving: servingSchema,
+    nutrients: nutrientsSchema,
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  }),
+  sync: syncMetadataSchema,
+});
+
+const barcodeAliasRecordSchema = z.object({
+  alias: z.object({
+    barcode: z.string().min(1),
+    ownerUserId: z.string().min(1),
+    productId: z.string().min(1),
+    visibility: z.enum(["private", "shared", "global"]),
+    createdAt: z.string().datetime(),
+  }),
+  sync: syncMetadataSchema,
+});
+
+const diaryEntryRecordSchema = z.object({
+  entry: z.object({
+    entryId: z.string().min(1),
+    ownerUserId: z.string().min(1),
+    productId: z.string().min(1),
+    loggedAt: z.string().datetime(),
+    meal: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+    servingMultiplier: z.number().positive(),
+    productSnapshot: foodProductRecordSchema.shape.product,
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  }),
+  sync: syncMetadataSchema,
+});
+
+const syncChangeSchemaBase = z.object({
+  changeId: z.string().min(1),
+  entityType: z.enum(["food_product", "barcode_alias", "diary_entry"]),
+  recordId: z.string().min(1),
+  operation: z.enum(["upsert", "delete"]),
+  changedAt: z.string().datetime(),
+  deviceId: z.string().min(1),
+  baseVersion: z.number().int().positive().optional(),
+});
+
+export const syncChangeSchema = z.discriminatedUnion("entityType", [
+  syncChangeSchemaBase.extend({
+    entityType: z.literal("food_product"),
+    payload: foodProductRecordSchema.optional(),
+  }),
+  syncChangeSchemaBase.extend({
+    entityType: z.literal("barcode_alias"),
+    payload: barcodeAliasRecordSchema.optional(),
+  }),
+  syncChangeSchemaBase.extend({
+    entityType: z.literal("diary_entry"),
+    payload: diaryEntryRecordSchema.optional(),
+  }),
+]);
+
+export const syncPushSchema = z.object({
+  userId: z.string().min(1),
+  deviceId: z.string().min(1),
+  cursor: z
+    .object({
+      deviceId: z.string().min(1),
+      lastPulledAt: z.string().datetime().optional(),
+      lastAcknowledgedChangeId: z.string().optional(),
+    })
+    .optional(),
+  changes: z.array(syncChangeSchema),
+});
+
+export const syncPullSchema = z.object({
+  userId: z.string().min(1),
+  deviceId: z.string().min(1),
+  cursor: z
+    .object({
+      deviceId: z.string().min(1),
+      lastPulledAt: z.string().datetime().optional(),
+      lastAcknowledgedChangeId: z.string().optional(),
+    })
+    .optional(),
+});

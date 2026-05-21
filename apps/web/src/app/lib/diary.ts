@@ -1,8 +1,33 @@
-import type { DiaryEntry, FoodProduct, MealType, Nutrients } from "@calorie-tracker/shared";
+import type {
+  BarcodeAliasRecord,
+  DiaryEntry,
+  DiaryEntryRecord,
+  FoodProduct,
+  FoodProductRecord,
+  MealType,
+  Nutrients,
+} from "@calorie-tracker/shared";
+import { createSyncMetadata, isDeletedRecord, markRecordForSync } from "@calorie-tracker/shared";
+import {
+  createBarcodeAliasFromProduct,
+  createPendingDeleteChange,
+  createPendingUpsertChange,
+  getOrCreateDeviceId,
+  readBarcodeAliasRecordsSync,
+  readDiaryEntryRecordsSync,
+  readFoodProductRecordsSync,
+  readPendingSyncChangesSync,
+  syncOutboxStorageKey,
+  writeBarcodeAliasRecordsSync,
+  writeDiaryEntryRecordsSync,
+  writeFoodProductRecordsSync,
+  writePendingSyncChangesSync,
+} from "@/lib/repositories/local-storage";
 
 export const storageKey = "calorie-tracker:diary:v1";
 export const foodStorageKey = "calorie-tracker:foods:v1";
 export const recipeStorageKey = "calorie-tracker:recipes:v1";
+export const barcodeAliasStorageKey = "calorie-tracker:barcode-aliases:v1";
 export const recipeDraftStorageKey = "calorie-tracker:recipe-draft:v1";
 export const ownerUserId = "local";
 
@@ -68,6 +93,10 @@ export function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function deviceId(): string {
+  return getOrCreateDeviceId(createId);
+}
+
 export function todayDateKey(): string {
   const now = new Date();
   return toDateKey(now);
@@ -121,22 +150,169 @@ export function formatDateChip(dateKey: string): { day: string; label: string } 
   };
 }
 
-export function readDiaryEntries(): DiaryEntry[] {
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (!stored) {
-      return [];
-    }
+function readDiaryEntryRecords(): DiaryEntryRecord[] {
+  return readDiaryEntryRecordsSync(storageKey, deviceId());
+}
 
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+function readFoodProductRecords(storage: string): FoodProductRecord[] {
+  return readFoodProductRecordsSync(storage, deviceId());
+}
+
+function readBarcodeAliasRecords(): BarcodeAliasRecord[] {
+  return readBarcodeAliasRecordsSync(barcodeAliasStorageKey);
+}
+
+function writeOutboxChange(change: ReturnType<typeof createPendingUpsertChange>): void {
+  const changes = readPendingSyncChangesSync();
+  writePendingSyncChangesSync([change, ...changes.filter((existing) => existing.changeId !== change.changeId)]);
+}
+
+function persistProductRecords(storage: string, records: FoodProductRecord[]): void {
+  writeFoodProductRecordsSync(storage, records);
+}
+
+function persistDiaryRecords(records: DiaryEntryRecord[]): void {
+  writeDiaryEntryRecordsSync(storageKey, records);
+}
+
+function persistBarcodeAliasRecords(records: BarcodeAliasRecord[]): void {
+  writeBarcodeAliasRecordsSync(barcodeAliasStorageKey, records);
+}
+
+function toFoodRecord(product: FoodProduct, existing?: FoodProductRecord): FoodProductRecord {
+  const updatedAt = product.updatedAt || new Date().toISOString();
+  return existing
+    ? markRecordForSync(
+        {
+          ...existing,
+          product,
+        },
+        {
+          updatedAt,
+          nextVersion: existing.sync.version + 1,
+        },
+      )
+    : {
+        product,
+        sync: createSyncMetadata({
+          recordId: product.productId,
+          deviceId: deviceId(),
+          updatedAt,
+          syncStatus: "pending_push",
+        }),
+      };
+}
+
+function toDiaryRecord(entry: DiaryEntry, existing?: DiaryEntryRecord): DiaryEntryRecord {
+  const updatedAt = entry.updatedAt || new Date().toISOString();
+  return existing
+    ? markRecordForSync(
+        {
+          ...existing,
+          entry,
+        },
+        {
+          updatedAt,
+          nextVersion: existing.sync.version + 1,
+        },
+      )
+    : {
+        entry,
+        sync: createSyncMetadata({
+          recordId: entry.entryId,
+          deviceId: deviceId(),
+          updatedAt,
+          syncStatus: "pending_push",
+        }),
+      };
+}
+
+function syncBarcodeAliasForProduct(product: FoodProduct): void {
+  if (!product.barcode) {
+    return;
   }
+
+  const aliasRecord = createBarcodeAliasFromProduct(product, deviceId());
+  if (!aliasRecord) {
+    return;
+  }
+
+  const records = readBarcodeAliasRecords();
+  const existing = records.find((record) => record.sync.recordId === aliasRecord.sync.recordId);
+  const nextRecord = existing
+    ? markRecordForSync(
+        {
+          ...existing,
+          alias: aliasRecord.alias,
+        },
+        {
+          updatedAt: product.updatedAt,
+          nextVersion: existing.sync.version + 1,
+        },
+      )
+    : aliasRecord;
+
+  persistBarcodeAliasRecords([nextRecord, ...records.filter((record) => record.sync.recordId !== nextRecord.sync.recordId)]);
+  writeOutboxChange(
+    createPendingUpsertChange({
+      entityType: "barcode_alias",
+      changeId: createId("change"),
+      deviceId: deviceId(),
+      changedAt: nextRecord.sync.updatedAt,
+      record: nextRecord,
+      ...(existing ? { baseVersion: existing.sync.version } : {}),
+    }),
+  );
+}
+
+export function readDiaryEntries(): DiaryEntry[] {
+  return readDiaryEntryRecords()
+    .filter((record) => !isDeletedRecord(record))
+    .map((record) => record.entry);
 }
 
 export function writeDiaryEntries(entries: DiaryEntry[]): void {
-  window.localStorage.setItem(storageKey, JSON.stringify(entries));
+  const existingRecords = readDiaryEntryRecords();
+  const existingById = new Map(existingRecords.map((record) => [record.sync.recordId, record]));
+  const nextIds = new Set(entries.map((entry) => entry.entryId));
+  const updatedRecords = entries.map((entry) => toDiaryRecord(entry, existingById.get(entry.entryId)));
+
+  const deletedRecords = existingRecords
+    .filter((record) => !nextIds.has(record.sync.recordId) && !isDeletedRecord(record))
+    .map((record) =>
+      markRecordForSync(record, {
+        updatedAt: new Date().toISOString(),
+        deletedAt: new Date().toISOString(),
+      }),
+    );
+
+  persistDiaryRecords([...updatedRecords, ...deletedRecords]);
+
+  for (const record of updatedRecords) {
+    writeOutboxChange(
+      createPendingUpsertChange({
+        entityType: "diary_entry",
+        changeId: createId("change"),
+        deviceId: deviceId(),
+        changedAt: record.sync.updatedAt,
+        record,
+        ...(existingById.get(record.sync.recordId) ? { baseVersion: existingById.get(record.sync.recordId)!.sync.version } : {}),
+      }),
+    );
+  }
+
+  for (const record of deletedRecords) {
+    writeOutboxChange(
+      createPendingDeleteChange({
+        entityType: "diary_entry",
+        changeId: createId("change"),
+        deviceId: deviceId(),
+        changedAt: record.sync.updatedAt,
+        record,
+        ...(existingById.get(record.sync.recordId) ? { baseVersion: existingById.get(record.sync.recordId)!.sync.version } : {}),
+      }),
+    );
+  }
 }
 
 export function writeDiaryEntry(product: FoodProduct, date: string, meal: MealType, servingMultiplier: number): void {
@@ -157,51 +333,102 @@ export function writeDiaryEntry(product: FoodProduct, date: string, meal: MealTy
 }
 
 export function readFoodProducts(): FoodProduct[] {
-  try {
-    const stored = window.localStorage.getItem(foodStorageKey);
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return readFoodProductRecords(foodStorageKey)
+    .filter((record) => !isDeletedRecord(record))
+    .map((record) => record.product);
 }
 
 export function writeFoodProduct(product: FoodProduct): void {
-  const products = readFoodProducts();
-  const withoutExisting = products.filter((existing) => existing.productId !== product.productId);
-  window.localStorage.setItem(foodStorageKey, JSON.stringify([product, ...withoutExisting]));
+  const existingRecords = readFoodProductRecords(foodStorageKey);
+  const existing = existingRecords.find((record) => record.sync.recordId === product.productId);
+  const nextRecord = toFoodRecord(product, existing);
+  persistProductRecords(foodStorageKey, [nextRecord, ...existingRecords.filter((record) => record.sync.recordId !== product.productId)]);
+  writeOutboxChange(
+    createPendingUpsertChange({
+      entityType: "food_product",
+      changeId: createId("change"),
+      deviceId: deviceId(),
+      changedAt: nextRecord.sync.updatedAt,
+      record: nextRecord,
+      ...(existing ? { baseVersion: existing.sync.version } : {}),
+    }),
+  );
+  syncBarcodeAliasForProduct(product);
 }
 
 export function deleteFoodProduct(productId: string): void {
-  window.localStorage.setItem(foodStorageKey, JSON.stringify(readFoodProducts().filter((product) => product.productId !== productId)));
+  const existingRecords = readFoodProductRecords(foodStorageKey);
+  const existing = existingRecords.find((record) => record.sync.recordId === productId);
+  if (!existing) {
+    return;
+  }
+
+  const deletedAt = new Date().toISOString();
+  const nextRecord = markRecordForSync(existing, { updatedAt: deletedAt, deletedAt });
+  persistProductRecords(foodStorageKey, [nextRecord, ...existingRecords.filter((record) => record.sync.recordId !== productId)]);
+  writeOutboxChange(
+    createPendingDeleteChange({
+      entityType: "food_product",
+      changeId: createId("change"),
+      deviceId: deviceId(),
+      changedAt: deletedAt,
+      record: nextRecord,
+      baseVersion: existing.sync.version,
+    }),
+  );
 }
 
 export function readRecipeProducts(): FoodProduct[] {
-  try {
-    const stored = window.localStorage.getItem(recipeStorageKey);
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return readFoodProductRecords(recipeStorageKey)
+    .filter((record) => !isDeletedRecord(record))
+    .map((record) => record.product);
 }
 
 export function writeRecipeProduct(product: FoodProduct): void {
-  const recipes = readRecipeProducts();
-  const withoutExisting = recipes.filter((existing) => existing.productId !== product.productId);
-  window.localStorage.setItem(recipeStorageKey, JSON.stringify([product, ...withoutExisting]));
+  const existingRecords = readFoodProductRecords(recipeStorageKey);
+  const existing = existingRecords.find((record) => record.sync.recordId === product.productId);
+  const nextRecord = toFoodRecord(product, existing);
+  persistProductRecords(recipeStorageKey, [nextRecord, ...existingRecords.filter((record) => record.sync.recordId !== product.productId)]);
+  writeOutboxChange(
+    createPendingUpsertChange({
+      entityType: "food_product",
+      changeId: createId("change"),
+      deviceId: deviceId(),
+      changedAt: nextRecord.sync.updatedAt,
+      record: nextRecord,
+      ...(existing ? { baseVersion: existing.sync.version } : {}),
+    }),
+  );
 }
 
 export function deleteRecipeProduct(productId: string): void {
-  window.localStorage.setItem(recipeStorageKey, JSON.stringify(readRecipeProducts().filter((product) => product.productId !== productId)));
+  const existingRecords = readFoodProductRecords(recipeStorageKey);
+  const existing = existingRecords.find((record) => record.sync.recordId === productId);
+  if (!existing) {
+    return;
+  }
+
+  const deletedAt = new Date().toISOString();
+  const nextRecord = markRecordForSync(existing, { updatedAt: deletedAt, deletedAt });
+  persistProductRecords(recipeStorageKey, [nextRecord, ...existingRecords.filter((record) => record.sync.recordId !== productId)]);
+  writeOutboxChange(
+    createPendingDeleteChange({
+      entityType: "food_product",
+      changeId: createId("change"),
+      deviceId: deviceId(),
+      changedAt: deletedAt,
+      record: nextRecord,
+      baseVersion: existing.sync.version,
+    }),
+  );
+}
+
+export function readPendingSyncChanges() {
+  return readPendingSyncChangesSync();
+}
+
+export function clearPendingSyncChanges(): void {
+  writePendingSyncChangesSync([]);
 }
 
 export function entriesForDate(entries: DiaryEntry[], dateKey: string): DiaryEntry[] {
