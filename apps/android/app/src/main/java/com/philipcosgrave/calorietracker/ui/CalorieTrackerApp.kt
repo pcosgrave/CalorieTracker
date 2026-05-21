@@ -1,6 +1,7 @@
 package com.philipcosgrave.calorietracker.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -228,7 +229,12 @@ fun CalorieTrackerApp() {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
         when (screen) {
             AppScreen.Diary -> DiaryScreen(
                 selectedDate = selectedDate,
