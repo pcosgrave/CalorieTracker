@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.scale
@@ -28,6 +29,8 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 
 @Composable
@@ -84,5 +87,18 @@ fun LogFoodScreen(
                 Text("Log this")
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 900)
+@Composable
+private fun LogFoodScreenPreview() {
+    PreviewTheme {
+        LogFoodScreen(
+            food = PreviewData.foods.last(),
+            date = PreviewData.date,
+            onBack = {},
+            onLog = { _, _, _, _ -> },
+        )
     }
 }

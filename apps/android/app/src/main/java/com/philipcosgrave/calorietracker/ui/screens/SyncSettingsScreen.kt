@@ -19,9 +19,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun SyncSettingsScreen(
@@ -102,5 +105,19 @@ fun SyncSettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 700)
+@Composable
+private fun SyncSettingsScreenPreview() {
+    PreviewTheme {
+        SyncSettingsScreen(
+            settings = PreviewData.syncSettings,
+            pendingChangeCount = 4,
+            onBack = {},
+            onSave = {},
+            onSyncNow = {},
+        )
     }
 }

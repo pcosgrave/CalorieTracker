@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.createId
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -25,6 +26,8 @@ import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodItem) -> Unit) {
@@ -87,5 +90,17 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 900)
+@Composable
+private fun NewIngredientScreenPreview() {
+    PreviewTheme {
+        NewIngredientScreen(
+            existing = PreviewData.food,
+            onBack = {},
+            onSave = {},
+        )
     }
 }

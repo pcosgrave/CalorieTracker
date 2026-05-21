@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.componentSummary
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -46,6 +47,8 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.SortMode
 import com.philipcosgrave.calorietracker.model.Totals
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -165,6 +168,13 @@ fun RecipeComponentRow(
     onRemove: () -> Unit,
 ) {
     var amount by remember(component.item.id, component.amount) { mutableStateOf(formatNumber(component.amount)) }
+    val availableUnits = remember(component.unit, component.item.servingUnit) {
+        buildList {
+            if (component.unit.isNotBlank()) add(component.unit)
+            if (component.item.servingUnit.isNotBlank() && component.item.servingUnit !in this) add(component.item.servingUnit)
+            addAll(measurementUnits.filterNot { it in this })
+        }
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -188,7 +198,7 @@ fun RecipeComponentRow(
                     label = { Text("Amount") },
                     modifier = Modifier.weight(1f),
                 )
-                UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f))
+                UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)
             }
         }
     }
@@ -258,7 +268,7 @@ fun DateStepper(date: LocalDate, onDateChange: (LocalDate) -> Unit, darkMode: Bo
 }
 
 @Composable
-fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, units: List<String> = measurementUnits) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         OutlinedTextField(
@@ -269,7 +279,7 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
         )
         Box(modifier = Modifier.fillMaxSize().clickable { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            measurementUnits.forEach { unit ->
+            units.forEach { unit ->
                 DropdownMenuItem(text = { Text(unit) }, onClick = { expanded = false; onChange(unit) })
             }
         }
@@ -294,6 +304,42 @@ fun SortMenu(value: SortMode, onChange: (SortMode) -> Unit, modifier: Modifier =
                     },
                 )
             }
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 300)
+@Composable
+private fun HeaderAndTotalsPreview() {
+    PreviewTheme {
+        Page {
+            Header(onOpenSyncSettings = {})
+            TotalsGrid(PreviewData.totals)
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 500)
+@Composable
+private fun RowsPreview() {
+    PreviewTheme {
+        Page {
+            DiaryEntryRow(entry = PreviewData.diaryEntries.first(), onEdit = {}, onDelete = {})
+            FoodSearchRow(item = PreviewData.foods.last(), showCalories = true, onClick = {}, onEdit = {}, onDelete = {})
+            RecipeComponentRow(component = PreviewData.recipeComponent, onChange = {}, onRemove = {})
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 450)
+@Composable
+private fun PickersPreview() {
+    PreviewTheme {
+        Page {
+            MealPicker(meal = Meal.Lunch, onMealChange = {})
+            DateStepper(date = PreviewData.date, onDateChange = {})
+            UnitPicker(value = "banana", onChange = {}, units = listOf("banana", "serving", "cup"))
+            SortMenu(value = SortMode.Recent, onChange = {})
         }
     }
 }

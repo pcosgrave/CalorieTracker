@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
@@ -29,6 +30,8 @@ import com.philipcosgrave.calorietracker.model.SortMode
 import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.SortMenu
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -118,5 +121,24 @@ fun AddFoodScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 1000)
+@Composable
+private fun AddFoodScreenPreview() {
+    PreviewTheme {
+        AddFoodScreen(
+            date = PreviewData.date,
+            foods = PreviewData.foods,
+            onBack = {},
+            onOpenSyncSettings = {},
+            onQuickCalories = {},
+            onAddIngredient = {},
+            onAddRecipe = {},
+            onSelectFood = {},
+            onDeleteFood = {},
+            onEditFood = {},
+        )
     }
 }

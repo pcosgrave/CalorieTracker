@@ -17,11 +17,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 
 @Composable
@@ -53,5 +56,17 @@ fun QuickCaloriesScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 700)
+@Composable
+private fun QuickCaloriesScreenPreview() {
+    PreviewTheme {
+        QuickCaloriesScreen(
+            date = PreviewData.date,
+            onBack = {},
+            onSave = { _, _, _ -> },
+        )
     }
 }

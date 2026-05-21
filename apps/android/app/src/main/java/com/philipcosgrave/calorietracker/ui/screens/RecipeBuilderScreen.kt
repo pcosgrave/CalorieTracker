@@ -20,8 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
+import com.philipcosgrave.calorietracker.domain.measurementUnits
 import com.philipcosgrave.calorietracker.domain.totalComponents
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.RecipeComponent
@@ -30,6 +32,8 @@ import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun RecipeBuilderScreen(
@@ -48,6 +52,12 @@ fun RecipeBuilderScreen(
             item.brand.contains(search, ignoreCase = true) ||
             item.components.any { it.item.name.contains(search, ignoreCase = true) }
     }
+    val draftServingUnits = remember(draft.servingUnit) {
+        buildList {
+            if (draft.servingUnit.isNotBlank()) add(draft.servingUnit)
+            addAll(measurementUnits.filterNot { it in this })
+        }
+    }
     val totals = totalComponents(draft.components)
 
     Page {
@@ -61,7 +71,7 @@ fun RecipeBuilderScreen(
                 OutlinedTextField(draft.brand, { onDraftChange(draft.copy(brand = it)) }, label = { Text("Brand") }, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(draft.servingQuantity, { onDraftChange(draft.copy(servingQuantity = it)) }, label = { Text("Serving size") }, modifier = Modifier.weight(1f))
-                    UnitPicker(draft.servingUnit, { onDraftChange(draft.copy(servingUnit = it)) }, Modifier.weight(1f))
+                    UnitPicker(draft.servingUnit, { onDraftChange(draft.copy(servingUnit = it)) }, Modifier.weight(1f), draftServingUnits)
                 }
                 Text("Recipe items", style = MaterialTheme.typography.titleLarge)
                 Text("${formatNumber(totals.calories)} cal - ${formatNumber(totals.protein)}g protein - ${formatNumber(totals.carbs)}g carbs - ${formatNumber(totals.fat)}g fat")
@@ -116,5 +126,21 @@ fun RecipeBuilderScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 1100)
+@Composable
+private fun RecipeBuilderScreenPreview() {
+    PreviewTheme {
+        RecipeBuilderScreen(
+            draft = PreviewData.recipeDraft,
+            foods = PreviewData.foods,
+            onDraftChange = {},
+            onBack = {},
+            onAddIngredient = {},
+            onStartNestedRecipe = {},
+            onSave = {},
+        )
     }
 }

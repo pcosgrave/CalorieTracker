@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.totalsForEntries
@@ -30,6 +31,8 @@ import com.philipcosgrave.calorietracker.ui.components.Header
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.TotalsGrid
+import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -98,6 +101,22 @@ fun DiaryScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 1200)
+@Composable
+private fun DiaryScreenPreview() {
+    PreviewTheme {
+        DiaryScreen(
+            selectedDate = PreviewData.date,
+            entries = PreviewData.diaryEntries,
+            onDateChange = {},
+            onAddFood = {},
+            onOpenSyncSettings = {},
+            onDeleteEntry = {},
+            onUpdateEntry = {},
+        )
     }
 }
 
