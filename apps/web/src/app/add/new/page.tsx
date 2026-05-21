@@ -121,7 +121,6 @@ export default function NewFoodPage() {
 
   const canSave =
     form.name.trim().length > 0 &&
-    form.brand.trim().length > 0 &&
     toNumber(form.servingQuantity) > 0 &&
     toNumber(form.calories) > 0;
 
@@ -149,7 +148,7 @@ export default function NewFoodPage() {
               </label>
               <label>
                 Brand
-                <input required value={form.brand} onChange={(event) => updateField("brand", event.target.value)} />
+                <input value={form.brand} onChange={(event) => updateField("brand", event.target.value)} />
               </label>
             </div>
 

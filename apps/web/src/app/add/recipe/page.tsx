@@ -385,7 +385,7 @@ export default function AddRecipePage() {
   }, [options, search]);
 
   const totals = totalComponents(draft.components);
-  const canSave = draft.name.trim().length > 0 && draft.brand.trim().length > 0 && draft.components.length > 0;
+  const canSave = draft.name.trim().length > 0 && draft.components.length > 0;
 
   function updateDraft(field: keyof Omit<RecipeDraft, "components">, value: string): void {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -523,7 +523,7 @@ export default function AddRecipePage() {
               </label>
               <label>
                 Brand
-                <input required value={draft.brand} onChange={(event) => updateDraft("brand", event.target.value)} />
+                <input value={draft.brand} onChange={(event) => updateDraft("brand", event.target.value)} />
               </label>
             </div>
             <div className={styles.twoColumn}>

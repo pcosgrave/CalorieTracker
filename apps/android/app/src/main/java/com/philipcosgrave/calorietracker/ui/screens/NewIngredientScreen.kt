@@ -62,7 +62,7 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Cancel") }
                     Button(
-                        enabled = name.isNotBlank() && brand.isNotBlank() && (calories.toDoubleOrNull() ?: 0.0) > 0,
+                        enabled = name.isNotBlank() && (calories.toDoubleOrNull() ?: 0.0) > 0,
                         onClick = {
                             onSave(
                                 FoodItem(

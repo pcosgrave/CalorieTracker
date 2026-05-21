@@ -89,7 +89,7 @@ fun RecipeBuilderScreen(
                 }
                 Button(
                     onClick = { onSave(draft) },
-                    enabled = draft.name.isNotBlank() && draft.brand.isNotBlank() && draft.components.isNotEmpty(),
+                    enabled = draft.name.isNotBlank() && draft.components.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Save recipe")
