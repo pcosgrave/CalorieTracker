@@ -3,6 +3,12 @@
   padding: 24px;
 }
 
+.compactPage {
+  min-height: 100vh;
+  background: #151918;
+  color: #f5f1e8;
+}
+
 .shell {
   display: grid;
   gap: 20px;
@@ -39,6 +45,21 @@
   gap: 20px;
 }
 
+.addGrid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 20px;
+}
+
+.addGrid > .panel:only-child {
+  grid-column: 1 / -1;
+}
+
+.mealList {
+  display: grid;
+  gap: 14px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -49,6 +70,593 @@
 .panel h2 {
   margin: 0 0 14px;
   font-size: 1.1rem;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panelHeader h2 {
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subtle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.dayControls {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  gap: 10px;
+}
+
+.dateScroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.dateChip,
+.dateChipSelected {
+  display: grid;
+  flex: 0 0 92px;
+  gap: 2px;
+  justify-items: center;
+  background: #eef3ef;
+  color: var(--foreground);
+}
+
+.dateChipSelected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dateChip span,
+.dateChipSelected span {
+  font-size: 0.78rem;
+}
+
+.addRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.addButton {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.iconLink {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.textButton {
+  display: inline-grid;
+  place-items: center;
+  min-height: 40px;
+  border-radius: 6px;
+  background: #e6ece8;
+  color: var(--accent-strong);
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.mealHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mealHeader h2 {
+  margin-bottom: 0;
+}
+
+.dayStepper {
+  display: grid;
+  grid-template-columns: 40px minmax(150px, 1fr) 40px;
+  gap: 8px;
+}
+
+.success {
+  border: 1px solid #9ac8ab;
+  border-radius: 8px;
+  background: #eff8f1;
+  color: #1f6a3b;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+}
+
+.quickForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.scannerPanel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.scannerFrame {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent 48%, rgba(23, 107, 93, 0.16) 49%, rgba(23, 107, 93, 0.16) 51%, transparent 52%),
+    #eef7f4;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.searchWrap {
+  position: relative;
+}
+
+.searchWrap input {
+  padding-right: 44px;
+}
+
+.clearSearch {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 32px;
+  min-height: 32px;
+  border-radius: 50%;
+  background: #e6ece8;
+  color: var(--accent-strong);
+  padding: 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.tab,
+.tabActive {
+  background: #eef3ef;
+  color: var(--foreground);
+}
+
+.tabActive {
+  background: var(--accent);
+  color: #fff;
+}
+
+.resultToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.resultToolbar > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.resultToolbar label {
+  min-width: 170px;
+}
+
+.filterButton {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  background: #e6ece8;
+  color: var(--accent-strong);
+  padding: 0;
+}
+
+.filterButton svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.resultList {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.foodResult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--foreground);
+  padding: 12px;
+  text-align: left;
+}
+
+.foodResultMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 14px;
+  min-height: auto;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0;
+  text-align: left;
+}
+
+.foodResult > span {
+  display: grid;
+  gap: 3px;
+}
+
+.foodIdentity {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+}
+
+.foodText {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.foodText strong,
+.foodText small {
+  text-align: left;
+}
+
+.foodMeta {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.foodTypeIcon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #eef3ef;
+}
+
+.foodTypeIcon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.foodResult > span:last-child {
+  justify-items: end;
+}
+
+.foodResult small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.componentList {
+  max-width: 420px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.optionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contextMenu {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.menuButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  background: #eef3ef;
+  color: var(--accent-strong);
+  font-size: 1.15rem;
+  padding: 0;
+}
+
+.menuPanel {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 132px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 24px rgba(26, 36, 32, 0.12);
+}
+
+.menuPanel a,
+.menuPanel button {
+  justify-content: start;
+  min-height: 38px;
+  border-radius: 0;
+  background: #fff;
+  color: var(--foreground);
+  padding: 0 12px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.menuPanel a:hover,
+.menuPanel button:hover {
+  background: #eef3ef;
+}
+
+.optionActions button,
+.smallTextButton {
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  padding: 0 10px;
+}
+
+.smallTextButton {
+  background: #e6ece8;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.emptyAction {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 18px;
+  text-align: center;
+}
+
+.emptyAction p {
+  margin: 0;
+}
+
+.emptyActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.newFoodForm {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.mobileTopbar {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  min-height: 66px;
+  background: #073f4d;
+  color: #fff;
+  padding: 0 14px;
+}
+
+.mobileTopbar h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.backButton {
+  min-height: 40px;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.foodDetail {
+  max-width: 560px;
+  margin: 0 auto;
+  background: #151918;
+  color: #f5f1e8;
+}
+
+.foodDetail h2 {
+  margin: 0;
+  padding: 16px 14px 10px;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.nutritionLabel {
+  margin: 0;
+  border-bottom: 1px solid #343a38;
+  color: #00a8d8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 8px 14px;
+  text-transform: uppercase;
+}
+
+.servingRow {
+  display: grid;
+  grid-template-columns: auto minmax(74px, 1fr) minmax(92px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #343a38;
+  padding: 14px;
+}
+
+.servingRow input,
+.servingRow select {
+  background: transparent;
+  border-width: 0 0 2px;
+  border-color: #c00042;
+  border-radius: 0;
+  color: #f5f1e8;
+}
+
+.servingRow option {
+  color: var(--foreground);
+}
+
+.choiceBlock {
+  border-bottom: 1px solid #343a38;
+  padding: 16px 14px;
+}
+
+.choiceBlock h3 {
+  margin: 0 0 14px;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.mealChoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 28px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #c9c4ba;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.radioLabel input {
+  min-height: auto;
+  width: auto;
+}
+
+.recipeIngredients {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid #343a38;
+  padding: 14px;
+}
+
+.recipeIngredients span {
+  color: var(--muted);
+}
+
+.recipeIngredients ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #d5d0c7;
+}
+
+.recipeIngredients li span {
+  margin-right: 12px;
+}
+
+.recipeIngredients li small {
+  color: #f5f1e8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dayPickRow {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #343a38;
+  padding: 18px 14px;
+}
+
+.dayPickRow > strong {
+  background: #fff200;
+  color: #31340c;
+  justify-self: start;
+}
+
+.bottomActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 20px 14px;
+}
+
+.bottomActions button:last-child {
+  background: #c00042;
+}
+
+.servingBadge {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .form {
@@ -103,6 +711,7 @@
 }
 
 .item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -126,6 +735,35 @@
   font-size: 0.84rem;
 }
 
+.itemMain {
+  display: grid;
+  flex: 1;
+  justify-items: start;
+  gap: 3px;
+  min-height: auto;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0;
+  text-align: left;
+}
+
+.itemMain strong {
+  font-size: 0.95rem;
+}
+
+.itemMain span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.itemActions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
 .empty {
   border: 1px dashed var(--line);
   border-radius: 8px;
@@ -140,6 +778,8 @@
   }
 
   .grid,
+  .addGrid,
+  .dayControls,
   .twoColumn,
   .fourColumn,
   .daySummary {
@@ -149,5 +789,52 @@
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .panelHeader,
+  .item,
+  .mealHeader,
+  .itemActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dayStepper {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    width: 100%;
+  }
+
+  .quickForm,
+  .resultToolbar,
+  .servingRow,
+  .mealChoiceGrid,
+  .dayPickRow,
+  .bottomActions {
+    grid-template-columns: 1fr;
+  }
+
+  .foodResult,
+  .foodResultMain,
+  .foodResult > span:last-child {
+    align-items: stretch;
+    justify-items: start;
+  }
+
+  .foodResult,
+  .foodResultMain,
+  .optionActions {
+    flex-direction: column;
+  }
+
+  .resultToolbar {
+    align-items: stretch;
+  }
+
+  .resultToolbar label {
+    min-width: 0;
+  }
+
+  .itemActions {
+    white-space: normal;
   }
 }
