@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun SyncSettingsScreen(
@@ -111,7 +110,7 @@ fun SyncSettingsScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 700)
 @Composable
 private fun SyncSettingsScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         SyncSettingsScreen(
             settings = PreviewData.syncSettings,
             pendingChangeCount = 4,

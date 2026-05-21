@@ -27,7 +27,6 @@ import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodItem) -> Unit) {
@@ -96,7 +95,7 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
 @Preview(showBackground = true, widthDp = 412, heightDp = 900)
 @Composable
 private fun NewIngredientScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         NewIngredientScreen(
             existing = PreviewData.food,
             onBack = {},

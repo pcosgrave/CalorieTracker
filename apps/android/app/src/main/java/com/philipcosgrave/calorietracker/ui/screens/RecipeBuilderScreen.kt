@@ -33,7 +33,6 @@ import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 
 @Composable
 fun RecipeBuilderScreen(
@@ -132,7 +131,7 @@ fun RecipeBuilderScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 1100)
 @Composable
 private fun RecipeBuilderScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         RecipeBuilderScreen(
             draft = PreviewData.recipeDraft,
             foods = PreviewData.foods,

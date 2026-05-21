@@ -1,13 +1,19 @@
 package com.philipcosgrave.calorietracker.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -17,20 +23,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
+import com.philipcosgrave.calorietracker.domain.measurementUnits
 import com.philipcosgrave.calorietracker.domain.scale
+import com.philipcosgrave.calorietracker.domain.withAdjustedComponents
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.Meal
+import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 
 @Composable
@@ -38,14 +47,29 @@ fun LogFoodScreen(
     food: FoodItem,
     date: LocalDate,
     onBack: () -> Unit,
-    onLog: (Meal, LocalDate, Double, Boolean) -> Unit,
+    onLog: (Meal, LocalDate, FoodItem, Double, Boolean) -> Unit,
 ) {
     var amount by remember(food.id) { mutableStateOf(formatNumber(food.servingQuantity)) }
     var unit by remember(food.id) { mutableStateOf(food.servingUnit) }
     var meal by remember { mutableStateOf(Meal.Breakfast) }
     var selectedDate by remember { mutableStateOf(date) }
+    var components by remember(food.id) { mutableStateOf(food.components) }
     val amountNumber = amount.toDoubleOrNull()?.coerceAtLeast(0.1) ?: food.servingQuantity
-    val adjusted = food.nutrients.scale(amountNumber / food.servingQuantity.coerceAtLeast(0.1))
+    val adjustedFood = if (components.isEmpty()) food else food.withAdjustedComponents(components)
+    val adjusted = adjustedFood.nutrients.scale(amountNumber / adjustedFood.servingQuantity.coerceAtLeast(0.1))
+
+    fun updateComponent(index: Int, amountText: String? = null, unitValue: String? = null) {
+        components = components.mapIndexed { componentIndex, component ->
+            if (componentIndex != index) {
+                component
+            } else {
+                component.copy(
+                    amount = amountText?.toDoubleOrNull()?.coerceAtLeast(0.0) ?: component.amount,
+                    unit = unitValue ?: component.unit,
+                )
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -67,24 +91,109 @@ fun LogFoodScreen(
             Text("Meal & Snacks Time", style = MaterialTheme.typography.titleLarge, color = Color.White)
             MealPicker(meal, { meal = it }, darkMode = true)
         }
-        if (food.components.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (components.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Recipe ingredients", color = Color.White, fontWeight = FontWeight.Bold)
-                food.components.forEach { component ->
-                    Row {
-                        Text("* ${component.item.name}", color = Color(0xFFD5D0C7), modifier = Modifier.weight(1f))
-                        Text("Serving: ${formatNumber(component.amount)} ${component.unit}", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                components.forEachIndexed { index, component ->
+                    EditableRecipeLogComponent(
+                        component = component,
+                        onAmountChange = { updateComponent(index, amountText = it) },
+                        onUnitChange = { updateComponent(index, unitValue = it) },
+                    )
                 }
             }
         }
         DateStepper(selectedDate, { selectedDate = it }, darkMode = true)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { onLog(meal, selectedDate, amountNumber, true) }, modifier = Modifier.weight(1f)) {
+            Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, true) }, modifier = Modifier.weight(1f)) {
                 Text("Log & add more")
             }
-            Button(onClick = { onLog(meal, selectedDate, amountNumber, false) }, modifier = Modifier.weight(1f)) {
+            Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, false) }, modifier = Modifier.weight(1f)) {
                 Text("Log this")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditableRecipeLogComponent(
+    component: RecipeComponent,
+    onAmountChange: (String) -> Unit,
+    onUnitChange: (String) -> Unit,
+) {
+    var amountText by remember(component.item.id) { mutableStateOf(formatNumber(component.amount)) }
+    val unitOptions = remember(component.unit, component.item.servingUnit) {
+        buildList {
+            if (component.unit.isNotBlank()) add(component.unit)
+            if (component.item.servingUnit.isNotBlank() && component.item.servingUnit !in this) add(component.item.servingUnit)
+            addAll(measurementUnits.filterNot { it in this })
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(component.item.name, color = Color(0xFFD5D0C7), fontWeight = FontWeight.Bold)
+            Text(
+                component.item.brand.ifBlank { component.item.servingUnit },
+                color = Color(0xFFA6A19A),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = {
+                amountText = it
+                onAmountChange(it)
+            },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(84.dp),
+        )
+        CompactUnitPicker(
+            value = component.unit,
+            onChange = onUnitChange,
+            units = unitOptions,
+            modifier = Modifier.width(108.dp),
+        )
+    }
+}
+
+@Composable
+private fun CompactUnitPicker(
+    value: String,
+    onChange: (String) -> Unit,
+    units: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember(value) { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable { expanded = true },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            units.forEach { unit ->
+                DropdownMenuItem(
+                    text = { Text(unit) },
+                    onClick = {
+                        expanded = false
+                        onChange(unit)
+                    },
+                )
             }
         }
     }
@@ -93,12 +202,12 @@ fun LogFoodScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 900)
 @Composable
 private fun LogFoodScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         LogFoodScreen(
             food = PreviewData.foods.last(),
             date = PreviewData.date,
             onBack = {},
-            onLog = { _, _, _, _ -> },
+            onLog = { _, _, _, _, _ -> },
         )
     }
 }

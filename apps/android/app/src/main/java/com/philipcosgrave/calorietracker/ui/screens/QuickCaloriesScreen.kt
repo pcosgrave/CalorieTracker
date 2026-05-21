@@ -24,7 +24,6 @@ import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 
 @Composable
@@ -62,7 +61,7 @@ fun QuickCaloriesScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 700)
 @Composable
 private fun QuickCaloriesScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         QuickCaloriesScreen(
             date = PreviewData.date,
             onBack = {},

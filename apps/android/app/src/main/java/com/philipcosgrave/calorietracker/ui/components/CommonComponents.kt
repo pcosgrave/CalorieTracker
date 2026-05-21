@@ -48,7 +48,6 @@ import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.SortMode
 import com.philipcosgrave.calorietracker.model.Totals
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -311,7 +310,7 @@ fun SortMenu(value: SortMode, onChange: (SortMode) -> Unit, modifier: Modifier =
 @Preview(showBackground = true, widthDp = 412, heightDp = 300)
 @Composable
 private fun HeaderAndTotalsPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         Page {
             Header(onOpenSyncSettings = {})
             TotalsGrid(PreviewData.totals)
@@ -322,7 +321,7 @@ private fun HeaderAndTotalsPreview() {
 @Preview(showBackground = true, widthDp = 412, heightDp = 500)
 @Composable
 private fun RowsPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         Page {
             DiaryEntryRow(entry = PreviewData.diaryEntries.first(), onEdit = {}, onDelete = {})
             FoodSearchRow(item = PreviewData.foods.last(), showCalories = true, onClick = {}, onEdit = {}, onDelete = {})
@@ -334,7 +333,7 @@ private fun RowsPreview() {
 @Preview(showBackground = true, widthDp = 412, heightDp = 450)
 @Composable
 private fun PickersPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         Page {
             MealPicker(meal = Meal.Lunch, onMealChange = {})
             DateStepper(date = PreviewData.date, onDateChange = {})

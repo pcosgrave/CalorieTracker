@@ -408,11 +408,11 @@ fun CalorieTrackerApp() {
                     food = food,
                     date = selectedDate,
                     onBack = { screen = AppScreen.AddFood },
-                    onLog = { meal, date, amount, addMore ->
-                        val multiplier = amount / food.servingQuantity.coerceAtLeast(0.1)
+                    onLog = { meal, date, loggedFood, amount, addMore ->
+                        val multiplier = amount / loggedFood.servingQuantity.coerceAtLeast(0.1)
                         val entry = DiaryEntry(
                             id = createId("entry"),
-                            food = food,
+                            food = loggedFood,
                             date = date,
                             meal = meal,
                             servingMultiplier = multiplier,

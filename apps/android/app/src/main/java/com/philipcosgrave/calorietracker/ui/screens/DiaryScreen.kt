@@ -32,7 +32,6 @@ import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.TotalsGrid
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -107,7 +106,7 @@ fun DiaryScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 1200)
 @Composable
 private fun DiaryScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         DiaryScreen(
             selectedDate = PreviewData.date,
             entries = PreviewData.diaryEntries,

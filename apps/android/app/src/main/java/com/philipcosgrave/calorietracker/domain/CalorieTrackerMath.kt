@@ -96,6 +96,15 @@ fun Totals.rounded(): Totals = Totals(
 fun FoodItem.componentSummary(): String =
     components.joinToString(", ") { "${it.item.name} - ${formatNumber(it.amount)} ${it.unit}" }
 
+fun FoodItem.withAdjustedComponents(updatedComponents: List<RecipeComponent>): FoodItem {
+    if (kind != FoodKind.Recipe) return this
+    val totals = totalComponents(updatedComponents)
+    return copy(
+        nutrients = Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat),
+        components = updatedComponents,
+    )
+}
+
 fun RecipeDraft.toFoodItem(existingId: String? = null): FoodItem {
     val nutrients = totalComponents(components)
     val quantity = servingQuantity.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 1.0

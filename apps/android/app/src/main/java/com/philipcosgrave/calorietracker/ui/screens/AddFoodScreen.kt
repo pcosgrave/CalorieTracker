@@ -31,7 +31,6 @@ import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.SortMenu
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
-import com.philipcosgrave.calorietracker.ui.preview.PreviewTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -127,7 +126,7 @@ fun AddFoodScreen(
 @Preview(showBackground = true, widthDp = 412, heightDp = 1000)
 @Composable
 private fun AddFoodScreenPreview() {
-    PreviewTheme {
+    PreviewData.Theme {
         AddFoodScreen(
             date = PreviewData.date,
             foods = PreviewData.foods,
