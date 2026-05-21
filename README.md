@@ -29,6 +29,33 @@ Temporary project name for a local-first calorie tracking app.
 - Android Studio for Android development
 - AWS CLI for deployed infrastructure work
 
+On Windows, the recommended package-manager setup is Scoop because it installs command-line tools into your user profile and does not require an Administrator shell:
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+scoop install nodejs-lts terraform aws
+```
+
+If this is a fresh PowerShell session, confirm Scoop's shims are on `PATH`:
+
+```powershell
+node --version
+npm --version
+terraform version
+aws --version
+```
+
+If you prefer official installers instead, install:
+
+- Node.js LTS from <https://nodejs.org/>
+- Git for Windows from <https://git-scm.com/download/win>
+- Android Studio from <https://developer.android.com/studio>
+- Terraform from <https://developer.hashicorp.com/terraform/install>
+- AWS CLI v2 from <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>
+
+After installing tools, close and reopen PowerShell so `PATH` changes are loaded.
+
 On macOS, install Node.js and npm with Homebrew:
 
 ```bash
@@ -40,6 +67,24 @@ Confirm Node.js and npm are available:
 ```bash
 node --version
 npm --version
+```
+
+On Windows, run the setup check from PowerShell:
+
+```powershell
+.\scripts\setup-windows.ps1
+```
+
+If PowerShell blocks script execution for this command, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+```
+
+The setup check reports missing or broken tools. It can also install workspace npm dependencies once Node.js and npm are working:
+
+```powershell
+.\scripts\setup-windows.ps1 -InstallDependencies
 ```
 
 ### Install Dependencies
@@ -130,6 +175,25 @@ GRADLE_USER_HOME="$PWD/.gradle-user-home" \
 ./gradlew :app:assembleDebug
 ```
 
+On Windows, open `apps\android` in Android Studio for the easiest path. To build from PowerShell after Android Studio has installed the SDK, run:
+
+```powershell
+cd apps\android
+.\gradlew.bat :app:assembleDebug
+```
+
+If Gradle cannot find the Android SDK, write a local `local.properties` file from the repo root:
+
+```powershell
+.\scripts\setup-windows.ps1 -WriteAndroidLocalProperties
+```
+
+Or pass the SDK location explicitly:
+
+```powershell
+.\scripts\setup-windows.ps1 -WriteAndroidLocalProperties -AndroidSdkPath "$env:LOCALAPPDATA\Android\Sdk"
+```
+
 ### Test The API
 
 Run API typechecks:
@@ -149,3 +213,13 @@ infra/terraform/environments/dev
 ```
 
 It targets `us-east-1` by default and defines the initial Cognito, DynamoDB, and S3 resources. Google federation is not wired yet because it needs real Google OAuth credentials.
+
+## Windows Troubleshooting
+
+If `node --version` fails with `Access is denied`, PowerShell is probably finding a packaged app shim instead of a normal Node.js install. Install Node.js LTS from the official installer, reopen PowerShell, and confirm that `Get-Command node -All` shows `C:\Program Files\nodejs\node.exe` before any WindowsApps or app-package paths.
+
+If `npm` is missing after installing Node.js, repair or reinstall Node.js LTS and choose the option that adds Node.js to `PATH`.
+
+If PowerShell blocks `npm.ps1`, either run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` or use `npm.cmd` for the same commands, for example `npm.cmd run typecheck`.
+
+If `terraform`, `aws`, or Android SDK commands are missing, install the relevant tool and reopen PowerShell. Terraform and AWS CLI are only required when working with deployed infrastructure.

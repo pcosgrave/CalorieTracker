@@ -330,18 +330,29 @@ export default function AddRecipePage() {
     setReturnToParentDraft(shouldReturnToParentDraft);
     setDraft(() => {
       const storedDraft = readDraft();
+      const hasExistingRecipe = existingRecipe !== undefined && existingRecipe.productId === recipeId;
       return {
         ...storedDraft,
-        name: existingRecipe?.name || params.get("name") || storedDraft.name,
-        brand: existingRecipe?.brand || params.get("brand") || storedDraft.brand,
-        servingQuantity: existingRecipe ? String(existingRecipe.serving.quantity) : params.get("servingQuantity") || storedDraft.servingQuantity,
+        name: hasExistingRecipe ? existingRecipe.name : (params.get("name") || storedDraft.name),
+        brand: hasExistingRecipe ? existingRecipe.brand || "" : (params.get("brand") || storedDraft.brand),
+        servingQuantity: existingRecipe ? String(existingRecipe.serving.quantity) : (params.get("servingQuantity") || storedDraft.servingQuantity),
         servingUnit: existingRecipe?.serving.unit || params.get("servingUnit") || storedDraft.servingUnit,
         components: existingRecipe?.recipeComponents || storedDraft.components,
       };
     });
-    const recipeOptions = readRecipeProducts()
-      .filter((product) => product.productId !== recipeId)
-      .map((product) => productToOption(product, "recipe"));
+
+    // Get all recipe products except the one being edited
+    const editableRecipeProducts = recipeId
+      ? readRecipeProducts().filter((product) => product.productId !== recipeId)
+      : readRecipeProducts();
+
+    const recipeOptions = editableRecipeProducts.map((product) => {
+      // For the recipe being edited, use the full product data with components
+      if (recipeId && product.productId === recipeId && existingRecipe) {
+        return productToOption(existingRecipe, "recipe");
+      }
+      return productToOption(product, "recipe");
+    });
 
     setOptions([
       ...readFoodProducts().map((product) => productToOption(product, "ingredient")),
@@ -377,6 +388,8 @@ export default function AddRecipePage() {
   }
 
   function addComponent(item: RecipeOption): void {
+    // When adding a recipe that's already in the draft being edited, add it as a component
+    // This allows using an existing recipe within a parent recipe
     setDraft((current) => ({
       ...current,
       components: [...current.components, { item, amount: String(item.servingQuantity), unit: item.servingUnit }],
