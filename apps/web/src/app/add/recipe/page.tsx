@@ -74,6 +74,10 @@ const measurementUnits = [
   "tsp",
 ];
 
+function unitOptions(...units: string[]): string[] {
+  return [...new Set([...units.filter((unit) => unit.trim().length > 0), ...measurementUnits])];
+}
+
 const conversionGroups: Record<string, Record<string, number>> = {
   volume: {
     tsp: 1,
@@ -537,7 +541,7 @@ export default function AddRecipePage() {
               <label>
                 Unit
                 <select value={draft.servingUnit} onChange={(event) => updateDraft("servingUnit", event.target.value)}>
-                  {measurementUnits.map((unit) => (
+                  {unitOptions(draft.servingUnit).map((unit) => (
                     <option key={unit} value={unit}>
                       {unit}
                     </option>
@@ -587,7 +591,7 @@ export default function AddRecipePage() {
                         value={component.unit}
                         onChange={(event) => updateComponent(index, { unit: event.target.value })}
                       >
-                        {measurementUnits.map((unit) => (
+                        {unitOptions(component.unit, component.item.servingUnit).map((unit) => (
                           <option key={unit} value={unit}>
                             {unit}
                           </option>
