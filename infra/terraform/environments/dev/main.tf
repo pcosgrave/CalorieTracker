@@ -10,7 +10,7 @@ terraform {
 }
 
 locals {
-  api_lambda_package_path   = abspath("${path.root}/../../../apps/api/dist/lambda/api.zip")
+  api_lambda_package_path   = abspath("${path.root}/../../../../apps/api/dist/lambda/api.zip")
   api_lambda_package_exists = fileexists(local.api_lambda_package_path)
 }
 

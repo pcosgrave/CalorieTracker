@@ -11,6 +11,7 @@ import type {
 import { isBarcodeAliasChange, isDiaryEntryChange, isFoodProductChange } from "@calorie-tracker/shared";
 import { markRecordForSync } from "@calorie-tracker/shared";
 import { barcodeAliasStorageKey, createId, foodStorageKey, recipeStorageKey, storageKey } from "@/app/lib/diary";
+import { getCognitoConfig } from "@/lib/auth/config";
 import {
   LocalStorageSyncOutboxRepository,
   LocalStorageSyncStateRepository,
@@ -41,11 +42,11 @@ function deviceId(): string {
 }
 
 async function pushRequest(baseUrl: string, body: object): Promise<SyncPushResponse> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/sync/push`, {
+  const response = await fetch("/api/sync/push", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-debug-user-id": "local",
+      "x-sync-api-base-url": baseUrl,
     },
     body: JSON.stringify(body),
   });
@@ -58,11 +59,11 @@ async function pushRequest(baseUrl: string, body: object): Promise<SyncPushRespo
 }
 
 async function pullRequest(baseUrl: string, body: object): Promise<SyncPullResponse> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/sync/pull`, {
+  const response = await fetch("/api/sync/pull", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-debug-user-id": "local",
+      "x-sync-api-base-url": baseUrl,
     },
     body: JSON.stringify(body),
   });
@@ -157,7 +158,11 @@ function applyIncomingChange(change: SyncChange): void {
 }
 
 export async function getSyncSettings(): Promise<SyncSettings> {
-  return new LocalStorageSyncStateRepository().getSettings();
+  const settings = await new LocalStorageSyncStateRepository().getSettings();
+  return {
+    ...settings,
+    apiBaseUrl: settings.apiBaseUrl || getCognitoConfig().apiBaseUrl,
+  };
 }
 
 export async function saveSyncSettings(settings: SyncSettings): Promise<void> {
@@ -180,7 +185,6 @@ export async function syncNow(): Promise<SyncResult> {
   const cursor = await stateRepository.getCursor();
   const pendingChanges = await outboxRepository.listPendingChanges();
   const pushResponse = await pushRequest(settings.apiBaseUrl, {
-    userId: "local",
     deviceId: deviceId(),
     cursor,
     changes: pendingChanges,
@@ -190,7 +194,6 @@ export async function syncNow(): Promise<SyncResult> {
 
   const nextCursor: SyncCursor = pushResponse.cursor;
   const pullResponse = await pullRequest(settings.apiBaseUrl, {
-    userId: "local",
     deviceId: deviceId(),
     cursor: nextCursor,
   });

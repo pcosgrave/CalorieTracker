@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { FoodProduct, Nutrients } from "@calorie-tracker/shared";
 import {
   createId,
-  ownerUserId,
+  currentOwnerUserId,
   readFoodProducts,
   readRecipeProducts,
   recipeDraftStorageKey,
@@ -422,7 +422,7 @@ export default function AddRecipePage() {
     const servingQuantity = Math.max(toNumber(draft.servingQuantity), 0.1);
     const product: StoredRecipeProduct = {
       productId: editId || createId("recipe"),
-      ownerUserId,
+      ownerUserId: currentOwnerUserId(),
       visibility: "private",
       name: draft.name.trim(),
       brand: draft.brand.trim(),

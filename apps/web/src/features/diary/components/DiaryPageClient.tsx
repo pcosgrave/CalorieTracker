@@ -2,17 +2,21 @@
 
 import styles from "@/app/page.module.css";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { DateNavigator } from "./DateNavigator";
 import { DaySummaryPanel } from "./DaySummaryPanel";
 import { EditEntryPanel } from "./EditEntryPanel";
 import { MealSections } from "./MealSections";
 import { useDiaryPage } from "../hooks/useDiaryPage";
+import { currentClientAuthUser } from "@/lib/auth/client";
 import { maybeAutoSync } from "@/lib/sync/service";
 
 export function DiaryPageClient() {
+  const [authUser, setAuthUser] = useState(() => currentClientAuthUser());
+
   useEffect(() => {
     void maybeAutoSync();
+    setAuthUser(currentClientAuthUser());
   }, []);
 
   const {
@@ -45,7 +49,15 @@ export function DiaryPageClient() {
             <Link className={styles.textButton} href="/settings">
               Sync
             </Link>
-            <button type="button">Sign in with Google</button>
+            {authUser ? (
+              <Link className={styles.textButton} href="/api/auth/logout">
+                {authUser.email || "Sign out"}
+              </Link>
+            ) : (
+              <Link className={styles.textButton} href="/api/auth/login?returnTo=/">
+                Sign in
+              </Link>
+            )}
           </div>
         </header>
 

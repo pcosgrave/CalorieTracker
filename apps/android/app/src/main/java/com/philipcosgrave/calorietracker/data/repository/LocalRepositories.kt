@@ -2,6 +2,7 @@ package com.philipcosgrave.calorietracker.data.repository
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.Room
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
 import com.philipcosgrave.calorietracker.data.readFoodItems
@@ -26,6 +27,7 @@ import com.philipcosgrave.calorietracker.data.local.syncMetadataFromEntity
 import com.philipcosgrave.calorietracker.data.local.syncPreferencesDataStore
 import com.philipcosgrave.calorietracker.data.local.toJsonString
 import com.philipcosgrave.calorietracker.domain.createId
+import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItem
@@ -43,7 +45,9 @@ private const val DATABASE_NAME = "calorie-tracker.db"
 
 object LocalRepositoryFactory {
     fun database(context: Context): CalorieTrackerDatabase =
-        Room.databaseBuilder(context, CalorieTrackerDatabase::class.java, DATABASE_NAME).build()
+        Room.databaseBuilder(context, CalorieTrackerDatabase::class.java, DATABASE_NAME)
+            .fallbackToDestructiveMigration()
+            .build()
 }
 
 class RoomFoodRepository(private val dao: FoodRecordDao) : FoodRepository {
@@ -206,45 +210,59 @@ class RoomSyncOutboxRepository(private val dao: SyncOutboxDao) : SyncOutboxRepos
 }
 
 class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepository {
+    private suspend fun currentUserScope(): String =
+        context.syncPreferencesDataStore.data.first()[SyncPreferencesKeys.CurrentUserId] ?: "guest"
+
+    private fun syncEnabledKey(userId: String) = androidx.datastore.preferences.core.booleanPreferencesKey("sync_enabled.$userId")
+    private fun backupModeKey(userId: String) = stringPreferencesKey("backup_mode.$userId")
+    private fun apiBaseUrlKey(userId: String) = stringPreferencesKey("api_base_url.$userId")
+    private fun lastSuccessfulSyncAtKey(userId: String) = stringPreferencesKey("last_successful_sync_at.$userId")
+    private fun lastPulledAtKey(userId: String) = stringPreferencesKey("last_pulled_at.$userId")
+    private fun lastAcknowledgedChangeIdKey(userId: String) = stringPreferencesKey("last_acknowledged_change_id.$userId")
+
     override suspend fun getCursor(): SyncCursor? {
         val prefs = context.syncPreferencesDataStore.data.first()
+        val userId = currentUserScope()
         val deviceId = prefs[SyncPreferencesKeys.DeviceId] ?: return null
         return SyncCursor(
             deviceId = deviceId,
-            lastPulledAt = prefs[SyncPreferencesKeys.LastPulledAt],
-            lastAcknowledgedChangeId = prefs[SyncPreferencesKeys.LastAcknowledgedChangeId],
+            lastPulledAt = prefs[lastPulledAtKey(userId)],
+            lastAcknowledgedChangeId = prefs[lastAcknowledgedChangeIdKey(userId)],
         )
     }
 
     override suspend fun saveCursor(cursor: SyncCursor) {
+        val userId = currentUserScope()
         context.syncPreferencesDataStore.edit { prefs ->
             prefs[SyncPreferencesKeys.DeviceId] = cursor.deviceId
-            cursor.lastPulledAt?.let { prefs[SyncPreferencesKeys.LastPulledAt] = it }
-            cursor.lastAcknowledgedChangeId?.let { prefs[SyncPreferencesKeys.LastAcknowledgedChangeId] = it }
+            cursor.lastPulledAt?.let { prefs[lastPulledAtKey(userId)] = it }
+            cursor.lastAcknowledgedChangeId?.let { prefs[lastAcknowledgedChangeIdKey(userId)] = it }
         }
     }
 
     override suspend fun getSettings(): SyncSettings {
         val prefs = context.syncPreferencesDataStore.data.first()
+        val userId = currentUserScope()
         return SyncSettings(
-            syncEnabled = prefs[SyncPreferencesKeys.SyncEnabled] ?: false,
-            backupMode = prefs[SyncPreferencesKeys.BackupMode]?.let { SyncSettings.BackupMode.valueOf(it) }
+            syncEnabled = prefs[syncEnabledKey(userId)] ?: false,
+            backupMode = prefs[backupModeKey(userId)]?.let { SyncSettings.BackupMode.valueOf(it) }
                 ?: SyncSettings.BackupMode.Disabled,
-            apiBaseUrl = prefs[SyncPreferencesKeys.ApiBaseUrl],
-            lastSuccessfulSyncAt = prefs[SyncPreferencesKeys.LastSuccessfulSyncAt],
+            apiBaseUrl = prefs[apiBaseUrlKey(userId)] ?: com.philipcosgrave.calorietracker.BuildConfig.SYNC_API_BASE_URL,
+            lastSuccessfulSyncAt = prefs[lastSuccessfulSyncAtKey(userId)],
         )
     }
 
     override suspend fun saveSettings(settings: SyncSettings) {
+        val userId = currentUserScope()
         context.syncPreferencesDataStore.edit { prefs ->
-            prefs[SyncPreferencesKeys.SyncEnabled] = settings.syncEnabled
-            prefs[SyncPreferencesKeys.BackupMode] = settings.backupMode.name
+            prefs[syncEnabledKey(userId)] = settings.syncEnabled
+            prefs[backupModeKey(userId)] = settings.backupMode.name
             if (settings.apiBaseUrl.isNullOrBlank()) {
-                prefs.remove(SyncPreferencesKeys.ApiBaseUrl)
+                prefs.remove(apiBaseUrlKey(userId))
             } else {
-                prefs[SyncPreferencesKeys.ApiBaseUrl] = settings.apiBaseUrl
+                prefs[apiBaseUrlKey(userId)] = settings.apiBaseUrl
             }
-            settings.lastSuccessfulSyncAt?.let { prefs[SyncPreferencesKeys.LastSuccessfulSyncAt] = it }
+            settings.lastSuccessfulSyncAt?.let { prefs[lastSuccessfulSyncAtKey(userId)] = it }
         }
     }
 }
@@ -256,7 +274,12 @@ class AndroidLocalStore(
     val diaryRepository: DiaryRepository,
     val syncOutboxRepository: SyncOutboxRepository,
     val syncStateRepository: SyncStateRepository,
+    val authRepository: AuthRepository,
 ) {
+    suspend fun currentOwnerUserId(): String = authRepository.currentOwnerUserId()
+
+    suspend fun currentAuthSession(): AuthSession? = authRepository.currentSession()
+
     suspend fun deviceId(): String {
         val existing = syncStateRepository.getCursor()?.deviceId
         if (existing != null) return existing

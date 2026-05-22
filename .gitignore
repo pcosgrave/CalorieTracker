@@ -10,6 +10,8 @@ build/
 .DS_Store
 .env
 .env.local
+*.tfvars
+*.tfvars.json
 local.properties
 .gradle/
 .gradle-user-home/

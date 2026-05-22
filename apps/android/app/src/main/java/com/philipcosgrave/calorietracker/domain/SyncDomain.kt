@@ -75,17 +75,17 @@ fun createFoodRecord(food: FoodItem, deviceId: String, existing: FoodItemRecord?
     )
 }
 
-fun createBarcodeAliasRecord(food: FoodItem, deviceId: String): BarcodeAliasRecord? {
+fun createBarcodeAliasRecord(food: FoodItem, deviceId: String, ownerUserId: String): BarcodeAliasRecord? {
     if (food.barcode.isBlank()) return null
     val updatedAt = nowIsoString()
     return BarcodeAliasRecord(
         barcode = food.barcode,
         productId = food.id,
-        ownerUserId = "local",
+        ownerUserId = ownerUserId,
         visibility = "private",
         createdAt = updatedAt,
         sync = createSyncMetadata(
-            recordId = "local:${food.barcode}",
+            recordId = "${ownerUserId}:${food.barcode}",
             deviceId = deviceId,
             updatedAt = updatedAt,
             syncStatus = SyncStatus.PendingPush,

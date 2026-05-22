@@ -13,6 +13,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.philipcosgrave.calorietracker.BuildConfig
+import com.philipcosgrave.calorietracker.data.auth.CognitoAuthRepository
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
 import com.philipcosgrave.calorietracker.data.readFoodItems
 import com.philipcosgrave.calorietracker.data.readStringList
@@ -41,6 +43,7 @@ import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
+import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
@@ -56,9 +59,14 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
-fun CalorieTrackerApp() {
+fun CalorieTrackerApp(
+    authCallbackUri: String? = null,
+    onAuthCallbackConsumed: () -> Unit = {},
+    openExternalUri: (String) -> Unit = {},
+) {
     val context = LocalContext.current
     val database = remember { LocalRepositoryFactory.database(context) }
+    val authRepository = remember { CognitoAuthRepository(context) }
     val localStore = remember {
         AndroidLocalStore(
             context = context,
@@ -67,6 +75,7 @@ fun CalorieTrackerApp() {
             diaryRepository = RoomDiaryRepository(database.diaryRecordDao()),
             syncOutboxRepository = RoomSyncOutboxRepository(database.syncOutboxDao()),
             syncStateRepository = DataStoreSyncStateRepository(context),
+            authRepository = authRepository,
         )
     }
     val scope = rememberCoroutineScope()
@@ -88,10 +97,12 @@ fun CalorieTrackerApp() {
             SyncSettings(
                 syncEnabled = false,
                 backupMode = SyncSettings.BackupMode.Disabled,
+                apiBaseUrl = BuildConfig.SYNC_API_BASE_URL,
             ),
         )
     }
     var pendingChangeCount by remember { mutableStateOf(0) }
+    var authSession by remember { mutableStateOf<AuthSession?>(null) }
 
     suspend fun refreshState() {
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
@@ -101,6 +112,7 @@ fun CalorieTrackerApp() {
         hiddenSeedIds = localStore.hiddenSeedIds()
         syncSettings = localStore.syncStateRepository.getSettings()
         pendingChangeCount = localStore.syncOutboxRepository.listPendingChanges().size
+        authSession = localStore.currentAuthSession()
     }
 
     suspend fun ensureSeedRecipes(deviceId: String) {
@@ -125,7 +137,7 @@ fun CalorieTrackerApp() {
                 baseVersion = existing?.sync?.version,
             ),
         )
-        createBarcodeAliasRecord(item, deviceId)?.let { alias ->
+        createBarcodeAliasRecord(item, deviceId, localStore.currentOwnerUserId())?.let { alias ->
             localStore.barcodeAliasRepository.save(alias)
             localStore.syncOutboxRepository.enqueue(
                 createChangeEnvelope(
@@ -238,6 +250,17 @@ fun CalorieTrackerApp() {
         }
     }
 
+    LaunchedEffect(authCallbackUri) {
+        val callback = authCallbackUri ?: return@LaunchedEffect
+        if (callback.startsWith(BuildConfig.COGNITO_ANDROID_REDIRECT_URI)) {
+            runCatching {
+                authRepository.completeSignIn(android.net.Uri.parse(callback))
+            }
+        }
+        refreshState()
+        onAuthCallbackConsumed()
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -348,6 +371,7 @@ fun CalorieTrackerApp() {
             AppScreen.SyncSettings -> SyncSettingsScreen(
                 settings = syncSettings,
                 pendingChangeCount = pendingChangeCount,
+                authSession = authSession,
                 onBack = { screen = previousScreen },
                 onSave = { settings ->
                     syncSettings = settings
@@ -357,6 +381,19 @@ fun CalorieTrackerApp() {
                     scope.launch {
                         syncService.syncNow()
                         refreshState()
+                    }
+                },
+                onSignIn = {
+                    scope.launch {
+                        val uri = authRepository.beginSignIn()
+                        openExternalUri(uri.toString())
+                    }
+                },
+                onSignOut = {
+                    scope.launch {
+                        val uri = authRepository.signOut()
+                        refreshState()
+                        openExternalUri(uri.toString())
                     }
                 },
             )

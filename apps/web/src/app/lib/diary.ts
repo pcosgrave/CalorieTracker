@@ -8,6 +8,7 @@ import type {
   Nutrients,
 } from "@calorie-tracker/shared";
 import { createSyncMetadata, isDeletedRecord, markRecordForSync } from "@calorie-tracker/shared";
+import { currentUserScope } from "@/lib/auth/client";
 import {
   createBarcodeAliasFromProduct,
   createPendingDeleteChange,
@@ -29,7 +30,10 @@ export const foodStorageKey = "calorie-tracker:foods:v1";
 export const recipeStorageKey = "calorie-tracker:recipes:v1";
 export const barcodeAliasStorageKey = "calorie-tracker:barcode-aliases:v1";
 export const recipeDraftStorageKey = "calorie-tracker:recipe-draft:v1";
-export const ownerUserId = "local";
+
+export function currentOwnerUserId(): string {
+  return currentUserScope();
+}
 
 export const mealOrder: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -319,7 +323,7 @@ export function writeDiaryEntry(product: FoodProduct, date: string, meal: MealTy
   const now = new Date().toISOString();
   const entry: DiaryEntry = {
     entryId: createId("entry"),
-    ownerUserId,
+    ownerUserId: currentOwnerUserId(),
     productId: product.productId,
     loggedAt: `${date}T12:00:00.000Z`,
     meal,

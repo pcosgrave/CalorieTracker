@@ -56,7 +56,7 @@ const foodProductRecordSchema = z.object({
     nutrients: nutrientsSchema,
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
-  }),
+  }).passthrough(),
   sync: syncMetadataSchema,
 });
 
@@ -82,7 +82,7 @@ const diaryEntryRecordSchema = z.object({
     productSnapshot: foodProductRecordSchema.shape.product,
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
-  }),
+  }).passthrough(),
   sync: syncMetadataSchema,
 });
 
@@ -112,7 +112,6 @@ export const syncChangeSchema = z.discriminatedUnion("entityType", [
 ]);
 
 export const syncPushSchema = z.object({
-  userId: z.string().min(1),
   deviceId: z.string().min(1),
   cursor: z
     .object({
@@ -125,7 +124,6 @@ export const syncPushSchema = z.object({
 });
 
 export const syncPullSchema = z.object({
-  userId: z.string().min(1),
   deviceId: z.string().min(1),
   cursor: z
     .object({

@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
@@ -29,9 +30,12 @@ import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 fun SyncSettingsScreen(
     settings: SyncSettings,
     pendingChangeCount: Int,
+    authSession: AuthSession?,
     onBack: () -> Unit,
     onSave: (SyncSettings) -> Unit,
     onSyncNow: () -> Unit,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
 ) {
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
     var apiBaseUrl by remember(settings) { mutableStateOf(settings.apiBaseUrl.orEmpty()) }
@@ -61,6 +65,14 @@ fun SyncSettingsScreen(
                     placeholder = { Text("https://api.example.com") },
                 )
 
+                Text(
+                    if (authSession != null) {
+                        "Signed in as ${authSession.email ?: authSession.name ?: authSession.userSub}"
+                    } else {
+                        "Not signed in. Sign in to sync against your Cognito account."
+                    },
+                )
+
                 Text("Backup mode", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SyncSettings.BackupMode.entries.forEach { mode ->
@@ -81,6 +93,12 @@ fun SyncSettingsScreen(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextButton(
+                        onClick = if (authSession != null) onSignOut else onSignIn,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(if (authSession != null) "Sign out" else "Sign in")
+                    }
+                    TextButton(
                         onClick = {
                             onSave(
                                 settings.copy(
@@ -97,7 +115,7 @@ fun SyncSettingsScreen(
                     Button(
                         onClick = onSyncNow,
                         modifier = Modifier.weight(1f),
-                        enabled = syncEnabled && apiBaseUrl.isNotBlank(),
+                        enabled = authSession != null && syncEnabled && apiBaseUrl.isNotBlank(),
                     ) {
                         Text("Sync now")
                     }
@@ -114,9 +132,12 @@ private fun SyncSettingsScreenPreview() {
         SyncSettingsScreen(
             settings = PreviewData.syncSettings,
             pendingChangeCount = 4,
+            authSession = null,
             onBack = {},
             onSave = {},
             onSyncNow = {},
+            onSignIn = {},
+            onSignOut = {},
         )
     }
 }

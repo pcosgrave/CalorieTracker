@@ -2,31 +2,38 @@ package com.philipcosgrave.calorietracker.data.sync
 
 import com.philipcosgrave.calorietracker.data.local.barcodeAliasRecordPayloadFromJson
 import com.philipcosgrave.calorietracker.data.local.barcodeAliasRecordPayloadToJson
-import com.philipcosgrave.calorietracker.data.local.diaryEntryFromJsonString
-import com.philipcosgrave.calorietracker.data.local.toJsonString
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
 import com.philipcosgrave.calorietracker.domain.nowIsoString
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
+import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
+import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodItemRecord
+import com.philipcosgrave.calorietracker.model.FoodKind
+import com.philipcosgrave.calorietracker.model.Meal
+import com.philipcosgrave.calorietracker.model.Nutrients
+import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.SyncChangeEnvelope
 import com.philipcosgrave.calorietracker.model.SyncCursor
 import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncPullResponse
 import com.philipcosgrave.calorietracker.model.SyncPushResponse
-import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.model.SyncStatus
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDate
 
 class ApiSyncService(private val localStore: AndroidLocalStore) {
     suspend fun syncNow(): SyncSummary {
         val settings = localStore.syncStateRepository.getSettings()
         require(settings.syncEnabled && !settings.apiBaseUrl.isNullOrBlank()) {
             "Sync is disabled or API base URL is missing"
+        }
+        require(localStore.currentAuthSession() != null) {
+            "You must sign in before syncing."
         }
 
         val cursor = localStore.syncStateRepository.getCursor() ?: SyncCursor(deviceId = localStore.deviceId())
@@ -62,11 +69,11 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
     }
 
     private suspend fun postPush(baseUrl: String, cursor: SyncCursor, changes: List<SyncChangeEnvelope<*>>): SyncPushResponse {
+        val ownerUserId = localStore.currentOwnerUserId()
         val requestBody = JSONObject()
-            .put("userId", "local")
             .put("deviceId", cursor.deviceId)
             .put("cursor", cursorToJson(cursor))
-            .put("changes", JSONArray().apply { changes.forEach { put(syncChangeToJson(it)) } })
+            .put("changes", JSONArray().apply { changes.forEach { put(syncChangeToJson(it, ownerUserId)) } })
 
         val response = postJson("${baseUrl.trimEnd('/')}/sync/push", requestBody)
         val cursorJson = response.getJSONObject("cursor")
@@ -84,7 +91,6 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
 
     private suspend fun postPull(baseUrl: String, cursor: SyncCursor): SyncPullResponse {
         val requestBody = JSONObject()
-            .put("userId", "local")
             .put("deviceId", cursor.deviceId)
             .put("cursor", cursorToJson(cursor))
 
@@ -109,7 +115,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
             .put("lastPulledAt", cursor.lastPulledAt)
             .put("lastAcknowledgedChangeId", cursor.lastAcknowledgedChangeId)
 
-    private fun syncChangeToJson(change: SyncChangeEnvelope<*>): JSONObject =
+    private fun syncChangeToJson(change: SyncChangeEnvelope<*>, ownerUserId: String): JSONObject =
         JSONObject()
             .put("changeId", change.changeId)
             .put("entityType", when (change.entityType) {
@@ -122,18 +128,18 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
             .put("changedAt", change.changedAt)
             .put("deviceId", change.deviceId)
             .put("baseVersion", change.baseVersion)
-            .put("payload", changePayloadToJson(change))
+            .put("payload", changePayloadToJson(change, ownerUserId))
 
-    private fun changePayloadToJson(change: SyncChangeEnvelope<*>): Any? =
+    private fun changePayloadToJson(change: SyncChangeEnvelope<*>, ownerUserId: String): Any? =
         when (val payload = change.payload) {
             is FoodItemRecord -> JSONObject()
-                .put("product", JSONObject(payload.food.toJsonString()))
+                .put("product", foodItemToWireJson(payload.food, payload.sync.updatedAt, ownerUserId))
                 .put("sync", syncMetadataToJson(payload.sync))
             is BarcodeAliasRecord -> JSONObject()
                 .put("alias", JSONObject(barcodeAliasRecordPayloadToJson(payload)))
                 .put("sync", syncMetadataToJson(payload.sync))
             is DiaryEntryRecord -> JSONObject()
-                .put("entry", JSONObject(payload.entry.toJsonString()))
+                .put("entry", diaryEntryToWireJson(payload, ownerUserId))
                 .put("sync", syncMetadataToJson(payload.sync))
             else -> null
         }
@@ -147,19 +153,27 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val payloadJson = json.optJSONObject("payload")
         val payload = when (entityType) {
             SyncEntityType.FoodProduct -> payloadJson?.let {
-                FoodItemRecord(
-                    food = com.philipcosgrave.calorietracker.data.local.foodItemFromJsonString(it.getJSONObject("product").toString()),
-                    sync = syncMetadataFromJson(it.getJSONObject("sync")),
-                )
+                val sync = syncMetadataFromJson(it.getJSONObject("sync"))
+                val productJson = it.optJSONObject("product") ?: it.optJSONObject("food")
+                productJson?.let { product ->
+                    FoodItemRecord(
+                        food = foodItemFromWireJson(product),
+                        sync = sync,
+                    )
+                }
             }
             SyncEntityType.BarcodeAlias -> payloadJson?.let {
                 barcodeAliasRecordPayloadFromJson(it.getJSONObject("alias").toString(), syncMetadataFromJson(it.getJSONObject("sync")))
             }
             SyncEntityType.DiaryEntry -> payloadJson?.let {
-                DiaryEntryRecord(
-                    entry = diaryEntryFromJsonString(it.getJSONObject("entry").toString()),
-                    sync = syncMetadataFromJson(it.getJSONObject("sync")),
-                )
+                val sync = syncMetadataFromJson(it.getJSONObject("sync"))
+                val entryJson = it.optJSONObject("entry")
+                entryJson?.let { entry ->
+                    DiaryEntryRecord(
+                        entry = diaryEntryFromWireJson(entry),
+                        sync = sync,
+                    )
+                }
             }
         }
         return SyncChangeEnvelope(
@@ -212,19 +226,123 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
             else -> SyncStatus.LocalOnly
         }
 
-    private fun postJson(url: String, body: JSONObject): JSONObject {
+    private suspend fun postJson(url: String, body: JSONObject): JSONObject {
+        val session = localStore.authRepository.refreshSessionIfNeeded()
+            ?: error("You must sign in before syncing.")
+
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("x-debug-user-id", "local")
+        connection.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
         connection.doOutput = true
         connection.outputStream.use { output ->
             output.write(body.toString().toByteArray())
         }
-        val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+        val inputStream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+        val responseText = inputStream.bufferedReader().use { it.readText() }
+        if (connection.responseCode !in 200..299) {
+            error("Sync request failed with status ${connection.responseCode}: $responseText")
+        }
         return JSONObject(responseText)
     }
 }
+
+private fun foodItemToWireJson(food: FoodItem, updatedAt: String, ownerUserId: String): JSONObject =
+    JSONObject()
+        .put("productId", food.id)
+        .put("ownerUserId", ownerUserId)
+        .put("visibility", "private")
+        .put("barcode", food.barcode.ifBlank { null })
+        .put("name", food.name)
+        .put("brand", food.brand.ifBlank { null })
+        .put(
+            "serving",
+            JSONObject()
+                .put("label", food.servingUnit)
+                .put("quantity", food.servingQuantity)
+                .put("unit", food.servingUnit),
+        )
+        .put(
+            "nutrients",
+            JSONObject()
+                .put("calories", food.nutrients.calories)
+                .put("proteinGrams", food.nutrients.proteinGrams)
+                .put("carbohydrateGrams", food.nutrients.carbohydrateGrams)
+                .put("fatGrams", food.nutrients.fatGrams),
+        )
+        .put("recipeComponents", JSONArray().apply {
+            food.components.forEach { component ->
+                put(
+                    JSONObject()
+                        .put("item", foodItemToWireJson(component.item, updatedAt, ownerUserId))
+                        .put("amount", component.amount)
+                        .put("unit", component.unit),
+                )
+            }
+        })
+        .put("createdAt", updatedAt)
+        .put("updatedAt", updatedAt)
+
+private fun diaryEntryToWireJson(record: DiaryEntryRecord, ownerUserId: String): JSONObject =
+    JSONObject()
+        .put("entryId", record.entry.id)
+        .put("ownerUserId", ownerUserId)
+        .put("productId", record.entry.food.id)
+        .put("loggedAt", "${record.entry.date}T12:00:00.000Z")
+        .put("meal", when (record.entry.meal) {
+            Meal.Breakfast -> "breakfast"
+            Meal.Lunch -> "lunch"
+            Meal.Dinner -> "dinner"
+            Meal.Snack -> "snack"
+        })
+        .put("servingMultiplier", record.entry.servingMultiplier)
+        .put("productSnapshot", foodItemToWireJson(record.entry.food, record.sync.updatedAt, ownerUserId))
+        .put("createdAt", record.sync.updatedAt)
+        .put("updatedAt", record.sync.updatedAt)
+
+private fun foodItemFromWireJson(json: JSONObject): FoodItem {
+    val componentsJson = json.optJSONArray("recipeComponents") ?: JSONArray()
+    return FoodItem(
+        id = json.optString("productId", json.optString("id")),
+        kind = if (componentsJson.length() > 0) FoodKind.Recipe else FoodKind.Ingredient,
+        name = json.getString("name"),
+        brand = json.optString("brand"),
+        barcode = json.optString("barcode"),
+        servingQuantity = json.optJSONObject("serving")?.optDouble("quantity") ?: json.optDouble("servingQuantity", 1.0),
+        servingUnit = json.optJSONObject("serving")?.optString("unit") ?: json.optString("servingUnit", "serving"),
+        nutrients = nutrientsFromWireJson(json.getJSONObject("nutrients")),
+        components = List(componentsJson.length()) { index ->
+            val component = componentsJson.getJSONObject(index)
+            RecipeComponent(
+                item = foodItemFromWireJson(component.getJSONObject("item")),
+                amount = component.optDouble("amount"),
+                unit = component.optString("unit", "serving"),
+            )
+        },
+    )
+}
+
+private fun diaryEntryFromWireJson(json: JSONObject): DiaryEntry =
+    DiaryEntry(
+        id = json.optString("entryId", json.optString("id")),
+        food = foodItemFromWireJson(json.getJSONObject("productSnapshot")),
+        date = LocalDate.parse(json.optString("loggedAt").take(10)),
+        meal = when (json.getString("meal")) {
+            "breakfast" -> Meal.Breakfast
+            "lunch" -> Meal.Lunch
+            "dinner" -> Meal.Dinner
+            else -> Meal.Snack
+        },
+        servingMultiplier = json.getDouble("servingMultiplier"),
+    )
+
+private fun nutrientsFromWireJson(json: JSONObject): Nutrients =
+    Nutrients(
+        calories = json.getDouble("calories"),
+        proteinGrams = json.optDouble("proteinGrams"),
+        carbohydrateGrams = json.optDouble("carbohydrateGrams"),
+        fatGrams = json.optDouble("fatGrams"),
+    )
 
 data class SyncSummary(
     val pushed: Int,

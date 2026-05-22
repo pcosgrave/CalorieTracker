@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { SyncSettings } from "@calorie-tracker/shared";
 import styles from "../page.module.css";
+import { currentClientAuthUser } from "@/lib/auth/client";
+import { getCognitoConfig } from "@/lib/auth/config";
 import { getPendingSyncCount, getSyncSettings, saveSyncSettings, syncNow } from "@/lib/sync/service";
 
 const defaultSettings: SyncSettings = {
@@ -16,11 +18,13 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SyncSettings>(defaultSettings);
   const [pendingCount, setPendingCount] = useState(0);
   const [status, setStatus] = useState("");
+  const [authUser, setAuthUser] = useState(() => currentClientAuthUser());
 
   useEffect(() => {
     void (async () => {
       setSettings(await getSyncSettings());
       setPendingCount(getPendingSyncCount());
+      setAuthUser(currentClientAuthUser());
     })();
   }, []);
 
@@ -71,11 +75,19 @@ export default function SettingsPage() {
             <label>
               API base URL
               <input
-                placeholder="https://api.example.com"
+                placeholder={getCognitoConfig().apiBaseUrl}
                 value={settings.apiBaseUrl || ""}
                 onChange={(event) => setSettings((current) => ({ ...current, apiBaseUrl: event.target.value }))}
               />
             </label>
+
+            <div className={styles.subtle}>
+              {authUser ? (
+                <p>Signed in as {authUser.email || authUser.name || authUser.userSub}</p>
+              ) : (
+                <p>Not signed in. Sign in to sync against your Cognito account.</p>
+              )}
+            </div>
 
             <label>
               Backup mode
@@ -90,10 +102,13 @@ export default function SettingsPage() {
             <p className={styles.subtle}>Last successful sync: {settings.lastSuccessfulSyncAt || "Never"}</p>
 
             <div className={styles.actions}>
+              <Link className={styles.textButton} href={authUser ? "/api/auth/logout" : "/api/auth/login?returnTo=/settings"}>
+                {authUser ? "Sign out" : "Sign in"}
+              </Link>
               <button type="button" onClick={save}>
                 Save
               </button>
-              <button type="button" onClick={runSync} disabled={!settings.syncEnabled || !settings.apiBaseUrl}>
+              <button type="button" onClick={runSync} disabled={!authUser || !settings.syncEnabled || !settings.apiBaseUrl}>
                 Sync now
               </button>
             </div>

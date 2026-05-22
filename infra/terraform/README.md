@@ -14,6 +14,12 @@ This directory now scaffolds a first-pass AWS `dev` environment for:
 - `modules/app`: the shared infrastructure module
 - `environments/dev`: the first deployable environment
 
+Helpful local files:
+
+- `environments/dev/backend.hcl.example`: example remote-state backend config
+- `environments/dev/terraform.tfvars.example`: example environment values
+- `../../scripts/bootstrap-terraform-backend.ps1`: one-time S3/DynamoDB backend bootstrap
+
 ## Current Deployment Model
 
 The Terraform `dev` environment always creates Cognito, DynamoDB, and S3.
@@ -28,16 +34,110 @@ That zip can be built from the repo root with:
 .\scripts\build-api-lambda.ps1
 ```
 
+## Recommended Remote State Setup
+
+Before your first real deploy, use a remote Terraform backend instead of local state. The recommended setup is:
+
+- S3 bucket for Terraform state
+- DynamoDB table for Terraform state locking
+
+You can bootstrap those backend resources with:
+
+```powershell
+.\scripts\bootstrap-terraform-backend.ps1 -BucketName <your-terraform-state-bucket> -LockTableName <your-terraform-locks-table> -Region <your-aws-region>
+```
+
+Then copy:
+
+- `environments/dev/backend.hcl.example` to `environments/dev/backend.hcl`
+- `environments/dev/terraform.tfvars.example` to `environments/dev/terraform.tfvars`
+
+Fill in your real bucket, lock table, region, and Cognito domain prefix before running `terraform init`.
+
 ## Dev Apply Flow
 
 From the repo root:
 
 ```powershell
 .\scripts\build-api-lambda.ps1
-terraform -chdir=infra/terraform/environments/dev init
-terraform -chdir=infra/terraform/environments/dev plan
-terraform -chdir=infra/terraform/environments/dev apply
+terraform -chdir=infra/terraform/environments/dev init -backend-config=backend.hcl
+terraform -chdir=infra/terraform/environments/dev plan -var-file=terraform.tfvars
+terraform -chdir=infra/terraform/environments/dev apply -var-file=terraform.tfvars
 ```
+
+## First-Time Operator Checklist
+
+From your side, here is the step-by-step flow:
+
+1. Install prerequisites locally:
+   - AWS CLI
+   - Terraform
+   - Node.js/npm
+
+2. Configure AWS credentials:
+   - `aws configure`
+   - or use AWS SSO / named profiles if you prefer
+
+3. Pick values you want to use:
+   - AWS region, for example `ca-central-1`
+   - Terraform state bucket name, which must be globally unique
+   - Terraform lock table name
+   - Cognito domain prefix, which must also be unique in AWS
+
+4. Bootstrap the Terraform backend:
+
+```powershell
+.\scripts\bootstrap-terraform-backend.ps1 -BucketName <your-terraform-state-bucket> -LockTableName <your-terraform-locks-table> -Region <your-aws-region>
+```
+
+5. Create your local backend config:
+
+```powershell
+Copy-Item infra\terraform\environments\dev\backend.hcl.example infra\terraform\environments\dev\backend.hcl
+```
+
+6. Edit `infra/terraform/environments/dev/backend.hcl` with your real values.
+
+7. Create your local Terraform variable file:
+
+```powershell
+Copy-Item infra\terraform\environments\dev\terraform.tfvars.example infra\terraform\environments\dev\terraform.tfvars
+```
+
+8. Edit `infra/terraform/environments/dev/terraform.tfvars` with your real values.
+   - At minimum, set `aws_region` and `cognito_domain_prefix`
+   - Update callback/logout URLs later if your auth flow changes
+
+9. Build the Lambda deployment zip:
+
+```powershell
+.\scripts\build-api-lambda.ps1
+```
+
+10. Initialize Terraform using the remote backend:
+
+```powershell
+terraform -chdir=infra/terraform/environments/dev init -backend-config=backend.hcl
+```
+
+11. Review the plan:
+
+```powershell
+terraform -chdir=infra/terraform/environments/dev plan -var-file=terraform.tfvars
+```
+
+12. Apply when the plan looks right:
+
+```powershell
+terraform -chdir=infra/terraform/environments/dev apply -var-file=terraform.tfvars
+```
+
+13. Capture the outputs you’ll need for the apps:
+   - `cognito_user_pool_id`
+   - `cognito_web_client_id`
+   - `cognito_android_client_id`
+   - `cognito_user_pool_domain`
+   - `api_base_url`
 
 ## Important Outputs
 
@@ -55,3 +155,4 @@ After apply, useful outputs include:
 - Google federation is still intentionally out of scope for this first pass.
 - The Android and web apps still need Cognito client integration and token handling.
 - The Lambda package currently vendors `zod` and the shared package, while relying on the AWS Lambda Node.js runtime's included AWS SDK v3. See AWS Lambda Node.js runtime docs for the runtime-included SDK behavior: [Building Lambda functions with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html).
+- `backend.hcl` and `terraform.tfvars` are intended to stay local and are ignored by git.

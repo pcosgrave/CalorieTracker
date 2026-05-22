@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import type { FoodProduct } from "@calorie-tracker/shared";
-import { createId, ownerUserId, readFoodProducts, toNumber, todayDateKey, writeFoodProduct } from "../../lib/diary";
+import { createId, currentOwnerUserId, readFoodProducts, toNumber, todayDateKey, writeFoodProduct } from "../../lib/diary";
 import styles from "../../page.module.css";
 
 type NewFoodForm = {
@@ -94,7 +94,7 @@ export default function NewFoodPage() {
     const servingQuantity = Math.max(toNumber(form.servingQuantity), 0.1);
     const product: FoodProduct = {
       productId: editId || createId("custom"),
-      ownerUserId,
+      ownerUserId: currentOwnerUserId(),
       visibility: "private",
       barcode: form.barcode.trim() || undefined,
       name: form.name.trim(),

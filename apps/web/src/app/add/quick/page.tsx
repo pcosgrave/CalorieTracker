@@ -7,7 +7,7 @@ import {
   createId,
   mealLabels,
   mealOrder,
-  ownerUserId,
+  currentOwnerUserId,
   shiftDateKey,
   toNumber,
   todayDateKey,
@@ -35,7 +35,7 @@ export default function QuickCaloriesPage() {
     const now = new Date().toISOString();
     const product: FoodProduct = {
       productId: createId("quick"),
-      ownerUserId,
+      ownerUserId: currentOwnerUserId(),
       visibility: "private",
       name: "Quick calories",
       serving: {

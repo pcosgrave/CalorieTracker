@@ -19,10 +19,18 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "AWS_REGION", "\"us-east-1\"")
+        buildConfigField("String", "COGNITO_DOMAIN", "\"philip-calorie-tracker-dev\"")
+        buildConfigField("String", "COGNITO_USER_POOL_ID", "\"us-east-1_WYQwdC4oO\"")
+        buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"bb27drot68rek496i4tmrn2ik\"")
+        buildConfigField("String", "SYNC_API_BASE_URL", "\"https://84jfkxkrd6.execute-api.us-east-1.amazonaws.com/dev\"")
+        buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"calorietracker://auth/callback\"")
+        buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"calorietracker://signout\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -53,6 +61,7 @@ configurations.configureEach {
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.01.00"))
     implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.camera:camera-camera2:$cameraXVersion")
     implementation("androidx.camera:camera-core:$cameraXVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraXVersion")

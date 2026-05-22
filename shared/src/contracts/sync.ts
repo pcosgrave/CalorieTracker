@@ -68,7 +68,6 @@ export interface SyncChangeRejection {
 }
 
 export interface SyncPushRequest {
-  userId: string;
   deviceId: string;
   cursor?: SyncCursor | undefined;
   changes: SyncChange[];
@@ -81,7 +80,6 @@ export interface SyncPushResponse {
 }
 
 export interface SyncPullRequest {
-  userId: string;
   deviceId: string;
   cursor?: SyncCursor | undefined;
 }

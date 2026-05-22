@@ -14,6 +14,7 @@ import {
   isDeletedRecord,
   markRecordForSync,
 } from "@calorie-tracker/shared";
+import { currentUserScope } from "@/lib/auth/client";
 import type {
   BarcodeAliasRepository,
   DiaryRepository,
@@ -26,6 +27,10 @@ export const webDeviceIdStorageKey = "calorie-tracker:sync-device-id:v1";
 export const syncOutboxStorageKey = "calorie-tracker:sync-outbox:v1";
 export const syncCursorStorageKey = "calorie-tracker:sync-cursor:v1";
 export const syncSettingsStorageKey = "calorie-tracker:sync-settings:v1";
+
+function scopeKey(baseKey: string): string {
+  return `${baseKey}:${currentUserScope()}`;
+}
 
 type RecordId = string;
 
@@ -48,12 +53,12 @@ function safeParse<T>(value: string | null): T | null {
 }
 
 function readArray<T>(key: string): T[] {
-  const parsed = safeParse<unknown[]>(window.localStorage.getItem(key));
+  const parsed = safeParse<unknown[]>(window.localStorage.getItem(scopeKey(key)));
   return Array.isArray(parsed) ? (parsed as T[]) : [];
 }
 
 function writeArray<T>(key: string, items: T[]): void {
-  window.localStorage.setItem(key, JSON.stringify(items));
+  window.localStorage.setItem(scopeKey(key), JSON.stringify(items));
 }
 
 function isSyncRecord(value: unknown): value is { sync: { recordId: string } } {
@@ -286,16 +291,16 @@ export class LocalStorageSyncOutboxRepository implements SyncOutboxRepository {
 
 export class LocalStorageSyncStateRepository implements SyncStateRepository {
   async getCursor(): Promise<SyncCursor | null> {
-    return safeParse<SyncCursor>(window.localStorage.getItem(syncCursorStorageKey));
+    return safeParse<SyncCursor>(window.localStorage.getItem(scopeKey(syncCursorStorageKey)));
   }
 
   async saveCursor(cursor: SyncCursor): Promise<void> {
-    window.localStorage.setItem(syncCursorStorageKey, JSON.stringify(cursor));
+    window.localStorage.setItem(scopeKey(syncCursorStorageKey), JSON.stringify(cursor));
   }
 
   async getSettings(): Promise<SyncSettings> {
     return (
-      safeParse<SyncSettings>(window.localStorage.getItem(syncSettingsStorageKey)) ?? {
+      safeParse<SyncSettings>(window.localStorage.getItem(scopeKey(syncSettingsStorageKey))) ?? {
         syncEnabled: false,
         backupMode: "disabled",
         apiBaseUrl: "",
@@ -304,7 +309,7 @@ export class LocalStorageSyncStateRepository implements SyncStateRepository {
   }
 
   async saveSettings(settings: SyncSettings): Promise<void> {
-    window.localStorage.setItem(syncSettingsStorageKey, JSON.stringify(settings));
+    window.localStorage.setItem(scopeKey(syncSettingsStorageKey), JSON.stringify(settings));
   }
 }
 

@@ -1,0 +1,27 @@
+aws_region = "ca-central-1"
+
+app_name    = "calorie-tracker"
+environment = "dev"
+
+web_callback_urls = [
+  "http://localhost:3000/auth/callback",
+]
+
+web_logout_urls = [
+  "http://localhost:3000/",
+]
+
+android_callback_urls = [
+  "calorietracker://auth/callback",
+]
+
+android_logout_urls = [
+  "calorietracker://signout",
+]
+
+cognito_domain_prefix = "replace-with-a-unique-cognito-domain-prefix"
+
+lambda_runtime         = "nodejs22.x"
+lambda_memory_mb       = 512
+lambda_timeout_seconds = 15
+api_stage_name         = "dev"

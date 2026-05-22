@@ -1,5 +1,5 @@
 import type { FoodProduct, Nutrients } from "@calorie-tracker/shared";
-import { createId, ownerUserId, todayDateKey } from "@/app/lib/diary";
+import { createId, currentOwnerUserId, todayDateKey } from "@/app/lib/diary";
 import type { CatalogItem, CatalogKind, LogState, StoredRecipeProduct } from "./types";
 
 export function dateFromUrl(): string {
@@ -23,7 +23,7 @@ export function itemServingUnit(item: CatalogItem): string {
 export function makeProductFromItem(item: CatalogItem, now: string, nutrients: Nutrients): FoodProduct {
   return {
     productId: createId(item.kind),
-    ownerUserId,
+    ownerUserId: currentOwnerUserId(),
     visibility: "private",
     barcode: item.barcode,
     name: item.name,

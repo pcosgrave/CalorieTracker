@@ -1,0 +1,10 @@
+export const authStateCookie = "ct_auth_state";
+export const pkceVerifierCookie = "ct_pkce_verifier";
+export const postAuthRedirectCookie = "ct_post_auth_redirect";
+export const accessTokenCookie = "ct_access_token";
+export const idTokenCookie = "ct_id_token";
+export const refreshTokenCookie = "ct_refresh_token";
+export const accessTokenExpiryCookie = "ct_access_token_exp";
+export const userSubCookie = "ct_user_sub";
+export const userEmailCookie = "ct_user_email";
+export const userNameCookie = "ct_user_name";

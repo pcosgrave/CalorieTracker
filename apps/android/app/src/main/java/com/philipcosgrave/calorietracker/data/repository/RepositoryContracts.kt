@@ -1,6 +1,8 @@
 package com.philipcosgrave.calorietracker.data.repository
 
+import android.net.Uri
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
+import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItemRecord
 import com.philipcosgrave.calorietracker.model.SyncChangeEnvelope
@@ -51,4 +53,13 @@ interface SyncStateRepository {
 interface SyncTransport {
     suspend fun push(changes: List<SyncChangeEnvelope<*>>, cursor: SyncCursor?): SyncPushResponse
     suspend fun pull(cursor: SyncCursor?): SyncPullResponse
+}
+
+interface AuthRepository {
+    suspend fun currentSession(): AuthSession?
+    suspend fun currentOwnerUserId(): String
+    suspend fun beginSignIn(returnToPath: String = "/settings"): Uri
+    suspend fun completeSignIn(callbackUri: Uri): AuthSession
+    suspend fun signOut(): Uri
+    suspend fun refreshSessionIfNeeded(): AuthSession?
 }
