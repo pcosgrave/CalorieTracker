@@ -7,3 +7,71 @@ variable "environment" {
   description = "Deployment environment."
   type        = string
 }
+
+variable "web_callback_urls" {
+  description = "OAuth callback URLs for the web client."
+  type        = list(string)
+}
+
+variable "web_logout_urls" {
+  description = "OAuth logout URLs for the web client."
+  type        = list(string)
+}
+
+variable "android_callback_urls" {
+  description = "OAuth callback URLs for the Android client."
+  type        = list(string)
+}
+
+variable "android_logout_urls" {
+  description = "OAuth logout URLs for the Android client."
+  type        = list(string)
+}
+
+variable "cognito_domain_prefix" {
+  description = "Optional Cognito hosted UI domain prefix."
+  type        = string
+  default     = null
+}
+
+variable "create_api" {
+  description = "Whether to create Lambda and API Gateway resources."
+  type        = bool
+  default     = true
+}
+
+variable "api_lambda_package_path" {
+  description = "Path to the Lambda deployment zip for the API handlers."
+  type        = string
+  default     = ""
+}
+
+variable "api_lambda_source_code_hash" {
+  description = "Base64-encoded SHA256 hash of the Lambda deployment zip."
+  type        = string
+  default     = null
+}
+
+variable "lambda_runtime" {
+  description = "Lambda runtime for the API handlers."
+  type        = string
+  default     = "nodejs22.x"
+}
+
+variable "lambda_memory_mb" {
+  description = "Memory size for API Lambda functions."
+  type        = number
+  default     = 512
+}
+
+variable "lambda_timeout_seconds" {
+  description = "Execution timeout for API Lambda functions."
+  type        = number
+  default     = 15
+}
+
+variable "api_stage_name" {
+  description = "API Gateway stage name."
+  type        = string
+  default     = "dev"
+}

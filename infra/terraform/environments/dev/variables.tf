@@ -5,13 +5,67 @@ variable "aws_region" {
 }
 
 variable "app_name" {
-  description = "Temporary app name used for resource naming."
+  description = "Application name used for resource naming."
   type        = string
   default     = "calorie-tracker"
 }
 
 variable "environment" {
   description = "Deployment environment."
+  type        = string
+  default     = "dev"
+}
+
+variable "web_callback_urls" {
+  description = "OAuth callback URLs for the web client."
+  type        = list(string)
+  default     = ["http://localhost:3000/auth/callback"]
+}
+
+variable "web_logout_urls" {
+  description = "OAuth logout URLs for the web client."
+  type        = list(string)
+  default     = ["http://localhost:3000/"]
+}
+
+variable "android_callback_urls" {
+  description = "OAuth callback URLs for the Android client."
+  type        = list(string)
+  default     = ["calorietracker://auth/callback"]
+}
+
+variable "android_logout_urls" {
+  description = "OAuth logout URLs for the Android client."
+  type        = list(string)
+  default     = ["calorietracker://signout"]
+}
+
+variable "cognito_domain_prefix" {
+  description = "Optional Cognito hosted UI domain prefix."
+  type        = string
+  default     = null
+}
+
+variable "lambda_runtime" {
+  description = "Lambda runtime for the API handlers."
+  type        = string
+  default     = "nodejs22.x"
+}
+
+variable "lambda_memory_mb" {
+  description = "Memory size for API Lambda functions."
+  type        = number
+  default     = 512
+}
+
+variable "lambda_timeout_seconds" {
+  description = "Execution timeout for API Lambda functions."
+  type        = number
+  default     = 15
+}
+
+variable "api_stage_name" {
+  description = "API Gateway stage name."
   type        = string
   default     = "dev"
 }
