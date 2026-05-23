@@ -72,9 +72,6 @@ fun Header(onOpenSyncSettings: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { }) {
-                Text("Sign in with Google")
-            }
             TextButton(onClick = onOpenSyncSettings) {
                 Text("Sync")
             }

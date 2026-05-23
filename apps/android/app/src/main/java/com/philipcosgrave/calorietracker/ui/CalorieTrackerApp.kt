@@ -18,6 +18,7 @@ import com.philipcosgrave.calorietracker.data.auth.CognitoAuthRepository
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
 import com.philipcosgrave.calorietracker.data.readFoodItems
 import com.philipcosgrave.calorietracker.data.readStringList
+import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
@@ -80,6 +81,7 @@ fun CalorieTrackerApp(
     }
     val scope = rememberCoroutineScope()
     val syncService = remember { ApiSyncService(localStore) }
+    val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var recipes by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -352,17 +354,25 @@ fun CalorieTrackerApp(
                             selectedFood = found
                             screen = AppScreen.LogFood
                         } else {
-                            editingFood = FoodItem(
-                                id = createId("custom"),
-                                kind = FoodKind.Ingredient,
-                                name = "",
-                                brand = "",
-                                barcode = barcode,
-                                servingQuantity = 1.0,
-                                servingUnit = "serving",
-                                nutrients = Nutrients(calories = 0.0),
-                            )
-                            screen = AppScreen.NewIngredient
+                            val remoteFood = openFoodFactsLookupService.lookupFoodByBarcode(barcode)
+                            if (remoteFood != null) {
+                                saveFood(remoteFood)
+                                refreshState()
+                                selectedFood = remoteFood
+                                screen = AppScreen.LogFood
+                            } else {
+                                editingFood = FoodItem(
+                                    id = createId("custom"),
+                                    kind = FoodKind.Ingredient,
+                                    name = "",
+                                    brand = "",
+                                    barcode = barcode,
+                                    servingQuantity = 1.0,
+                                    servingUnit = "serving",
+                                    nutrients = Nutrients(calories = 0.0),
+                                )
+                                screen = AppScreen.NewIngredient
+                            }
                         }
                     }
                 },
