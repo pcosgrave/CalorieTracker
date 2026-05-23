@@ -1,6 +1,7 @@
 package com.philipcosgrave.calorietracker.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.Room
@@ -276,9 +277,25 @@ class AndroidLocalStore(
     val syncStateRepository: SyncStateRepository,
     val authRepository: AuthRepository,
 ) {
+    private suspend fun currentUserScope(): String = authRepository.currentOwnerUserId()
+
+    private fun healthConnectEnabledKey(userId: String) = booleanPreferencesKey("health_connect_enabled.$userId")
+
     suspend fun currentOwnerUserId(): String = authRepository.currentOwnerUserId()
 
     suspend fun currentAuthSession(): AuthSession? = authRepository.currentSession()
+
+    suspend fun isHealthConnectExportEnabled(): Boolean {
+        val userId = currentUserScope()
+        return context.syncPreferencesDataStore.data.first()[healthConnectEnabledKey(userId)] ?: false
+    }
+
+    suspend fun setHealthConnectExportEnabled(enabled: Boolean) {
+        val userId = currentUserScope()
+        context.syncPreferencesDataStore.edit { prefs ->
+            prefs[healthConnectEnabledKey(userId)] = enabled
+        }
+    }
 
     suspend fun deviceId(): String {
         val existing = syncStateRepository.getCursor()?.deviceId

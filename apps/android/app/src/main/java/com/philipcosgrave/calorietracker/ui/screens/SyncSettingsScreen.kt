@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
 import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.components.Page
@@ -31,11 +32,16 @@ fun SyncSettingsScreen(
     settings: SyncSettings,
     pendingChangeCount: Int,
     authSession: AuthSession?,
+    healthConnectAvailability: HealthConnectAvailability,
+    healthConnectPermissionGranted: Boolean,
+    healthConnectExportEnabled: Boolean,
     onBack: () -> Unit,
     onSave: (SyncSettings) -> Unit,
     onSyncNow: () -> Unit,
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
+    onConnectHealthConnect: () -> Unit,
+    onSetHealthConnectExportEnabled: (Boolean) -> Unit,
 ) {
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
     var apiBaseUrl by remember(settings) { mutableStateOf(settings.apiBaseUrl.orEmpty()) }
@@ -88,6 +94,40 @@ fun SyncSettingsScreen(
                     }
                 }
 
+                Text("Health Connect", style = MaterialTheme.typography.titleMedium)
+                when (healthConnectAvailability) {
+                    HealthConnectAvailability.Available -> {
+                        if (healthConnectPermissionGranted) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Export logged meals")
+                                    Text("Write nutrition records so other Health Connect apps can display your food logs.")
+                                }
+                                Switch(
+                                    checked = healthConnectExportEnabled,
+                                    onCheckedChange = onSetHealthConnectExportEnabled,
+                                )
+                            }
+                        } else {
+                            Text("Health Connect is available, but CalorieTracker still needs permission to write nutrition records.")
+                            Button(onClick = onConnectHealthConnect, modifier = Modifier.fillMaxWidth()) {
+                                Text("Connect Health Connect")
+                            }
+                        }
+                    }
+
+                    HealthConnectAvailability.UpdateRequired -> {
+                        Text("Install or update Health Connect before nutrition logs can be shared with connected health apps.")
+                        Button(onClick = onConnectHealthConnect, modifier = Modifier.fillMaxWidth()) {
+                            Text("Install or update")
+                        }
+                    }
+
+                    HealthConnectAvailability.Unavailable -> {
+                        Text("Health Connect is not available on this device, so food logs stay local to CalorieTracker.")
+                    }
+                }
+
                 Text("Pending local changes: $pendingChangeCount")
                 Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}")
 
@@ -133,11 +173,16 @@ private fun SyncSettingsScreenPreview() {
             settings = PreviewData.syncSettings,
             pendingChangeCount = 4,
             authSession = null,
+            healthConnectAvailability = PreviewData.healthConnectAvailability,
+            healthConnectPermissionGranted = true,
+            healthConnectExportEnabled = true,
             onBack = {},
             onSave = {},
             onSyncNow = {},
             onSignIn = {},
             onSignOut = {},
+            onConnectHealthConnect = {},
+            onSetHealthConnectExportEnabled = {},
         )
     }
 }

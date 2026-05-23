@@ -1,5 +1,6 @@
 package com.philipcosgrave.calorietracker.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
@@ -13,8 +14,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.health.connect.client.PermissionController
 import com.philipcosgrave.calorietracker.BuildConfig
 import com.philipcosgrave.calorietracker.data.auth.CognitoAuthRepository
+import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
+import com.philipcosgrave.calorietracker.data.health.HealthConnectNutritionExporter
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
 import com.philipcosgrave.calorietracker.data.readFoodItems
 import com.philipcosgrave.calorietracker.data.readStringList
@@ -82,6 +86,7 @@ fun CalorieTrackerApp(
     val scope = rememberCoroutineScope()
     val syncService = remember { ApiSyncService(localStore) }
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
+    val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var recipes by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -105,6 +110,9 @@ fun CalorieTrackerApp(
     }
     var pendingChangeCount by remember { mutableStateOf(0) }
     var authSession by remember { mutableStateOf<AuthSession?>(null) }
+    var healthConnectAvailability by remember { mutableStateOf(HealthConnectAvailability.Unavailable) }
+    var healthConnectPermissionGranted by remember { mutableStateOf(false) }
+    var healthConnectExportEnabled by remember { mutableStateOf(false) }
 
     suspend fun refreshState() {
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
@@ -115,6 +123,24 @@ fun CalorieTrackerApp(
         syncSettings = localStore.syncStateRepository.getSettings()
         pendingChangeCount = localStore.syncOutboxRepository.listPendingChanges().size
         authSession = localStore.currentAuthSession()
+        healthConnectAvailability = healthConnectExporter.availability()
+        healthConnectPermissionGranted =
+            healthConnectAvailability == HealthConnectAvailability.Available &&
+                healthConnectExporter.hasWriteNutritionPermission()
+        healthConnectExportEnabled = localStore.isHealthConnectExportEnabled()
+    }
+
+    val healthPermissionsLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract(),
+    ) { grantedPermissions ->
+        scope.launch {
+            val granted =
+                HealthConnectNutritionExporter.writeNutritionPermission in grantedPermissions
+            if (granted) {
+                localStore.setHealthConnectExportEnabled(true)
+            }
+            refreshState()
+        }
     }
 
     suspend fun ensureSeedRecipes(deviceId: String) {
@@ -205,6 +231,12 @@ fun CalorieTrackerApp(
                 baseVersion = existing?.sync?.version,
             ),
         )
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            runCatching { healthConnectExporter.exportEntry(record) }
+        }
     }
 
     suspend fun deleteDiaryEntry(entry: DiaryEntry) {
@@ -228,6 +260,12 @@ fun CalorieTrackerApp(
                 baseVersion = existing.sync.version,
             ),
         )
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            runCatching { healthConnectExporter.deleteEntry(entry.id) }
+        }
     }
 
     suspend fun findFoodByBarcode(barcode: String): FoodItem? {
@@ -382,6 +420,9 @@ fun CalorieTrackerApp(
                 settings = syncSettings,
                 pendingChangeCount = pendingChangeCount,
                 authSession = authSession,
+                healthConnectAvailability = healthConnectAvailability,
+                healthConnectPermissionGranted = healthConnectPermissionGranted,
+                healthConnectExportEnabled = healthConnectExportEnabled,
                 onBack = { screen = previousScreen },
                 onSave = { settings ->
                     syncSettings = settings
@@ -404,6 +445,25 @@ fun CalorieTrackerApp(
                         val uri = authRepository.signOut()
                         refreshState()
                         openExternalUri(uri.toString())
+                    }
+                },
+                onConnectHealthConnect = {
+                    when (healthConnectAvailability) {
+                        HealthConnectAvailability.Available -> {
+                            healthPermissionsLauncher.launch(HealthConnectNutritionExporter.requestedPermissions)
+                        }
+
+                        HealthConnectAvailability.UpdateRequired -> {
+                            openExternalUri(HealthConnectNutritionExporter.onboardingUri().toString())
+                        }
+
+                        HealthConnectAvailability.Unavailable -> Unit
+                    }
+                },
+                onSetHealthConnectExportEnabled = { enabled ->
+                    scope.launch {
+                        localStore.setHealthConnectExportEnabled(enabled)
+                        refreshState()
                     }
                 },
             )

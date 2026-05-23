@@ -11,6 +11,7 @@ import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.model.Totals
+import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
 import com.philipcosgrave.calorietracker.ui.theme.CalorieTrackerTheme
 import java.time.LocalDate
 
@@ -100,6 +101,7 @@ object PreviewData {
         apiBaseUrl = "https://api.calorietracker.dev",
         lastSuccessfulSyncAt = "2026-05-21T09:30:00Z",
     )
+    val healthConnectAvailability: HealthConnectAvailability = HealthConnectAvailability.Available
 
     @Composable
     fun Theme(content: @Composable () -> Unit) {
