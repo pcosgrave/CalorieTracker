@@ -32,6 +32,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
+import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
@@ -41,6 +42,7 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
     var brand by remember(existing?.id) { mutableStateOf(existing?.brand.orEmpty()) }
     var barcode by remember(existing?.id) { mutableStateOf(existing?.barcode.orEmpty()) }
     var servingQuantity by remember(existing?.id) { mutableStateOf(existing?.servingQuantity?.let(::formatNumber) ?: "1") }
+    var servingUnit by remember(existing?.id) { mutableStateOf(existing?.servingUnit ?: "serving") }
     var calories by remember(existing?.id) { mutableStateOf(existing?.nutrients?.calories?.let(::formatNumber).orEmpty()) }
     var protein by remember(existing?.id) { mutableStateOf(existing?.nutrients?.proteinGrams?.let(::formatNumber).orEmpty()) }
     var carbs by remember(existing?.id) { mutableStateOf(existing?.nutrients?.carbohydrateGrams?.let(::formatNumber).orEmpty()) }
@@ -53,16 +55,28 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
             AppFormField(brand, { brand = it }, "Brand (Optional)", Modifier.fillMaxWidth())
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AppFormField(servingQuantity, {
+                    if (isDigitsOnlyInput(it)) {
+                        servingQuantity = it
+                    }
+                }, "Serving Size", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                UnitPicker(
+                    value = servingUnit,
+                    onChange = { servingUnit = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(calories, {
                     if (isDigitsOnlyInput(it)) {
                         calories = it
                     }
                 }, "Calories (kcal)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                AppFormField(servingQuantity, {
+                AppFormField(barcode, {
                     if (isDigitsOnlyInput(it)) {
-                        servingQuantity = it
+                        barcode = it
                     }
-                }, "Servings", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Barcode / UPC", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(protein, {
@@ -76,22 +90,17 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                     }
                 }, "Carbs (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 AppFormField(fat, {
                     if (isDigitsOnlyInput(it)) {
                         fat = it
                     }
-                }, "Fat (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                AppFormField(barcode, {
-                    if (isDigitsOnlyInput(it)) {
-                        barcode = it
-                    }
-                }, "Barcode / UPC", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Fat (g)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             }
 
             AppPrimaryButton(
                 text = "Save Food",
-                enabled = name.isNotBlank() && (calories.toDoubleOrNull() ?: 0.0) > 0,
+                enabled = name.isNotBlank() && servingUnit.isNotBlank() && (calories.toDoubleOrNull() ?: 0.0) > 0,
                 onClick = {
                     onSave(
                         FoodItem(
@@ -101,7 +110,7 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                             brand = brand.trim(),
                             barcode = barcode.trim(),
                             servingQuantity = servingQuantity.toDoubleOrNull()?.coerceAtLeast(0.1) ?: 1.0,
-                            servingUnit = existing?.servingUnit ?: "serving",
+                            servingUnit = servingUnit.trim(),
                             nutrients = Nutrients(
                                 calories = calories.toDoubleOrNull() ?: 0.0,
                                 proteinGrams = protein.toDoubleOrNull() ?: 0.0,
