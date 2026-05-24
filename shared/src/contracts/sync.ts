@@ -1,8 +1,8 @@
-import type { BarcodeAlias, DiaryEntry, FoodProduct } from "./entities.js";
+import type { BarcodeAlias, DiaryEntry, FoodProduct, WeightEntry } from "./entities.js";
 
 export type SyncStatus = "local_only" | "pending_push" | "synced" | "sync_error";
 
-export type SyncEntityType = "food_product" | "barcode_alias" | "diary_entry";
+export type SyncEntityType = "food_product" | "barcode_alias" | "diary_entry" | "weight_entry";
 
 export type SyncOperation = "upsert" | "delete";
 
@@ -31,6 +31,11 @@ export interface DiaryEntryRecord {
   sync: SyncMetadata;
 }
 
+export interface WeightEntryRecord {
+  entry: WeightEntry;
+  sync: SyncMetadata;
+}
+
 export interface SyncCursor {
   deviceId: string;
   lastPulledAt?: string | undefined;
@@ -42,6 +47,10 @@ export interface SyncSettings {
   backupMode: "disabled" | "manual_backup" | "automatic_backup";
   apiBaseUrl?: string | undefined;
   lastSuccessfulSyncAt?: string | undefined;
+  calorieTargetMin?: number | undefined;
+  calorieTargetMax?: number | undefined;
+  weightUnit?: "kilograms" | "pounds" | undefined;
+  goalWeightKg?: number | undefined;
 }
 
 export interface SyncChangeEnvelope<TPayload> {
@@ -58,8 +67,9 @@ export interface SyncChangeEnvelope<TPayload> {
 export type FoodProductChange = SyncChangeEnvelope<FoodProductRecord>;
 export type BarcodeAliasChange = SyncChangeEnvelope<BarcodeAliasRecord>;
 export type DiaryEntryChange = SyncChangeEnvelope<DiaryEntryRecord>;
+export type WeightEntryChange = SyncChangeEnvelope<WeightEntryRecord>;
 
-export type SyncChange = FoodProductChange | BarcodeAliasChange | DiaryEntryChange;
+export type SyncChange = FoodProductChange | BarcodeAliasChange | DiaryEntryChange | WeightEntryChange;
 
 export interface SyncChangeRejection {
   changeId: string;

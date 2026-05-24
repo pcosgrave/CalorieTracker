@@ -10,12 +10,15 @@ import type {
   SyncMetadata,
   SyncOperation,
   SyncStatus,
+  WeightEntryChange,
+  WeightEntryRecord,
 } from "../contracts/sync.js";
 
 type SyncRecordMap = {
   barcode_alias: BarcodeAliasRecord;
   diary_entry: DiaryEntryRecord;
   food_product: FoodProductRecord;
+  weight_entry: WeightEntryRecord;
 };
 
 export function createSyncMetadata(params: {
@@ -100,4 +103,8 @@ export function isBarcodeAliasChange(change: SyncChange): change is BarcodeAlias
 
 export function isDiaryEntryChange(change: SyncChange): change is DiaryEntryChange {
   return change.entityType === "diary_entry";
+}
+
+export function isWeightEntryChange(change: SyncChange): change is WeightEntryChange {
+  return change.entityType === "weight_entry";
 }

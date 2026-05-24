@@ -64,8 +64,8 @@ export function AddFoodSearchPage({
             <Link className={styles.textButton} href="/settings">
               Sync
             </Link>
-            <Link className={styles.textButton} href={`/?date=${date}`}>
-              Back to diary
+            <Link className={styles.textButton} href={`/food?date=${date}`}>
+              Back to food log
             </Link>
           </div>
         </header>

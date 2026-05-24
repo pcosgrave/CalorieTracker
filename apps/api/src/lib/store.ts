@@ -4,6 +4,7 @@ import type {
   BarcodeLookupResponse,
   CreateDiaryEntryRequest,
   CreateFoodProductRequest,
+  CreateWeightEntryRequest,
   DiaryEntry,
   FoodProduct,
   SyncChange,
@@ -12,6 +13,7 @@ import type {
   SyncPullResponse,
   SyncPushRequest,
   SyncPushResponse,
+  WeightEntry,
 } from "@calorie-tracker/shared";
 import { randomUUID } from "node:crypto";
 
@@ -20,6 +22,7 @@ const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const productsTableName = requiredEnv("PRODUCTS_TABLE_NAME");
 const barcodeAliasesTableName = requiredEnv("BARCODE_ALIASES_TABLE_NAME");
 const diaryEntriesTableName = requiredEnv("DIARY_ENTRIES_TABLE_NAME");
+const weightEntriesTableName = requiredEnv("WEIGHT_ENTRIES_TABLE_NAME");
 const syncChangesTableName = requiredEnv("SYNC_CHANGES_TABLE_NAME");
 
 export async function lookupBarcode(userId: string, barcode: string): Promise<BarcodeLookupResponse> {
@@ -130,6 +133,48 @@ export async function createDiaryEntry(
   return entry;
 }
 
+export async function createWeightEntry(
+  userId: string,
+  request: CreateWeightEntryRequest,
+): Promise<WeightEntry> {
+  const now = new Date().toISOString();
+  const entry: WeightEntry = {
+    entryId: randomUUID(),
+    ownerUserId: userId,
+    loggedAt: request.loggedAt,
+    weightKg: request.weightKg,
+    source: request.source ?? "manual",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await client.send(
+    new PutCommand({
+      TableName: weightEntriesTableName,
+      Item: entry,
+      ConditionExpression: "attribute_not_exists(ownerUserId) AND attribute_not_exists(entryId)",
+    }),
+  );
+
+  return entry;
+}
+
+export async function listWeightEntries(userId: string): Promise<WeightEntry[]> {
+  const result = await client.send(
+    new QueryCommand({
+      TableName: weightEntriesTableName,
+      KeyConditionExpression: "ownerUserId = :ownerUserId",
+      ExpressionAttributeValues: {
+        ":ownerUserId": userId,
+      },
+      Limit: 365,
+      ScanIndexForward: false,
+    }),
+  );
+
+  return (result.Items ?? []) as WeightEntry[];
+}
+
 export async function pushSyncChanges(userId: string, request: SyncPushRequest): Promise<SyncPushResponse> {
   const acceptedChangeIds: string[] = [];
 
@@ -139,7 +184,7 @@ export async function pushSyncChanges(userId: string, request: SyncPushRequest):
         TableName: syncChangesTableName,
         Item: {
           ownerUserId: userId,
-          sortKey: toSyncSortKey(change.changedAt, change.changeId),
+          changeKey: toSyncSortKey(change.changedAt, change.changeId),
           changeId: change.changeId,
           entityType: change.entityType,
           recordId: change.recordId,
@@ -170,10 +215,10 @@ export async function pullSyncChanges(userId: string, request: SyncPullRequest):
   const result = await client.send(
     new QueryCommand({
       TableName: syncChangesTableName,
-      KeyConditionExpression: "ownerUserId = :ownerUserId AND sortKey > :sortKey",
+      KeyConditionExpression: "ownerUserId = :ownerUserId AND changeKey > :changeKey",
       ExpressionAttributeValues: {
         ":ownerUserId": userId,
-        ":sortKey": toSyncSortKey(changedAfter, request.cursor?.lastAcknowledgedChangeId ?? ""),
+        ":changeKey": toSyncSortKey(changedAfter, request.cursor?.lastAcknowledgedChangeId ?? ""),
       },
       Limit: 200,
       ScanIndexForward: true,

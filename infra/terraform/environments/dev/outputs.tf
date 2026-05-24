@@ -30,6 +30,10 @@ output "diary_entries_table_name" {
   value = module.app.diary_entries_table_name
 }
 
+output "weight_entries_table_name" {
+  value = module.app.weight_entries_table_name
+}
+
 output "sync_changes_table_name" {
   value = module.app.sync_changes_table_name
 }

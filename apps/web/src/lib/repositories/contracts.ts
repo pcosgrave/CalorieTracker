@@ -7,6 +7,7 @@ import type {
   SyncPullResponse,
   SyncPushResponse,
   SyncSettings,
+  WeightEntryRecord,
 } from "@calorie-tracker/shared";
 
 export interface FoodRepository {
@@ -29,6 +30,13 @@ export interface DiaryRepository {
   listByDateRange(startDate: string, endDate: string): Promise<DiaryEntryRecord[]>;
   getById(recordId: string): Promise<DiaryEntryRecord | null>;
   save(record: DiaryEntryRecord): Promise<void>;
+  softDelete(recordId: string, deletedAt: string): Promise<void>;
+}
+
+export interface WeightRepository {
+  list(): Promise<WeightEntryRecord[]>;
+  getById(recordId: string): Promise<WeightEntryRecord | null>;
+  save(record: WeightEntryRecord): Promise<void>;
   softDelete(recordId: string, deletedAt: string): Promise<void>;
 }
 

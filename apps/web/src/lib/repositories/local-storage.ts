@@ -7,6 +7,8 @@ import type {
   SyncChange,
   SyncCursor,
   SyncSettings,
+  WeightEntry,
+  WeightEntryRecord,
 } from "@calorie-tracker/shared";
 import {
   createSyncChange,
@@ -21,12 +23,14 @@ import type {
   FoodRepository,
   SyncOutboxRepository,
   SyncStateRepository,
+  WeightRepository,
 } from "./contracts";
 
 export const webDeviceIdStorageKey = "calorie-tracker:sync-device-id:v1";
 export const syncOutboxStorageKey = "calorie-tracker:sync-outbox:v1";
 export const syncCursorStorageKey = "calorie-tracker:sync-cursor:v1";
 export const syncSettingsStorageKey = "calorie-tracker:sync-settings:v1";
+export const weightStorageKey = "calorie-tracker:weights:v1";
 
 function scopeKey(baseKey: string): string {
   return `${baseKey}:${currentUserScope()}`;
@@ -97,6 +101,17 @@ function createMigratedFoodRecord(product: FoodProduct, deviceId: string): FoodP
 }
 
 function createMigratedDiaryRecord(entry: DiaryEntry, deviceId: string): DiaryEntryRecord {
+  return {
+    entry,
+    sync: createSyncMetadata({
+      recordId: entry.entryId,
+      deviceId,
+      updatedAt: entry.updatedAt || entry.createdAt || nowIso(),
+    }),
+  };
+}
+
+function createMigratedWeightRecord(entry: WeightEntry, deviceId: string): WeightEntryRecord {
   return {
     entry,
     sync: createSyncMetadata({
@@ -257,6 +272,39 @@ class LocalStorageBarcodeAliasRepository implements BarcodeAliasRepository {
   }
 }
 
+class LocalStorageWeightRepository implements WeightRepository {
+  constructor(private readonly config: RecordStorage<WeightEntryRecord>) {}
+
+  async list(): Promise<WeightEntryRecord[]> {
+    return loadRecords(this.config)
+      .filter((record) => !isDeletedRecord(record))
+      .sort((left, right) => right.entry.loggedAt.localeCompare(left.entry.loggedAt));
+  }
+
+  async getById(recordId: string): Promise<WeightEntryRecord | null> {
+    return loadRecords(this.config).find((record) => record.sync.recordId === recordId && !isDeletedRecord(record)) ?? null;
+  }
+
+  async save(record: WeightEntryRecord): Promise<void> {
+    const records = loadRecords(this.config);
+    const next = [record, ...records.filter((existing) => existing.sync.recordId !== record.sync.recordId)];
+    saveRecords(this.config, next);
+  }
+
+  async softDelete(recordId: string, deletedAt: string): Promise<void> {
+    const records = loadRecords(this.config);
+    const next = records.map((record) =>
+      record.sync.recordId === recordId
+        ? markRecordForSync(record, {
+            deletedAt,
+            updatedAt: deletedAt,
+          })
+        : record,
+    );
+    saveRecords(this.config, next);
+  }
+}
+
 export class LocalStorageSyncOutboxRepository implements SyncOutboxRepository {
   async listPendingChanges(): Promise<SyncChange[]> {
     return readArray<SyncChange>(syncOutboxStorageKey);
@@ -304,6 +352,9 @@ export class LocalStorageSyncStateRepository implements SyncStateRepository {
         syncEnabled: false,
         backupMode: "disabled",
         apiBaseUrl: "",
+        calorieTargetMin: 1800,
+        calorieTargetMax: 2200,
+        weightUnit: "kilograms",
       }
     );
   }
@@ -346,6 +397,17 @@ export function createBarcodeAliasRepository(params: {
   });
 }
 
+export function createWeightRepository(params: {
+  storageKey: string;
+  deviceId: string;
+}): WeightRepository {
+  return new LocalStorageWeightRepository({
+    key: params.storageKey,
+    getRecordId: (record) => record.sync.recordId,
+    fromLegacyItem: (item) => createMigratedWeightRecord(item as WeightEntry, params.deviceId),
+  });
+}
+
 export function createBarcodeAliasFromProduct(product: FoodProduct, deviceId: string): BarcodeAliasRecord | null {
   if (!product.barcode) {
     return null;
@@ -364,11 +426,11 @@ export function createBarcodeAliasFromProduct(product: FoodProduct, deviceId: st
 }
 
 export function createPendingUpsertChange(params: {
-  entityType: "food_product" | "barcode_alias" | "diary_entry";
+  entityType: "food_product" | "barcode_alias" | "diary_entry" | "weight_entry";
   changeId: string;
   deviceId: string;
   changedAt: string;
-  record: FoodProductRecord | BarcodeAliasRecord | DiaryEntryRecord;
+  record: FoodProductRecord | BarcodeAliasRecord | DiaryEntryRecord | WeightEntryRecord;
   baseVersion?: number;
 }): SyncChange {
   return createSyncChange(params.entityType, {
@@ -382,11 +444,11 @@ export function createPendingUpsertChange(params: {
 }
 
 export function createPendingDeleteChange(params: {
-  entityType: "food_product" | "barcode_alias" | "diary_entry";
+  entityType: "food_product" | "barcode_alias" | "diary_entry" | "weight_entry";
   changeId: string;
   deviceId: string;
   changedAt: string;
-  record: FoodProductRecord | BarcodeAliasRecord | DiaryEntryRecord;
+  record: FoodProductRecord | BarcodeAliasRecord | DiaryEntryRecord | WeightEntryRecord;
   baseVersion?: number;
 }): SyncChange {
   return createSyncChange(params.entityType, {
@@ -459,4 +521,22 @@ export function readPendingSyncChangesSync(): SyncChange[] {
 
 export function writePendingSyncChangesSync(changes: SyncChange[]): void {
   writeArray(syncOutboxStorageKey, changes);
+}
+
+export function readWeightEntryRecordsSync(storageKey: string, deviceId: string): WeightEntryRecord[] {
+  return loadRecords({
+    key: storageKey,
+    getRecordId: (record: WeightEntryRecord) => record.sync.recordId,
+    fromLegacyItem: (item) => createMigratedWeightRecord(item as WeightEntry, deviceId),
+  });
+}
+
+export function writeWeightEntryRecordsSync(storageKey: string, records: WeightEntryRecord[]): void {
+  saveRecords(
+    {
+      key: storageKey,
+      getRecordId: (record: WeightEntryRecord) => record.sync.recordId,
+    },
+    records,
+  );
 }

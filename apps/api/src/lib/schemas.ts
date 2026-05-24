@@ -32,6 +32,12 @@ export const createDiaryEntrySchema = z.object({
   servingMultiplier: z.number().positive(),
 });
 
+export const createWeightEntrySchema = z.object({
+  loggedAt: z.string().datetime(),
+  weightKg: z.number().positive(),
+  source: z.enum(["manual", "health_connect", "import"]).optional(),
+});
+
 export const emptySchema = z.object({});
 
 const syncMetadataSchema = z.object({
@@ -86,9 +92,22 @@ const diaryEntryRecordSchema = z.object({
   sync: syncMetadataSchema,
 });
 
+const weightEntryRecordSchema = z.object({
+  entry: z.object({
+    entryId: z.string().min(1),
+    ownerUserId: z.string().min(1),
+    loggedAt: z.string().datetime(),
+    weightKg: z.number().positive(),
+    source: z.enum(["manual", "health_connect", "import"]),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  }).passthrough(),
+  sync: syncMetadataSchema,
+});
+
 const syncChangeSchemaBase = z.object({
   changeId: z.string().min(1),
-  entityType: z.enum(["food_product", "barcode_alias", "diary_entry"]),
+  entityType: z.enum(["food_product", "barcode_alias", "diary_entry", "weight_entry"]),
   recordId: z.string().min(1),
   operation: z.enum(["upsert", "delete"]),
   changedAt: z.string().datetime(),
@@ -108,6 +127,10 @@ export const syncChangeSchema = z.discriminatedUnion("entityType", [
   syncChangeSchemaBase.extend({
     entityType: z.literal("diary_entry"),
     payload: diaryEntryRecordSchema.optional(),
+  }),
+  syncChangeSchemaBase.extend({
+    entityType: z.literal("weight_entry"),
+    payload: weightEntryRecordSchema.optional(),
   }),
 ]);
 

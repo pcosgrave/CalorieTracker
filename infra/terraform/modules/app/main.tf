@@ -11,6 +11,7 @@ locals {
     PRODUCTS_TABLE_NAME        = aws_dynamodb_table.products.name
     BARCODE_ALIASES_TABLE_NAME = aws_dynamodb_table.barcode_aliases.name
     DIARY_ENTRIES_TABLE_NAME   = aws_dynamodb_table.diary_entries.name
+    WEIGHT_ENTRIES_TABLE_NAME  = aws_dynamodb_table.weight_entries.name
     SYNC_CHANGES_TABLE_NAME    = aws_dynamodb_table.sync_changes.name
   }
 
@@ -166,6 +167,29 @@ resource "aws_dynamodb_table" "diary_entries" {
   tags = local.tags
 }
 
+resource "aws_dynamodb_table" "weight_entries" {
+  name         = "${local.name_prefix}-weight-entries"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "ownerUserId"
+  range_key    = "entryId"
+
+  attribute {
+    name = "ownerUserId"
+    type = "S"
+  }
+
+  attribute {
+    name = "entryId"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = local.tags
+}
+
 resource "aws_dynamodb_table" "sync_changes" {
   name         = "${local.name_prefix}-sync-changes"
   billing_mode = "PAY_PER_REQUEST"
@@ -264,6 +288,7 @@ resource "aws_iam_role_policy" "api_lambda" {
           aws_dynamodb_table.products.arn,
           aws_dynamodb_table.barcode_aliases.arn,
           aws_dynamodb_table.diary_entries.arn,
+          aws_dynamodb_table.weight_entries.arn,
           aws_dynamodb_table.sync_changes.arn,
         ]
       }
@@ -335,6 +360,44 @@ resource "aws_lambda_function" "diary_create" {
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
   handler          = "dist/handlers/diary.create"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "weights_create" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-weights-create"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/weights.create"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "weights_list" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-weights-list"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/weights.list"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -446,6 +509,14 @@ resource "aws_api_gateway_resource" "sync" {
   path_part   = "sync"
 }
 
+resource "aws_api_gateway_resource" "weights" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_rest_api.main[0].root_resource_id
+  path_part   = "weights"
+}
+
 resource "aws_api_gateway_resource" "sync_push" {
   count = var.create_api ? 1 : 0
 
@@ -507,6 +578,26 @@ resource "aws_api_gateway_method" "sync_push_post" {
 
   rest_api_id   = aws_api_gateway_rest_api.main[0].id
   resource_id   = aws_api_gateway_resource.sync_push[0].id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "weights_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.weights[0].id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "weights_post" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.weights[0].id
   http_method   = "POST"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
@@ -577,6 +668,28 @@ resource "aws_api_gateway_integration" "sync_push_post" {
   uri                     = aws_lambda_function.sync_push[0].invoke_arn
 }
 
+resource "aws_api_gateway_integration" "weights_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.weights[0].id
+  http_method             = aws_api_gateway_method.weights_get[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.weights_list[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "weights_post" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.weights[0].id
+  http_method             = aws_api_gateway_method.weights_post[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.weights_create[0].invoke_arn
+}
+
 resource "aws_api_gateway_integration" "sync_pull_post" {
   count = var.create_api ? 1 : 0
 
@@ -638,6 +751,26 @@ resource "aws_lambda_permission" "apigw_sync_push" {
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "apigw_weights_create" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeWeightsCreate"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.weights_create[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_weights_list" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeWeightsList"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.weights_list[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
 resource "aws_lambda_permission" "apigw_sync_pull" {
   count = var.create_api ? 1 : 0
 
@@ -659,6 +792,8 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.foods_post[0].id,
       aws_api_gateway_integration.foods_barcode_get[0].id,
       aws_api_gateway_integration.diary_post[0].id,
+      aws_api_gateway_integration.weights_get[0].id,
+      aws_api_gateway_integration.weights_post[0].id,
       aws_api_gateway_integration.sync_push_post[0].id,
       aws_api_gateway_integration.sync_pull_post[0].id,
     ]))

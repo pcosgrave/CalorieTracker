@@ -11,6 +11,7 @@ import {
   totalsForEntries,
   writeDiaryEntries,
 } from "@/app/lib/diary";
+import { maybeAutoSync } from "@/lib/sync/service";
 import type { EntryEditForm } from "../types";
 import { groupEntriesByMeal } from "../utils";
 
@@ -30,6 +31,7 @@ export function useDiaryPage() {
   useEffect(() => {
     if (loaded) {
       writeDiaryEntries(entries);
+      void maybeAutoSync();
     }
   }, [entries, loaded]);
 

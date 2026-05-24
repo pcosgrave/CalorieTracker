@@ -7,10 +7,11 @@ import type {
   SyncPullResponse,
   SyncPushResponse,
   SyncSettings,
+  WeightEntryRecord,
 } from "@calorie-tracker/shared";
-import { isBarcodeAliasChange, isDiaryEntryChange, isFoodProductChange } from "@calorie-tracker/shared";
-import { markRecordForSync } from "@calorie-tracker/shared";
+import { isBarcodeAliasChange, isDiaryEntryChange, isFoodProductChange, isWeightEntryChange, markRecordForSync } from "@calorie-tracker/shared";
 import { barcodeAliasStorageKey, createId, foodStorageKey, recipeStorageKey, storageKey } from "@/app/lib/diary";
+import { weightStorageKey } from "@/app/lib/weight";
 import { getCognitoConfig } from "@/lib/auth/config";
 import {
   LocalStorageSyncOutboxRepository,
@@ -23,6 +24,8 @@ import {
   writeBarcodeAliasRecordsSync,
   writeDiaryEntryRecordsSync,
   writeFoodProductRecordsSync,
+  readWeightEntryRecordsSync,
+  writeWeightEntryRecordsSync,
 } from "@/lib/repositories/local-storage";
 
 type SyncResult = {
@@ -154,6 +157,27 @@ function applyIncomingChange(change: SyncChange): void {
     const record = change.payload as BarcodeAliasRecord;
     const currentRecords = readBarcodeAliasRecordsSync(barcodeAliasStorageKey);
     writeBarcodeAliasRecordsSync(barcodeAliasStorageKey, mergeByRecordId(currentRecords, record));
+    return;
+  }
+
+  if (change.operation === "delete" && isWeightEntryChange(change)) {
+    const deletedAt = change.changedAt;
+    const currentRecords = readWeightEntryRecordsSync(weightStorageKey, currentDeviceId);
+    writeWeightEntryRecordsSync(
+      weightStorageKey,
+      currentRecords.map((record) =>
+        record.sync.recordId === change.recordId
+          ? markRecordForSync(record, { updatedAt: deletedAt, deletedAt, syncStatus: "synced" })
+          : record,
+      ),
+    );
+    return;
+  }
+
+  if (isWeightEntryChange(change) && change.payload) {
+    const record = change.payload as WeightEntryRecord;
+    const currentRecords = readWeightEntryRecordsSync(weightStorageKey, currentDeviceId);
+    writeWeightEntryRecordsSync(weightStorageKey, mergeByRecordId(currentRecords, record));
   }
 }
 

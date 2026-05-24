@@ -33,6 +33,16 @@ export interface DiaryEntry {
   updatedAt: string;
 }
 
+export interface WeightEntry {
+  entryId: string;
+  ownerUserId: string;
+  loggedAt: string;
+  weightKg: number;
+  source: "manual" | "health_connect" | "import";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateFoodProductRequest {
   barcode?: string | undefined;
   name: string;
@@ -46,6 +56,12 @@ export interface CreateDiaryEntryRequest {
   loggedAt: string;
   meal: MealType;
   servingMultiplier: number;
+}
+
+export interface CreateWeightEntryRequest {
+  loggedAt: string;
+  weightKg: number;
+  source?: "manual" | "health_connect" | "import";
 }
 
 export interface BarcodeLookupResponse {

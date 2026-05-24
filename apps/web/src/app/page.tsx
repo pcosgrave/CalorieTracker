@@ -1,5 +1,5 @@
-import { DiaryPageClient } from "@/features/diary/components/DiaryPageClient";
+import { HomePageClient } from "@/features/home/components/HomePageClient";
 
 export default function Home() {
-  return <DiaryPageClient />;
+  return <HomePageClient />;
 }

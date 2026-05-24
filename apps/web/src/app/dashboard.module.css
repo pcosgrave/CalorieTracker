@@ -1,0 +1,317 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(24, 119, 240, 0.12), transparent 32%),
+    linear-gradient(180deg, #f4f7fb 0%, #edf1f8 100%);
+  color: #162033;
+}
+
+.darkPage {
+  background:
+    radial-gradient(circle at top, rgba(24, 119, 240, 0.18), transparent 32%),
+    linear-gradient(180deg, #0d1118 0%, #101720 100%);
+  color: #f5f7fb;
+}
+
+.shell {
+  width: min(980px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: clamp(2rem, 3vw, 3rem);
+  font-weight: 800;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: rgba(22, 32, 51, 0.68);
+}
+
+.darkPage .subtitle,
+.darkPage .subtle {
+  color: rgba(245, 247, 251, 0.68);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.textButton,
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.8rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.textButton {
+  background: rgba(255, 255, 255, 0.72);
+  color: #1768f2;
+}
+
+.darkPage .textButton {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.primaryButton {
+  background: #1677f0;
+  color: white;
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.78);
+  color: #1c2536;
+}
+
+.darkPage .secondaryButton {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f7fb;
+}
+
+.dangerButton {
+  background: rgba(255, 97, 74, 0.12);
+  color: #d14c39;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(189, 199, 216, 0.52);
+  border-radius: 2rem;
+  padding: 1.4rem;
+  box-shadow: 0 18px 42px rgba(30, 44, 78, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.darkPage .panel {
+  background: rgba(20, 28, 39, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.3);
+}
+
+.metricsGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.metricCard {
+  display: grid;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.metricLabel {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgba(22, 32, 51, 0.72);
+}
+
+.darkPage .metricLabel {
+  color: rgba(245, 247, 251, 0.7);
+}
+
+.metricValue {
+  font-size: clamp(2rem, 3.4vw, 3rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metricHint,
+.subtle {
+  color: rgba(22, 32, 51, 0.62);
+}
+
+.section {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.rangeTabs,
+.periodTabs,
+.dateTabs {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pill,
+.activePill {
+  appearance: none;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  border: 1px solid rgba(189, 199, 216, 0.82);
+  cursor: pointer;
+}
+
+.pill {
+  background: rgba(255, 255, 255, 0.74);
+  color: inherit;
+}
+
+.activePill {
+  background: #1677f0;
+  border-color: #1677f0;
+  color: white;
+}
+
+.darkPage .pill {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.chartShell {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.chartPanel {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.yAxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 240px;
+  font-size: 0.82rem;
+  color: rgba(22, 32, 51, 0.62);
+}
+
+.darkPage .yAxis {
+  color: rgba(245, 247, 251, 0.6);
+}
+
+.chartArea {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.chartSvg {
+  width: 100%;
+  height: 240px;
+  overflow: visible;
+}
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(22, 32, 51, 0.62);
+}
+
+.darkPage .xAxis {
+  color: rgba(245, 247, 251, 0.6);
+}
+
+.historyList,
+.mealList {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.historyRow,
+.mealRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.darkPage .historyRow,
+.darkPage .mealRow {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.historyActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.formGrid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.formRow {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(189, 199, 216, 0.82);
+  background: rgba(255, 255, 255, 0.84);
+  color: inherit;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+}
+
+.darkPage .field input,
+.darkPage .field select {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.goalLine {
+  color: #36c15b;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    width: min(100% - 1rem, 980px);
+  }
+
+  .topbar {
+    flex-direction: column;
+  }
+
+  .chartPanel {
+    grid-template-columns: 56px 1fr;
+  }
+}

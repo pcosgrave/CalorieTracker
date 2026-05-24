@@ -46,6 +46,9 @@ export function DiaryPageClient() {
             <p>Manual labels, private barcode shortcuts, cloud sync when signed in.</p>
           </div>
           <div className={styles.headerActions}>
+            <Link className={styles.textButton} href="/">
+              Home
+            </Link>
             <Link className={styles.textButton} href="/settings">
               Sync
             </Link>
@@ -54,7 +57,7 @@ export function DiaryPageClient() {
                 {authUser.email || "Sign out"}
               </Link>
             ) : (
-              <Link className={styles.textButton} href="/api/auth/login?returnTo=/">
+              <Link className={styles.textButton} href="/api/auth/login?returnTo=/food">
                 Sign in
               </Link>
             )}

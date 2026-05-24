@@ -12,6 +12,9 @@ const defaultSettings: SyncSettings = {
   syncEnabled: false,
   backupMode: "disabled",
   apiBaseUrl: "",
+  calorieTargetMin: 1800,
+  calorieTargetMax: 2200,
+  weightUnit: "kilograms",
 };
 
 export default function SettingsPage() {
@@ -53,7 +56,7 @@ export default function SettingsPage() {
             <p>Keep local data primary and optionally back it up to your API.</p>
           </div>
           <Link className={styles.textButton} href="/">
-            Back to diary
+            Back home
           </Link>
         </header>
 
@@ -96,6 +99,38 @@ export default function SettingsPage() {
                 <option value="manual_backup">Manual backup</option>
                 <option value="automatic_backup">Automatic backup</option>
               </select>
+            </label>
+
+            <label>
+              Calorie target min
+              <input
+                value={settings.calorieTargetMin ?? 1800}
+                onChange={(event) => setSettings((current) => ({ ...current, calorieTargetMin: Number(event.target.value) || 0 }))}
+              />
+            </label>
+
+            <label>
+              Calorie target max
+              <input
+                value={settings.calorieTargetMax ?? 2200}
+                onChange={(event) => setSettings((current) => ({ ...current, calorieTargetMax: Number(event.target.value) || 0 }))}
+              />
+            </label>
+
+            <label>
+              Weight unit
+              <select value={settings.weightUnit ?? "kilograms"} onChange={(event) => setSettings((current) => ({ ...current, weightUnit: event.target.value as SyncSettings["weightUnit"] }))}>
+                <option value="kilograms">Kilograms</option>
+                <option value="pounds">Pounds</option>
+              </select>
+            </label>
+
+            <label>
+              Goal weight (kg)
+              <input
+                value={settings.goalWeightKg ?? ""}
+                onChange={(event) => setSettings((current) => ({ ...current, goalWeightKg: event.target.value ? Number(event.target.value) : undefined }))}
+              />
             </label>
 
             <p className={styles.subtle}>Pending local changes: {pendingCount}</p>

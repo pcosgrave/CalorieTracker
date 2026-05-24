@@ -30,6 +30,10 @@ output "diary_entries_table_name" {
   value = aws_dynamodb_table.diary_entries.name
 }
 
+output "weight_entries_table_name" {
+  value = aws_dynamodb_table.weight_entries.name
+}
+
 output "sync_changes_table_name" {
   value = aws_dynamodb_table.sync_changes.name
 }
