@@ -13,6 +13,7 @@ build/
 *.tfvars
 *.tfvars.json
 local.properties
+apps/android/secure.properties
 .gradle/
 .gradle-user-home/
 .idea/

@@ -1,6 +1,23 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 val cameraXVersion = "1.4.1"
+val secureProperties = Properties().apply {
+    val secureFile = rootProject.file("secure.properties")
+    if (secureFile.exists()) {
+        secureFile.inputStream().use(::load)
+    }
+}
+
+fun requiredSecureConfig(key: String): String =
+    (secureProperties.getProperty(key)
+        ?: providers.gradleProperty(key).orNull
+        ?: providers.environmentVariable(key).orNull)
+        ?.takeIf { it.isNotBlank() }
+        ?: error(
+            "Missing Android secure config '$key'. " +
+                "Define it in apps/android/secure.properties, as a Gradle property, or as an environment variable.",
+        )
 
 plugins {
     id("com.android.application")
@@ -19,13 +36,13 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "AWS_REGION", "\"us-east-1\"")
-        buildConfigField("String", "COGNITO_DOMAIN", "\"philip-calorie-tracker-dev\"")
-        buildConfigField("String", "COGNITO_USER_POOL_ID", "\"us-east-1_WYQwdC4oO\"")
-        buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"bb27drot68rek496i4tmrn2ik\"")
-        buildConfigField("String", "SYNC_API_BASE_URL", "\"https://84jfkxkrd6.execute-api.us-east-1.amazonaws.com/dev\"")
-        buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"calorietracker://auth/callback\"")
-        buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"calorietracker://signout\"")
+        buildConfigField("String", "AWS_REGION", "\"${requiredSecureConfig("CT_AWS_REGION")}\"")
+        buildConfigField("String", "COGNITO_DOMAIN", "\"${requiredSecureConfig("CT_COGNITO_DOMAIN")}\"")
+        buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${requiredSecureConfig("CT_COGNITO_USER_POOL_ID")}\"")
+        buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_CLIENT_ID")}\"")
+        buildConfigField("String", "SYNC_API_BASE_URL", "\"${requiredSecureConfig("CT_SYNC_API_BASE_URL")}\"")
+        buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_REDIRECT_URI")}\"")
+        buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_LOGOUT_URI")}\"")
     }
 
     buildFeatures {

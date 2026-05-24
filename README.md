@@ -151,6 +151,8 @@ npm run build --workspace @calorie-tracker/web
 
 Open `apps/android` in Android Studio, let Gradle sync, then run the `app` configuration on an emulator or device.
 
+Before the Android app can talk to AWS/Cognito, create a local `apps/android/secure.properties` file from `apps/android/secure.properties.example` and fill in the real `CT_*` values. That file is ignored by git on purpose.
+
 The current Android app is also a static shell. It includes the temporary package name and declares the ML Kit barcode scanning dependency, but the camera scanner and persistence are not wired yet.
 
 The temporary Android package name is:

@@ -1,0 +1,7 @@
+CT_AWS_REGION=us-east-1
+CT_COGNITO_DOMAIN=your-cognito-domain-prefix
+CT_COGNITO_USER_POOL_ID=us-east-1_example
+CT_COGNITO_ANDROID_CLIENT_ID=your-android-client-id
+CT_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/dev
+CT_COGNITO_ANDROID_REDIRECT_URI=calorietracker://auth/callback
+CT_COGNITO_ANDROID_LOGOUT_URI=calorietracker://signout
