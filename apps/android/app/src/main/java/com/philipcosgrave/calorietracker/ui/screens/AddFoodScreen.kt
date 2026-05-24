@@ -1,6 +1,7 @@
 package com.philipcosgrave.calorietracker.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.SortMode
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
+import com.philipcosgrave.calorietracker.ui.components.AppBorder
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
@@ -55,6 +57,11 @@ fun AddFoodScreen(
     onAddRecipe: () -> Unit,
     onSelectFood: (FoodItem) -> Unit,
     onQuickLogFood: (FoodItem) -> Unit,
+    remoteSearchResults: List<FoodItem>,
+    remoteSearchQuery: String,
+    isSearchingRemote: Boolean,
+    onSearchOpenFoodFacts: (String) -> Unit,
+    onImportRemoteFood: (FoodItem) -> Unit,
     onDeleteFood: (FoodItem) -> Unit,
     onEditFood: (FoodItem) -> Unit,
 ) {
@@ -77,6 +84,10 @@ fun AddFoodScreen(
                 SortMode.Alphabetical -> list.sortedBy { it.name }
             }
         }
+    val shouldShowRemoteSearch =
+        search.trim().length >= 3 && activeKind == FoodKind.Ingredient && results.size < 2
+    val showingRemoteResultsForCurrentSearch =
+        remoteSearchQuery.equals(search.trim(), ignoreCase = true)
 
     Page {
         PageHeader(
@@ -173,6 +184,52 @@ fun AddFoodScreen(
                     )
                 }
             }
+
+            if (shouldShowRemoteSearch) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White, RoundedCornerShape(18.dp))
+                            .border(1.dp, AppBorder, RoundedCornerShape(18.dp))
+                            .padding(14.dp),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(onClick = { onSearchOpenFoodFacts(search) }) {
+                                Text("Search Open Food Facts", color = AppBlue, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                "Packaged foods scan better when a barcode is available.",
+                                color = AppMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+
+                    if (isSearchingRemote) {
+                        Text("Searching Open Food Facts...", color = AppMuted)
+                    } else if (showingRemoteResultsForCurrentSearch && remoteSearchResults.isNotEmpty()) {
+                        Text("Open Food Facts", fontWeight = FontWeight.Bold, color = AppMuted)
+                        remoteSearchResults.forEach { item ->
+                            FoodSearchRow(
+                                item = item,
+                                showCalories = true,
+                                onClick = { onImportRemoteFood(item) },
+                                onDoubleClick = { onImportRemoteFood(item) },
+                            )
+                        }
+                    } else {
+                        Text(
+                            if (showingRemoteResultsForCurrentSearch) {
+                                "No Open Food Facts matches found."
+                            } else {
+                                "No Open Food Facts matches loaded yet."
+                            },
+                            color = AppMuted,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -192,6 +249,11 @@ private fun AddFoodScreenPreview() {
             onAddRecipe = {},
             onSelectFood = {},
             onQuickLogFood = {},
+            remoteSearchResults = emptyList(),
+            remoteSearchQuery = "",
+            isSearchingRemote = false,
+            onSearchOpenFoodFacts = {},
+            onImportRemoteFood = {},
             onDeleteFood = {},
             onEditFood = {},
         )

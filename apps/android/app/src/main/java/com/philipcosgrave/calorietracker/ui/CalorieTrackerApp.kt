@@ -114,6 +114,9 @@ fun CalorieTrackerApp(
     var healthConnectAvailability by remember { mutableStateOf(HealthConnectAvailability.Unavailable) }
     var healthConnectPermissionGranted by remember { mutableStateOf(false) }
     var healthConnectExportEnabled by remember { mutableStateOf(false) }
+    var remoteSearchResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+    var remoteSearchQuery by remember { mutableStateOf("") }
+    var isSearchingRemote by remember { mutableStateOf(false) }
 
     suspend fun refreshState() {
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
@@ -375,6 +378,30 @@ fun CalorieTrackerApp(
                     scope.launch {
                         saveDiaryEntry(entry)
                         refreshState()
+                    }
+                },
+                remoteSearchResults = remoteSearchResults,
+                remoteSearchQuery = remoteSearchQuery,
+                isSearchingRemote = isSearchingRemote,
+                onSearchOpenFoodFacts = { query ->
+                    remoteSearchQuery = query.trim()
+                    isSearchingRemote = true
+                    scope.launch {
+                        remoteSearchResults = openFoodFactsLookupService.searchFoodsByName(remoteSearchQuery)
+                        isSearchingRemote = false
+                    }
+                },
+                onImportRemoteFood = { item ->
+                    scope.launch {
+                        saveFood(item)
+                        refreshState()
+                        remoteSearchResults = remoteSearchResults.map { remote ->
+                            if (remote.barcode.isNotBlank() && remote.barcode == item.barcode) item
+                            else if (remote.name == item.name && remote.brand == item.brand) item
+                            else remote
+                        }
+                        selectedFood = item
+                        screen = AppScreen.LogFood
                     }
                 },
                 onDeleteFood = { item ->

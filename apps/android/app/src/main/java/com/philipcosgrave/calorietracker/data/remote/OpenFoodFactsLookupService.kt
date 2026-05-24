@@ -10,6 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val OpenFoodFactsBaseUrl = "https://world.openfoodfacts.org/api/v2/product"
+private const val OpenFoodFactsSearchUrl = "https://world.openfoodfacts.org/cgi/search.pl"
 private const val OpenFoodFactsUserAgent = "CalorieTracker/0.1 (https://github.com/philipcosgrave/CalorieTracker)"
 
 class OpenFoodFactsLookupService {
@@ -20,19 +21,47 @@ class OpenFoodFactsLookupService {
         }
 
         val product = json.optJSONObject("product") ?: return@withContext null
+        parseFood(product)
+    }
+
+    suspend fun searchFoodsByName(query: String, limit: Int = 8): List<FoodItem> = withContext(Dispatchers.IO) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.length < 2) return@withContext emptyList()
+
+        val encodedQuery = java.net.URLEncoder.encode(normalizedQuery, Charsets.UTF_8.name())
+        val json = getJsonObject(
+            "$OpenFoodFactsSearchUrl?search_terms=$encodedQuery&search_simple=1&action=process&json=1&page_size=$limit",
+        ) ?: return@withContext emptyList()
+
+        val products = json.optJSONArray("products") ?: return@withContext emptyList()
+        buildList {
+            for (index in 0 until products.length()) {
+                val product = products.optJSONObject(index) ?: continue
+                val parsed = parseFood(product) ?: continue
+                if (parsed.name.contains(normalizedQuery, ignoreCase = true) ||
+                    parsed.brand.contains(normalizedQuery, ignoreCase = true)
+                ) {
+                    add(parsed)
+                }
+            }
+        }.distinctBy { it.barcode.ifBlank { "${it.name}|${it.brand}" } }
+    }
+
+    private fun parseFood(product: JSONObject): FoodItem? {
         val name = product.optString("product_name").trim()
         if (name.isBlank()) {
-            return@withContext null
+            return null
         }
 
+        val barcode = product.optString("code").trim()
         val nutriments = product.optJSONObject("nutriments") ?: JSONObject()
         val servingQuantity = product.optDouble("serving_quantity").takeIf { it > 0 } ?: 100.0
         val servingUnit = product.optString("serving_quantity_unit").trim()
             .ifBlank { parseServingUnit(product.optString("serving_size")) }
             .ifBlank { "g" }
 
-        FoodItem(
-            id = "off-$barcode",
+        return FoodItem(
+            id = "off-${barcode.ifBlank { name.lowercase().replace("\\s+".toRegex(), "-") }}",
             kind = FoodKind.Ingredient,
             name = name,
             brand = product.optString("brands").trim().ifBlank { "" },
