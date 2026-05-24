@@ -6,10 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +42,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppSegmentedControl
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.ScrollablePillSelector
-import com.philipcosgrave.calorietracker.ui.components.appSoftColor
+import com.philipcosgrave.calorietracker.ui.components.SectionDivider
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -53,6 +56,8 @@ fun WeightScreen(
     goalWeightKg: Double?,
     onBack: () -> Unit,
     onLogWeight: () -> Unit,
+    onEditWeight: (WeightEntry) -> Unit,
+    onDeleteWeight: (WeightEntry) -> Unit,
 ) {
     val today = LocalDate.now()
     val overallLatest = remember(weights) { weights.maxByOrNull { it.date } }
@@ -131,12 +136,15 @@ fun WeightScreen(
                     isCurrentWeight = effectiveDailyEntry?.id == overallLatest?.id,
                     weightUnit = weightUnit,
                     goalWeightKg = goalWeightKg,
+                    onEdit = onEditWeight,
+                    onDelete = onDeleteWeight,
                 )
             } else {
                 WeightTrendChart(
                     points = chartPoints.map { it.second },
                     labels = chartPoints.map { it.first },
                     goalValue = goalWeightKg?.let { convertWeightFromKg(it, weightUnit) },
+                    unitLabel = weightUnitLabel(weightUnit),
                 )
             }
 
@@ -159,7 +167,12 @@ fun WeightScreen(
                 Text("No weights logged for this selection yet.", color = AppMuted)
             } else {
                 historyEntries.forEach { entry ->
-                    WeightHistoryRow(entry = entry, weightUnit = weightUnit)
+                    WeightHistoryRow(
+                        entry = entry,
+                        weightUnit = weightUnit,
+                        onEdit = onEditWeight,
+                        onDelete = onDeleteWeight,
+                    )
                 }
             }
         }
@@ -245,6 +258,8 @@ private fun DailyWeightSummary(
     isCurrentWeight: Boolean,
     weightUnit: SyncSettings.WeightUnit,
     goalWeightKg: Double?,
+    onEdit: (WeightEntry) -> Unit,
+    onDelete: (WeightEntry) -> Unit,
 ) {
     AppCardContainer {
         if (entry == null) {
@@ -267,6 +282,7 @@ private fun DailyWeightSummary(
                     color = AppMuted,
                 )
             }
+            WeightEntryActions(entry = entry, onEdit = onEdit, onDelete = onDelete)
         }
     }
 }
@@ -276,6 +292,7 @@ private fun WeightTrendChart(
     points: List<Double>,
     labels: List<String>,
     goalValue: Double?,
+    unitLabel: String,
 ) {
     AppCardContainer {
         if (points.isEmpty()) {
@@ -286,63 +303,84 @@ private fun WeightTrendChart(
         val minValue = listOfNotNull(points.minOrNull(), goalValue).minOrNull() ?: 0.0
         val maxValue = listOfNotNull(points.maxOrNull(), goalValue).maxOrNull() ?: minValue
         val span = (maxValue - minValue).takeIf { it > 0.1 } ?: 1.0
+        val topTick = maxValue
+        val middleTick = minValue + (span / 2.0)
+        val bottomTick = minValue
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-        ) {
-            val leftPad = 20f
-            val rightPad = 20f
-            val topPad = 20f
-            val bottomPad = 26f
-            val usableWidth = size.width - leftPad - rightPad
-            val usableHeight = size.height - topPad - bottomPad
-            val stepX = if (points.size == 1) 0f else usableWidth / (points.size - 1)
-
-            repeat(3) { index ->
-                val y = topPad + usableHeight * (index / 2f)
-                drawLine(
-                    color = AppMuted.copy(alpha = 0.15f),
-                    start = Offset(leftPad, y),
-                    end = Offset(size.width - rightPad, y),
-                    strokeWidth = 2f,
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+            Column(
+                modifier = Modifier.height(220.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                listOf(topTick, middleTick, bottomTick).forEachIndexed { index, tick ->
+                    Text(
+                        if (index == 0) "${formatNumber(tick)} $unitLabel" else formatNumber(tick),
+                        color = AppMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
             }
 
-            goalValue?.let { goal ->
-                val normalized = ((goal - minValue) / span).toFloat()
-                val y = topPad + usableHeight - usableHeight * normalized
-                drawLine(
-                    color = androidx.compose.ui.graphics.Color(0xFF36C15B),
-                    start = Offset(leftPad, y),
-                    end = Offset(size.width - rightPad, y),
-                    strokeWidth = 4f,
-                )
-            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                ) {
+                    val leftPad = 4f
+                    val rightPad = 4f
+                    val topPad = 20f
+                    val bottomPad = 26f
+                    val usableWidth = size.width - leftPad - rightPad
+                    val usableHeight = size.height - topPad - bottomPad
+                    val stepX = if (points.size == 1) 0f else usableWidth / (points.size - 1)
 
-            val path = Path()
-            points.forEachIndexed { index, value ->
-                val normalized = ((value - minValue) / span).toFloat()
-                val x = leftPad + stepX * index
-                val y = topPad + usableHeight - usableHeight * normalized
-                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                drawCircle(color = AppBlue, radius = 7f, center = Offset(x, y))
+                    repeat(3) { index ->
+                        val y = topPad + usableHeight * (index / 2f)
+                        drawLine(
+                            color = AppMuted.copy(alpha = 0.15f),
+                            start = Offset(leftPad, y),
+                            end = Offset(size.width - rightPad, y),
+                            strokeWidth = 2f,
+                        )
+                    }
+
+                    goalValue?.let { goal ->
+                        val normalized = ((goal - minValue) / span).toFloat()
+                        val y = topPad + usableHeight - usableHeight * normalized
+                        drawLine(
+                            color = androidx.compose.ui.graphics.Color(0xFF36C15B),
+                            start = Offset(leftPad, y),
+                            end = Offset(size.width - rightPad, y),
+                            strokeWidth = 4f,
+                        )
+                    }
+
+                    val path = Path()
+                    points.forEachIndexed { index, value ->
+                        val normalized = ((value - minValue) / span).toFloat()
+                        val x = leftPad + stepX * index
+                        val y = topPad + usableHeight - usableHeight * normalized
+                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                        drawCircle(color = AppBlue, radius = 7f, center = Offset(x, y))
+                    }
+                    drawPath(path = path, color = AppBlue, style = Stroke(width = 6f))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    labels.take(5).forEach { label ->
+                        Text(label, color = AppMuted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
-            drawPath(path = path, color = AppBlue, style = Stroke(width = 6f))
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            labels.take(5).forEach { label ->
-                Text(label, color = AppMuted, style = MaterialTheme.typography.labelSmall)
-            }
-        }
         goalValue?.let {
             Text(
-                "Goal baseline: ${formatNumber(it)}",
+                "Goal baseline: ${formatNumber(it)} $unitLabel",
                 color = androidx.compose.ui.graphics.Color(0xFF36C15B),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
@@ -355,22 +393,47 @@ private fun WeightTrendChart(
 private fun WeightHistoryRow(
     entry: WeightEntry,
     weightUnit: SyncSettings.WeightUnit,
+    onEdit: (WeightEntry) -> Unit,
+    onDelete: (WeightEntry) -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            "${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            "${formatNumber(convertWeightFromKg(entry.weightKg, weightUnit))} ${weightUnitLabel(weightUnit)}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                "${formatNumber(convertWeightFromKg(entry.weightKg, weightUnit))} ${weightUnitLabel(weightUnit)}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        WeightEntryActions(entry = entry, onEdit = onEdit, onDelete = onDelete)
+        SectionDivider()
+    }
+}
+
+@Composable
+private fun WeightEntryActions(
+    entry: WeightEntry,
+    onEdit: (WeightEntry) -> Unit,
+    onDelete: (WeightEntry) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = { onEdit(entry) }) {
+            Text("Edit", color = AppBlue, fontWeight = FontWeight.Medium)
+        }
+        TextButton(onClick = { onDelete(entry) }) {
+            Text("Delete", color = androidx.compose.ui.graphics.Color(0xFFFF6B5C), fontWeight = FontWeight.Medium)
+        }
     }
 }
 
@@ -436,6 +499,8 @@ private fun WeightScreenPreview() {
             goalWeightKg = PreviewData.syncSettings.goalWeightKg,
             onBack = {},
             onLogWeight = {},
+            onEditWeight = {},
+            onDeleteWeight = {},
         )
     }
 }

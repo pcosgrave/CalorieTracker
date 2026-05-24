@@ -189,6 +189,15 @@ class RoomWeightRepository(private val dao: WeightRecordDao) : WeightRepository 
             )
         }
 
+    override suspend fun getById(ownerUserId: String, recordId: String): WeightEntry? =
+        dao.getById(ownerUserId, recordId)?.let { entity ->
+            WeightEntry(
+                id = entity.recordId,
+                date = LocalDate.parse(entity.loggedOn),
+                weightKg = entity.weightKg,
+            )
+        }
+
     override suspend fun save(ownerUserId: String, entry: WeightEntry) {
         dao.upsert(
             WeightRecordEntity(
@@ -199,6 +208,10 @@ class RoomWeightRepository(private val dao: WeightRecordDao) : WeightRepository 
                 updatedAt = java.time.Instant.now().toString(),
             ),
         )
+    }
+
+    override suspend fun delete(ownerUserId: String, recordId: String) {
+        dao.delete(ownerUserId, recordId)
     }
 }
 

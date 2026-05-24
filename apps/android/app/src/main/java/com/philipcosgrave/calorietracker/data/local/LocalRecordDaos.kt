@@ -70,6 +70,12 @@ interface WeightRecordDao {
     @Query("SELECT * FROM weight_records WHERE ownerUserId = :ownerUserId ORDER BY loggedOn DESC, updatedAt DESC LIMIT 1")
     suspend fun latest(ownerUserId: String): WeightRecordEntity?
 
+    @Query("SELECT * FROM weight_records WHERE ownerUserId = :ownerUserId AND recordId = :recordId LIMIT 1")
+    suspend fun getById(ownerUserId: String, recordId: String): WeightRecordEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: WeightRecordEntity)
+
+    @Query("DELETE FROM weight_records WHERE ownerUserId = :ownerUserId AND recordId = :recordId")
+    suspend fun delete(ownerUserId: String, recordId: String)
 }

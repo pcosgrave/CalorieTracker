@@ -39,7 +39,9 @@ interface DiaryRepository {
 interface WeightRepository {
     suspend fun list(ownerUserId: String): List<WeightEntry>
     suspend fun latest(ownerUserId: String): WeightEntry?
+    suspend fun getById(ownerUserId: String, recordId: String): WeightEntry?
     suspend fun save(ownerUserId: String, entry: WeightEntry)
+    suspend fun delete(ownerUserId: String, recordId: String)
 }
 
 interface SyncOutboxRepository {

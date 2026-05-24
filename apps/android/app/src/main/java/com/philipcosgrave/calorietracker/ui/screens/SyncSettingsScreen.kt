@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +36,6 @@ import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
-import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SectionDivider
@@ -44,6 +44,7 @@ import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import kotlinx.coroutines.delay
 
 @Composable
 fun SyncSettingsScreen(
@@ -71,6 +72,25 @@ fun SyncSettingsScreen(
     var weightUnit by remember(settings) { mutableStateOf(settings.weightUnit) }
     var goalWeightText by remember(settings) {
         mutableStateOf(settings.goalWeightKg?.let { formatWeightForUnit(it, settings.weightUnit) } ?: "")
+    }
+    val draftSettings = settings.copy(
+        syncEnabled = syncEnabled,
+        backupMode = backupMode,
+        apiBaseUrl = apiBaseUrl.trim().ifBlank { null },
+        calorieTargetMin = calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
+        calorieTargetMax = maxOf(
+            calorieTargetMax.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMax,
+            calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
+        ),
+        weightUnit = weightUnit,
+        goalWeightKg = goalWeightText.toDoubleOrNull()?.let { convertWeightToKg(it, weightUnit) },
+    )
+
+    LaunchedEffect(draftSettings) {
+        if (draftSettings != settings) {
+            delay(350)
+            onSave(draftSettings)
+        }
     }
 
     Page {
@@ -101,7 +121,7 @@ fun SyncSettingsScreen(
                 }
             }
 
-            AppPrimaryButton(
+            com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton(
                 text = when {
                     healthConnectAvailability == HealthConnectAvailability.UpdateRequired -> "Install or Update Health Connect"
                     healthConnectPermissionGranted -> if (healthConnectExportEnabled) "Health Connect Enabled" else "Reconnect Health Connect"
@@ -219,33 +239,11 @@ fun SyncSettingsScreen(
             Text("Pending local changes: $pendingChangeCount", color = AppMuted)
             Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}", color = AppMuted)
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(
-                    onClick = if (authSession != null) onSignOut else onSignIn,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (authSession != null) "Sign out" else "Sign in", color = AppMuted)
-                }
-                AppPrimaryButton(
-                    text = "Save",
-                    onClick = {
-                        onSave(
-                            settings.copy(
-                                syncEnabled = syncEnabled,
-                                backupMode = backupMode,
-                                apiBaseUrl = apiBaseUrl.trim().ifBlank { null },
-                                calorieTargetMin = calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
-                                calorieTargetMax = maxOf(
-                                    calorieTargetMax.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMax,
-                                    calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
-                                ),
-                                weightUnit = weightUnit,
-                                goalWeightKg = goalWeightText.toDoubleOrNull()?.let { convertWeightToKg(it, weightUnit) },
-                            ),
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+            TextButton(
+                onClick = if (authSession != null) onSignOut else onSignIn,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (authSession != null) "Sign out" else "Sign in", color = AppMuted)
             }
 
             TextButton(

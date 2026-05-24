@@ -36,7 +36,7 @@ fun LogWeightScreen(
     weightUnit: SyncSettings.WeightUnit,
     existingEntry: WeightEntry? = null,
     onBack: () -> Unit,
-    onSave: (LocalDate, Double) -> Unit,
+    onSave: (WeightEntry) -> Unit,
 ) {
     var selectedDate by remember(existingEntry?.date, initialDate) { mutableStateOf(existingEntry?.date ?: initialDate) }
     var weightText by remember(existingEntry?.weightKg, weightUnit) {
@@ -64,10 +64,16 @@ fun LogWeightScreen(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AppPrimaryButton(
-                text = "Save Weight",
+                text = if (existingEntry == null) "Save Weight" else "Update Weight",
                 onClick = {
                     val entered = weightText.toDoubleOrNull() ?: return@AppPrimaryButton
-                    onSave(selectedDate, convertWeightToKg(entered, weightUnit))
+                    onSave(
+                        WeightEntry(
+                            id = existingEntry?.id ?: "",
+                            date = selectedDate,
+                            weightKg = convertWeightToKg(entered, weightUnit),
+                        ),
+                    )
                 },
                 modifier = Modifier.weight(1f),
                 enabled = weightText.toDoubleOrNull() != null,
@@ -109,7 +115,7 @@ private fun LogWeightScreenPreview() {
             weightUnit = PreviewData.syncSettings.weightUnit,
             existingEntry = PreviewData.weightEntries.last(),
             onBack = {},
-            onSave = { _, _ -> },
+            onSave = { },
         )
     }
 }

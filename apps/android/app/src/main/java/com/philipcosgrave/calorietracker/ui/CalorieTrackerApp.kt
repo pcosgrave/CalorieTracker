@@ -108,6 +108,7 @@ fun CalorieTrackerApp(
     var recipeDraft by remember { mutableStateOf(RecipeDraft()) }
     var parentRecipeDraft by remember { mutableStateOf<RecipeDraft?>(null) }
     var editingFood by remember { mutableStateOf<FoodItem?>(null) }
+    var editingWeight by remember { mutableStateOf<WeightEntry?>(null) }
     var syncSettings by remember {
         mutableStateOf(
             SyncSettings(
@@ -285,21 +286,30 @@ fun CalorieTrackerApp(
         }
     }
 
-    suspend fun saveWeightEntry(date: LocalDate, weightKg: Double) {
-        val entry = WeightEntry(
-            id = createId("weight"),
-            date = date,
-            weightKg = weightKg,
-        )
+    suspend fun saveWeightEntry(entry: WeightEntry) {
+        val weightEntry = entry.copy(id = entry.id.ifBlank { createId("weight") })
         localStore.weightRepository.save(
             localStore.currentOwnerUserId(),
-            entry,
+            weightEntry,
         )
         if (healthConnectAvailability == HealthConnectAvailability.Available &&
             healthConnectPermissionGranted &&
             healthConnectExportEnabled
         ) {
-            runCatching { healthConnectExporter.exportWeightEntry(entry) }
+            runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
+        }
+    }
+
+    suspend fun deleteWeightEntry(entry: WeightEntry) {
+        localStore.weightRepository.delete(
+            localStore.currentOwnerUserId(),
+            entry.id,
+        )
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            runCatching { healthConnectExporter.deleteWeightEntry(entry.id) }
         }
     }
 
@@ -431,19 +441,39 @@ fun CalorieTrackerApp(
                 weightUnit = syncSettings.weightUnit,
                 goalWeightKg = syncSettings.goalWeightKg,
                 onBack = { screen = AppScreen.Home },
-                onLogWeight = { screen = AppScreen.LogWeight },
+                onLogWeight = {
+                    editingWeight = null
+                    screen = AppScreen.LogWeight
+                },
+                onEditWeight = { entry ->
+                    editingWeight = entry
+                    selectedDate = entry.date
+                    screen = AppScreen.LogWeight
+                },
+                onDeleteWeight = { entry ->
+                    weights = weights.filterNot { it.id == entry.id }
+                    scope.launch {
+                        deleteWeightEntry(entry)
+                        refreshState()
+                    }
+                },
             )
 
             AppScreen.LogWeight -> LogWeightScreen(
                 initialDate = selectedDate,
                 weightUnit = syncSettings.weightUnit,
-                onBack = { screen = AppScreen.Weight },
-                onSave = { date, weightKg ->
-                    selectedDate = date
+                existingEntry = editingWeight,
+                onBack = {
+                    editingWeight = null
+                    screen = AppScreen.Weight
+                },
+                onSave = { entry ->
+                    selectedDate = entry.date
                     scope.launch {
-                        saveWeightEntry(date, weightKg)
+                        saveWeightEntry(entry)
                         refreshState()
                     }
+                    editingWeight = null
                     screen = AppScreen.Weight
                 },
             )

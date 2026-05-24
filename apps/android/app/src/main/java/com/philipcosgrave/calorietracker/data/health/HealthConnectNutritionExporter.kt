@@ -184,11 +184,20 @@ class HealthConnectNutritionExporter(private val context: Context) {
         val record = WeightRecord(
             time = loggedAt.toInstant(),
             zoneOffset = loggedAt.offset ?: ZoneOffset.UTC,
-            metadata = Metadata.manualEntry(entry.id, 1L),
+            metadata = Metadata.manualEntry(entry.id, entry.date.toEpochDay()),
             weight = Mass.kilograms(entry.weightKg),
         )
 
         client.insertRecords(listOf(record))
+    }
+
+    suspend fun deleteWeightEntry(entryId: String) {
+        if (!hasWriteWeightPermission()) return
+        client.deleteRecords(
+            WeightRecord::class,
+            emptyList(),
+            listOf(entryId),
+        )
     }
 
     suspend fun importWeightEntries(): List<WeightEntry> {
