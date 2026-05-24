@@ -38,6 +38,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppSegmentedControl
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
+import com.philipcosgrave.calorietracker.ui.components.ScrollablePillSelector
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.DayOfWeek
@@ -176,72 +177,64 @@ private fun WeightPeriodPillsRow(
     onSelectWeek: (LocalDate) -> Unit,
     onSelectMonth: (LocalDate) -> Unit,
 ) {
-    val options = when (range) {
-        WeightChartRange.Daily -> buildList {
-            var cursor = today
-            repeat(5) {
-                add(cursor)
-                cursor = cursor.minusDays(1)
-            }.let { }
-        }.reversed()
-
-        WeightChartRange.Weekly -> buildList {
-            var cursor = startOfWeek(today)
-            repeat(5) {
-                add(cursor)
-                cursor = cursor.minusWeeks(1)
-            }.let { }
-        }.reversed()
-
-        WeightChartRange.Monthly -> buildList {
-            var cursor = today.withDayOfMonth(1)
-            repeat(5) {
-                add(cursor)
-                cursor = cursor.minusMonths(1)
-            }.let { }
-        }.reversed()
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        options.forEach { option ->
-            val selected =
-                when (range) {
-                    WeightChartRange.Daily -> option == selectedDailyDate
-                    WeightChartRange.Weekly -> option == selectedWeekStart
-                    WeightChartRange.Monthly -> option == selectedMonthStart
-                }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (selected) AppBlue else appSoftColor(),
-                        RoundedCornerShape(14.dp),
-                    )
-                    .clickable {
-                        when (range) {
-                            WeightChartRange.Daily -> onSelectDay(option)
-                            WeightChartRange.Weekly -> onSelectWeek(option)
-                            WeightChartRange.Monthly -> onSelectMonth(option)
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = when (range) {
-                        WeightChartRange.Daily -> "${option.month.name.take(3)} ${option.dayOfMonth}"
-                        WeightChartRange.Weekly -> "W${option.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}"
-                        WeightChartRange.Monthly -> option.month.name.take(3)
-                    },
-                    modifier = Modifier.align(Alignment.Center),
-                    color = if (selected) androidx.compose.ui.graphics.Color.White else AppMuted,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelLarge,
-                )
+    when (range) {
+        WeightChartRange.Daily -> {
+            val selected = minOf(selectedDailyDate, today)
+            val earliest = minOf(selected, today.minusDays(60))
+            val options = remember(selected, today) {
+                generateSequence(earliest) { current ->
+                    current.takeIf { it.isBefore(today) }?.plusDays(1)
+                }.toList()
             }
+            ScrollablePillSelector(
+                options = options,
+                selectedOption = selected,
+                currentOption = today,
+                currentLabel = "Today",
+                onSelect = onSelectDay,
+                labelForOption = { date -> "${date.month.name.take(3)} ${date.dayOfMonth}" },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        WeightChartRange.Weekly -> {
+            val currentWeek = startOfWeek(today)
+            val selected = minOf(selectedWeekStart, currentWeek)
+            val earliest = minOf(selected, currentWeek.minusWeeks(16))
+            val options = remember(selected, currentWeek) {
+                generateSequence(earliest) { current ->
+                    current.takeIf { it.isBefore(currentWeek) }?.plusWeeks(1)
+                }.toList()
+            }
+            ScrollablePillSelector(
+                options = options,
+                selectedOption = selected,
+                currentOption = currentWeek,
+                currentLabel = "This week",
+                onSelect = onSelectWeek,
+                labelForOption = { week -> "W${week.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}" },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        WeightChartRange.Monthly -> {
+            val currentMonth = today.withDayOfMonth(1)
+            val selected = minOf(selectedMonthStart, currentMonth)
+            val earliest = minOf(selected, currentMonth.minusMonths(12))
+            val options = remember(selected, currentMonth) {
+                generateSequence(earliest) { current ->
+                    current.takeIf { it.isBefore(currentMonth) }?.plusMonths(1)
+                }.toList()
+            }
+            ScrollablePillSelector(
+                options = options,
+                selectedOption = selected,
+                currentOption = currentMonth,
+                currentLabel = "This month",
+                onSelect = onSelectMonth,
+                labelForOption = { month -> month.month.name.take(3) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

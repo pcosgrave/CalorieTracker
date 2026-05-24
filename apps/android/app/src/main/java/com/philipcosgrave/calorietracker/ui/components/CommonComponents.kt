@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +37,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +66,7 @@ import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.SortMode
 import com.philipcosgrave.calorietracker.model.Totals
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import kotlinx.coroutines.android.awaitFrame
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -523,12 +529,48 @@ fun DatePillsRow(
     onDateChange: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dates = buildList {
-        var cursor = minOf(selectedDate, today)
-        add(cursor)
-        while (size < 3 && cursor.isAfter(LocalDate.MIN.plusDays(1))) {
-            cursor = cursor.minusDays(1)
-            add(0, cursor)
+    val clampedSelectedDate = minOf(selectedDate, today)
+    val earliestDate = minOf(clampedSelectedDate, today.minusDays(60))
+    val dates = remember(clampedSelectedDate, today) {
+        generateSequence(earliestDate) { current ->
+            current.takeIf { it.isBefore(today) }?.plusDays(1)
+        }.toList()
+    }
+
+    ScrollablePillSelector(
+        options = dates,
+        selectedOption = clampedSelectedDate,
+        currentOption = today,
+        currentLabel = "Today",
+        onSelect = onDateChange,
+        labelForOption = { date -> date.format(DateTimeFormatter.ofPattern("MMM d")) },
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun <T> ScrollablePillSelector(
+    options: List<T>,
+    selectedOption: T,
+    currentOption: T? = null,
+    currentLabel: String? = null,
+    onSelect: (T) -> Unit,
+    labelForOption: (T) -> String,
+    modifier: Modifier = Modifier,
+) {
+    val selectedIndex = options.indexOf(selectedOption).coerceAtLeast(0)
+    val listState = rememberLazyListState()
+    val fadeColor = appCardColor()
+
+    LaunchedEffect(selectedIndex, options.size) {
+        listState.animateScrollToItem(selectedIndex.coerceAtLeast(0))
+        awaitFrame()
+        val layoutInfo = listState.layoutInfo
+        val selectedItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (selectedItem != null) {
+            val viewportWidth = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+            val centeredOffset = -((viewportWidth - selectedItem.size) / 2)
+            listState.animateScrollToItem(selectedIndex, centeredOffset)
         }
     }
 
@@ -537,19 +579,73 @@ fun DatePillsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        dates.forEach { date ->
-            val selected = date == selectedDate
+        Box(modifier = Modifier.weight(1f)) {
+            LazyRow(
+                state = listState,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                itemsIndexed(options, key = { _, option -> option.hashCode() }) { _, option ->
+                    val selected = option == selectedOption
+                    Box(
+                        modifier = Modifier
+                            .background(if (selected) AppBlue else appSoftColor(), RoundedCornerShape(14.dp))
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(onClick = { onSelect(option) }) {
+                            Text(
+                                labelForOption(option),
+                                color = if (selected) Color.White else AppMuted,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (listState.canScrollBackward) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .width(24.dp)
+                        .height(48.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(fadeColor, fadeColor.copy(alpha = 0f)),
+                            ),
+                        ),
+                )
+            }
+
+            if (listState.canScrollForward) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(24.dp)
+                        .height(48.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(fadeColor.copy(alpha = 0f), fadeColor),
+                            ),
+                        ),
+                )
+            }
+        }
+
+        if (currentOption != null && currentLabel != null && selectedOption != currentOption) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .background(if (selected) AppBlue else appSoftColor(), RoundedCornerShape(14.dp))
+                    .background(appSoftColor(), RoundedCornerShape(14.dp))
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                TextButton(onClick = { onDateChange(date) }) {
+                TextButton(onClick = { onSelect(currentOption) }) {
                     Text(
-                        date.format(DateTimeFormatter.ofPattern("MMM d")),
-                        color = if (selected) Color.White else AppMuted,
+                        currentLabel,
+                        color = AppBlue,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelLarge,
                     )
