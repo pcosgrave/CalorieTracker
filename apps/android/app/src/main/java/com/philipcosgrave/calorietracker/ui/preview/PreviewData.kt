@@ -100,6 +100,8 @@ object PreviewData {
         backupMode = SyncSettings.BackupMode.AutomaticBackup,
         apiBaseUrl = "https://api.calorietracker.dev",
         lastSuccessfulSyncAt = "2026-05-21T09:30:00Z",
+        calorieTargetMin = 1800,
+        calorieTargetMax = 2200,
     )
     val healthConnectAvailability: HealthConnectAvailability = HealthConnectAvailability.Available
 

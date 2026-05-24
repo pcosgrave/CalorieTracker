@@ -42,6 +42,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.util.concurrent.Executors
 
@@ -62,7 +63,7 @@ fun BarcodeScannerScreen(
     var isResolving by remember { mutableStateOf(false) }
 
     Page {
-        Text("Scan Barcode", style = MaterialTheme.typography.headlineMedium)
+        PageHeader("Scan Barcode", onBack = onBack)
         Text("Point the camera at a package barcode to find a saved food or create a new one.")
         if (!hasCameraPermission) {
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -73,9 +74,6 @@ fun BarcodeScannerScreen(
                     Text("Camera access is required to scan barcodes.")
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth()) {
                         Text("Allow camera")
-                    }
-                    TextButton(onClick = onBack, modifier = Modifier.align(Alignment.End)) {
-                        Text("Back")
                     }
                 }
             }
@@ -105,9 +103,6 @@ fun BarcodeScannerScreen(
                         }
                     }
                 }
-            }
-            TextButton(onClick = onBack, modifier = Modifier.align(Alignment.End)) {
-                Text("Back")
             }
         }
     }

@@ -311,6 +311,8 @@ fun CalorieTrackerApp(
             AppScreen.Diary -> DiaryScreen(
                 selectedDate = selectedDate,
                 entries = diary,
+                targetRangeMin = syncSettings.calorieTargetMin,
+                targetRangeMax = syncSettings.calorieTargetMax,
                 onDateChange = { selectedDate = it },
                 onAddFood = { screen = AppScreen.AddFood },
                 onOpenSyncSettings = {

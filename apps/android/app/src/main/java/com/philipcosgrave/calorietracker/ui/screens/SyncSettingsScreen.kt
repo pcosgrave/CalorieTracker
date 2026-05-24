@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
@@ -35,7 +38,9 @@ import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SectionDivider
+import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
 @Composable
@@ -57,12 +62,11 @@ fun SyncSettingsScreen(
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
     var apiBaseUrl by remember(settings) { mutableStateOf(settings.apiBaseUrl.orEmpty()) }
     var backupMode by remember(settings) { mutableStateOf(settings.backupMode) }
+    var calorieTargetMin by remember(settings) { mutableStateOf(settings.calorieTargetMin.toString()) }
+    var calorieTargetMax by remember(settings) { mutableStateOf(settings.calorieTargetMax.toString()) }
 
     Page {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Sync Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-            TextButton(onClick = onBack) { Text("Back", color = AppBlue) }
-        }
+        PageHeader("Settings", onBack = onBack)
 
         AppCardContainer {
             Text("Health Connect", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -110,6 +114,33 @@ fun SyncSettingsScreen(
             }
 
             SectionDivider()
+            Text("Calorie Target Range", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AppFormField(
+                    value = calorieTargetMin,
+                    onValueChange = {
+                        if (isDigitsOnlyInput(it)) {
+                            calorieTargetMin = it
+                        }
+                    },
+                    label = "Min kcal",
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                AppFormField(
+                    value = calorieTargetMax,
+                    onValueChange = {
+                        if (isDigitsOnlyInput(it)) {
+                            calorieTargetMax = it
+                        }
+                    },
+                    label = "Max kcal",
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            }
+
+            SectionDivider()
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Enable Cloud Sync", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -153,6 +184,11 @@ fun SyncSettingsScreen(
                                 syncEnabled = syncEnabled,
                                 backupMode = backupMode,
                                 apiBaseUrl = apiBaseUrl.trim().ifBlank { null },
+                                calorieTargetMin = calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
+                                calorieTargetMax = maxOf(
+                                    calorieTargetMax.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMax,
+                                    calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
+                                ),
                             ),
                         )
                     },

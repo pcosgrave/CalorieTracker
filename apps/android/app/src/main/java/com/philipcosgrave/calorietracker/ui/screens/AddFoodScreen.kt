@@ -38,6 +38,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppSegmentedControl
 import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SortMenu
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
@@ -77,19 +78,10 @@ fun AddFoodScreen(
         }
 
     Page {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                "Search foods",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onBack) { Text("Back", color = AppBlue) }
-                Box(modifier = Modifier.weight(1f))
+        PageHeader(
+            title = "Search foods",
+            onBack = onBack,
+            actions = {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -123,8 +115,8 @@ fun AddFoodScreen(
                         )
                     }
                 }
-            }
-        }
+            },
+        )
 
         AppCardContainer {
             Box(modifier = Modifier.fillMaxWidth()) {

@@ -1,6 +1,7 @@
 package com.philipcosgrave.calorietracker.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,14 +18,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.Meal
+import com.philipcosgrave.calorietracker.ui.components.AppBlue
+import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
@@ -34,12 +41,13 @@ fun QuickCaloriesScreen(
     onBack: () -> Unit,
     onSave: (Double, Meal, LocalDate) -> Unit,
 ) {
+    val today = LocalDate.now()
     var calories by remember { mutableStateOf("") }
     var meal by remember { mutableStateOf(Meal.Snack) }
     var selectedDate by remember { mutableStateOf(date) }
 
     Page {
-        Text("Quick Calories", style = MaterialTheme.typography.headlineMedium)
+        PageHeader("Quick Calories", onBack = onBack)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(calories,
@@ -55,9 +63,11 @@ fun QuickCaloriesScreen(
                     ),
                     modifier = Modifier.fillMaxWidth())
                 MealPicker(meal, { meal = it })
-                DateStepper(selectedDate, { selectedDate = it })
+
+                DatePillsRow(selectedDate,
+                    today = today,
+                    onDateChange = { selectedDate = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Cancel") }
                     Button(
                         onClick = { onSave(calories.toDoubleOrNull() ?: 0.0, meal, selectedDate) },
                         enabled = (calories.toDoubleOrNull() ?: 0.0) > 0,

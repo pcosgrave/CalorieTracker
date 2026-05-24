@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,17 +88,33 @@ fun Page(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun Header(onOpenSyncSettings: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("CalorieTracker", style = MaterialTheme.typography.headlineMedium)
+fun PageHeader(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
-            "Manual labels, private barcode shortcuts, cloud sync when signed in.",
-            style = MaterialTheme.typography.bodyMedium,
+            title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onOpenSyncSettings) {
-                Text("Sync")
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("Back", color = AppBlue) }
+            Box(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.width(72.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions,
+            )
         }
     }
 }
@@ -441,10 +459,9 @@ fun SortMenu(value: SortMode, onChange: (SortMode) -> Unit, modifier: Modifier =
 
 @Preview(showBackground = true, widthDp = 412, heightDp = 300)
 @Composable
-private fun HeaderAndTotalsPreview() {
+private fun TotalsPreview() {
     PreviewData.Theme {
         Page {
-            Header(onOpenSyncSettings = {})
             TotalsGrid(PreviewData.totals)
         }
     }
@@ -468,9 +485,52 @@ private fun PickersPreview() {
     PreviewData.Theme {
         Page {
             MealPicker(meal = Meal.Lunch, onMealChange = {})
-            DateStepper(date = PreviewData.date, onDateChange = {})
+            DatePillsRow(selectedDate = PreviewData.date, today = PreviewData.date,  onDateChange = {})
             UnitPicker(value = "banana", onChange = {}, units = listOf("banana", "serving", "cup"))
             SortMenu(value = SortMode.Recent, onChange = {})
+        }
+    }
+}
+
+@Composable
+fun DatePillsRow(
+    selectedDate: LocalDate,
+    today: LocalDate,
+    onDateChange: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dates = buildList {
+        var cursor = minOf(selectedDate, today)
+        add(cursor)
+        while (size < 3 && cursor.isAfter(LocalDate.MIN.plusDays(1))) {
+            cursor = cursor.minusDays(1)
+            add(0, cursor)
+        }
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        dates.forEach { date ->
+            val selected = date == selectedDate
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (selected) AppBlue else Color(0xFFF1F4F9), RoundedCornerShape(14.dp))
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                TextButton(onClick = { onDateChange(date) }) {
+                    Text(
+                        date.format(DateTimeFormatter.ofPattern("MMM d")),
+                        color = if (selected) Color.White else AppMuted,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
         }
     }
 }

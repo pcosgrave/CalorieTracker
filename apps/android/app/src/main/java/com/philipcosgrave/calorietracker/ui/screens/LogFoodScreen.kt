@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -39,8 +40,10 @@ import com.philipcosgrave.calorietracker.domain.withAdjustedComponents
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.RecipeComponent
+import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
@@ -84,9 +87,8 @@ fun LogFoodScreen(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        TextButton(onClick = onBack) { Text("< Back") }
+        PageHeader("Add foods", onBack = onBack)
         Text(food.name, style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
-        Text("NUTRITION FACTS", color = colorScheme.primary, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Serving size", color = colorScheme.onBackground)
             OutlinedTextField(

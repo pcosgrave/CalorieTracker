@@ -3,12 +3,15 @@ package com.philipcosgrave.calorietracker.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -34,45 +38,65 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
-import com.philipcosgrave.calorietracker.ui.components.AppSuccess
 import com.philipcosgrave.calorietracker.ui.components.AppSoft
+import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
 import com.philipcosgrave.calorietracker.ui.components.DiaryEntryRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-
-private const val DailyGoalCalories = 2000.0
+import kotlin.math.max
 
 @Composable
 fun DiaryScreen(
     selectedDate: LocalDate,
     entries: List<DiaryEntry>,
+    targetRangeMin: Int,
+    targetRangeMax: Int,
     onDateChange: (LocalDate) -> Unit,
     onAddFood: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onUpdateEntry: (DiaryEntry) -> Unit,
 ) {
+    val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
     val totals = totalsForEntries(selectedEntries)
-    val progress = (totals.calories / DailyGoalCalories).coerceIn(0.0, 1.0)
+    val rangeMin = targetRangeMin.coerceAtLeast(0)
+    val rangeMax = max(targetRangeMax, rangeMin + 1)
+    val overflowSpan = max(rangeMax - rangeMin, 200)
+    val currentCalories = totals.calories.toFloat()
+    val currentProgress =
+        when {
+            currentCalories <= rangeMin -> {
+                if (rangeMin == 0) 0f else (currentCalories / rangeMin.toFloat()) * (1f / 3f)
+            }
+
+            currentCalories <= rangeMax -> {
+                val inRangeProgress = (currentCalories - rangeMin.toFloat()) / (rangeMax - rangeMin).toFloat()
+                (1f / 3f) + inRangeProgress * (1f / 3f)
+            }
+
+            else -> {
+                val overProgress = ((currentCalories - rangeMax.toFloat()) / overflowSpan.toFloat()).coerceIn(0f, 1f)
+                (2f / 3f) + overProgress * (1f / 3f)
+            }
+        }.coerceIn(0f, 1f)
     var editingEntry by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Page {
         AppCardContainer {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Today", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-                    Text(selectedDate.format(DateTimeFormatter.ofPattern("MMM d")), color = AppMuted)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DatePillsRow(
+                    selectedDate = selectedDate,
+                    today = today,
+                    onDateChange = onDateChange,
+                    modifier = Modifier.weight(1f),
+                )
                 TextButton(onClick = onOpenSyncSettings) {
-                    Text("⋯", color = AppMuted, style = MaterialTheme.typography.titleLarge)
+                    Text("...", color = AppMuted, style = MaterialTheme.typography.titleLarge)
                 }
             }
-
-            DatePillsRow(selectedDate = selectedDate, onDateChange = onDateChange)
 
             AppCardContainer(
                 modifier = Modifier
@@ -83,34 +107,29 @@ fun DiaryScreen(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .background(AppSoft, RoundedCornerShape(32.dp))
-                        .padding(horizontal = 34.dp, vertical = 30.dp),
+                        .padding(horizontal = 20.dp, vertical = 15.dp),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(formatNumber(totals.calories), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold)
-                        Text("of ${formatNumber(DailyGoalCalories)} Goal", color = AppMuted)
+                        Text(
+                            formatNumber(totals.calories),
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                        Text("$rangeMin-$rangeMax target", color = AppMuted)
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(12.dp)
-                        .background(Color(0xFFD7DAE5), RoundedCornerShape(999.dp)),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress.toFloat())
-                            .height(12.dp)
-                            .background(AppSuccess, RoundedCornerShape(999.dp)),
-                    )
-                }
-                Text("Daily Intake", modifier = Modifier.align(Alignment.CenterHorizontally), color = AppMuted)
+                IntakeRangeBar(
+                    currentProgress = currentProgress,
+                    lowerTarget = rangeMin,
+                    upperTarget = rangeMax,
+                )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MacroStat("14g", "PROTEIN", Modifier.weight(1f))
-                    MacroStat("25g", "CARBS", Modifier.weight(1f))
-                    MacroStat("6g", "FAT", Modifier.weight(1f))
-                }
+                MacroRow(
+                    protein = totals.protein,
+                    carbs = totals.carbs,
+                    fat = totals.fat,
+                )
 
                 Box(
                     modifier = Modifier
@@ -144,12 +163,22 @@ fun DiaryScreen(
                 AppCardContainer {
                     if (mealEntries.isEmpty()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(meal.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("Add later", color = AppMuted)
+                            Text(
+                                meal.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text("0 cal", color = AppMuted)
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(meal.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(
+                                meal.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
                             Text("${formatNumber(totalsForEntries(mealEntries).calories)} cal", fontWeight = FontWeight.Bold)
                         }
                         mealEntries.forEach { entry ->
@@ -163,27 +192,107 @@ fun DiaryScreen(
 }
 
 @Composable
-private fun DatePillsRow(selectedDate: LocalDate, onDateChange: (LocalDate) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        (-1..1).forEach { offset ->
-            val date = selectedDate.plusDays(offset.toLong())
-            val selected = offset == 0
+private fun IntakeRangeBar(
+    currentProgress: Float,
+    lowerTarget: Int,
+    upperTarget: Int,
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp),
+    ) {
+        val barWidth = maxWidth
+        val firstBreak = maxWidth / 3f
+        val secondBreak = firstBreak * 2f
+        val markerOffset = ((barWidth - 18.dp) * currentProgress).coerceIn(0.dp, barWidth - 18.dp)
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .background(if (selected) AppBlue else Color.Transparent, RoundedCornerShape(16.dp))
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .height(16.dp)
+                    .background(Color(0xFFD7DAE5), RoundedCornerShape(999.dp)),
             ) {
-                TextButton(onClick = { onDateChange(date) }) {
-                    Text(
-                        date.format(DateTimeFormatter.ofPattern("MMM d")),
-                        color = if (selected) Color.White else AppMuted,
-                        fontWeight = FontWeight.Bold,
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .background(Color(0xFFF0D58A), RoundedCornerShape(topStart = 999.dp, bottomStart = 999.dp)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .background(Color(0xFF9BE2AB)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .background(Color(0xFFFFC4BA), RoundedCornerShape(topEnd = 999.dp, bottomEnd = 999.dp)),
                     )
                 }
+
+                Box(
+                    modifier = Modifier
+                        .padding(start = firstBreak - 1.dp)
+                        .width(2.dp)
+                        .height(16.dp)
+                        .background(Color.White),
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(start = secondBreak - 1.dp)
+                        .width(2.dp)
+                        .height(16.dp)
+                        .background(Color.White),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = markerOffset)
+                        .size(18.dp)
+                        .background(AppBlue, CircleShape),
+                )
+            }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "$lowerTarget",
+                    color = AppMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .width(72.dp)
+                        .align(Alignment.CenterStart)
+                        .absoluteOffset((firstBreak - 36.dp).coerceAtLeast(0.dp), 0.dp)
+                )
+                Text(
+                    "$upperTarget",
+                    color = AppMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .width(72.dp)
+                        .align(Alignment.CenterStart)
+                        .absoluteOffset((secondBreak - 36.dp).coerceAtLeast(0.dp), 0.dp)
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun MacroRow(protein: Double, carbs: Double, fat: Double) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        MacroStat("${formatNumber(protein)}g", "PROTEIN", Modifier.weight(1f))
+        MacroStat("${formatNumber(carbs)}g", "CARBS", Modifier.weight(1f))
+        MacroStat("${formatNumber(fat)}g", "FAT", Modifier.weight(1f))
     }
 }
 
@@ -212,6 +321,8 @@ private fun DiaryScreenPreview() {
         DiaryScreen(
             selectedDate = PreviewData.date,
             entries = PreviewData.diaryEntries,
+            targetRangeMin = PreviewData.syncSettings.calorieTargetMin,
+            targetRangeMax = PreviewData.syncSettings.calorieTargetMax,
             onDateChange = {},
             onAddFood = {},
             onOpenSyncSettings = {},

@@ -58,6 +58,8 @@ data class SyncSettings(
     val backupMode: BackupMode,
     val apiBaseUrl: String? = null,
     val lastSuccessfulSyncAt: String? = null,
+    val calorieTargetMin: Int = 1800,
+    val calorieTargetMax: Int = 2200,
 ) {
     enum class BackupMode {
         Disabled,

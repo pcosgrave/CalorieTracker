@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -41,6 +42,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
@@ -72,10 +74,7 @@ fun RecipeBuilderScreen(
     }
 
     Page {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Add Recipe", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-            TextButton(onClick = onBack) { Text("Back", color = AppBlue) }
-        }
+        PageHeader("Add Recipe", onBack = onBack)
 
         AppCardContainer {
             AppFormField(draft.name, { onDraftChange(draft.copy(name = it)) }, "Recipe Name", Modifier.fillMaxWidth())

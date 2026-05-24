@@ -218,6 +218,8 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
     private fun backupModeKey(userId: String) = stringPreferencesKey("backup_mode.$userId")
     private fun apiBaseUrlKey(userId: String) = stringPreferencesKey("api_base_url.$userId")
     private fun lastSuccessfulSyncAtKey(userId: String) = stringPreferencesKey("last_successful_sync_at.$userId")
+    private fun calorieTargetMinKey(userId: String) = stringPreferencesKey("calorie_target_min.$userId")
+    private fun calorieTargetMaxKey(userId: String) = stringPreferencesKey("calorie_target_max.$userId")
     private fun lastPulledAtKey(userId: String) = stringPreferencesKey("last_pulled_at.$userId")
     private fun lastAcknowledgedChangeIdKey(userId: String) = stringPreferencesKey("last_acknowledged_change_id.$userId")
 
@@ -250,6 +252,8 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
                 ?: SyncSettings.BackupMode.Disabled,
             apiBaseUrl = prefs[apiBaseUrlKey(userId)] ?: com.philipcosgrave.calorietracker.BuildConfig.SYNC_API_BASE_URL,
             lastSuccessfulSyncAt = prefs[lastSuccessfulSyncAtKey(userId)],
+            calorieTargetMin = prefs[calorieTargetMinKey(userId)]?.toIntOrNull() ?: 1800,
+            calorieTargetMax = prefs[calorieTargetMaxKey(userId)]?.toIntOrNull() ?: 2200,
         )
     }
 
@@ -263,6 +267,8 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             } else {
                 prefs[apiBaseUrlKey(userId)] = settings.apiBaseUrl
             }
+            prefs[calorieTargetMinKey(userId)] = settings.calorieTargetMin.toString()
+            prefs[calorieTargetMaxKey(userId)] = settings.calorieTargetMax.toString()
             settings.lastSuccessfulSyncAt?.let { prefs[lastSuccessfulSyncAtKey(userId)] = it }
         }
     }
