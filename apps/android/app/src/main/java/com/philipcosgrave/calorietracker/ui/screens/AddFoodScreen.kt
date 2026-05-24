@@ -54,6 +54,7 @@ fun AddFoodScreen(
     onAddIngredient: () -> Unit,
     onAddRecipe: () -> Unit,
     onSelectFood: (FoodItem) -> Unit,
+    onQuickLogFood: (FoodItem) -> Unit,
     onDeleteFood: (FoodItem) -> Unit,
     onEditFood: (FoodItem) -> Unit,
 ) {
@@ -166,6 +167,7 @@ fun AddFoodScreen(
                         item = item,
                         showCalories = true,
                         onClick = { onSelectFood(item) },
+                        onDoubleClick = { onQuickLogFood(item) },
                         onEdit = { onEditFood(item) },
                         onDelete = { onDeleteFood(item) },
                     )
@@ -189,6 +191,7 @@ private fun AddFoodScreenPreview() {
             onAddIngredient = {},
             onAddRecipe = {},
             onSelectFood = {},
+            onQuickLogFood = {},
             onDeleteFood = {},
             onEditFood = {},
         )

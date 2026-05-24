@@ -3,6 +3,7 @@ package com.philipcosgrave.calorietracker.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -175,6 +176,7 @@ fun FoodSearchRow(
     item: FoodItem,
     showCalories: Boolean,
     onClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
 ) {
@@ -185,7 +187,10 @@ fun FoodSearchRow(
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onClick)
+                .combinedClickable(
+                    onClick = onClick,
+                    onDoubleClick = onDoubleClick,
+                )
                 .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -203,7 +208,6 @@ fun FoodSearchRow(
                     color = AppMuted,
                 )
             }
-            if (showCalories) Text("${formatNumber(item.nutrients.calories)}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             if (onEdit != null && onDelete != null) {
                 OverflowMenu(onEdit = onEdit, onDelete = onDelete)
             }
@@ -274,7 +278,7 @@ fun KindIcon(kind: FoodKind) {
 fun OverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }) { Text("⋯", color = AppMuted) }
+        TextButton(onClick = { expanded = true }) { Text("\u22EE", color = AppMuted) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("Edit") }, onClick = { expanded = false; onEdit() })
             DropdownMenuItem(text = { Text("Delete") }, onClick = { expanded = false; onDelete() })

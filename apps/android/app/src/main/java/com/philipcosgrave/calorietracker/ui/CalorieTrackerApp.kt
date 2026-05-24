@@ -45,6 +45,7 @@ import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
+import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
@@ -359,6 +360,22 @@ fun CalorieTrackerApp(
                 onSelectFood = {
                     selectedFood = it
                     screen = AppScreen.LogFood
+                },
+                onQuickLogFood = { food ->
+                    val today = LocalDate.now()
+                    val entry = DiaryEntry(
+                        id = createId("entry"),
+                        food = food,
+                        date = today,
+                        meal = Meal.Snack,
+                        servingMultiplier = 1.0,
+                    )
+                    diary = listOf(entry) + diary
+                    selectedDate = today
+                    scope.launch {
+                        saveDiaryEntry(entry)
+                        refreshState()
+                    }
                 },
                 onDeleteFood = { item ->
                     if (customFoods.any { it.id == item.id } || recipes.any { it.id == item.id }) {
