@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.MealType
 import androidx.health.connect.client.records.NutritionRecord
@@ -52,6 +53,8 @@ class HealthConnectNutritionExporter(private val context: Context) {
             HealthPermission.getReadPermission(HeartRateRecord::class)
         val readCaloriesBurnedPermission: String =
             HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class)
+        val readActiveCaloriesBurnedPermission: String =
+            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
         val writeWeightPermission: String =
             HealthPermission.getWritePermission(WeightRecord::class)
         val readWeightPermission: String =
@@ -65,6 +68,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
             readStepsPermission,
             readHeartRatePermission,
             readCaloriesBurnedPermission,
+            readActiveCaloriesBurnedPermission,
         )
 
         fun onboardingUri(): Uri =
@@ -109,9 +113,17 @@ class HealthConnectNutritionExporter(private val context: Context) {
             AggregateRequest(
                 metrics = setOf(
                     StepsRecord.COUNT_TOTAL,
-                    TotalCaloriesBurnedRecord.ENERGY_TOTAL,
+                    ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
                 ),
                 timeRangeFilter = TimeRangeFilter.between(start, end),
+            ),
+        )
+        val caloriesBurnedResponse = client.readRecords(
+            ReadRecordsRequest(
+                recordType = TotalCaloriesBurnedRecord::class,
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+                ascendingOrder = false,
+                pageSize = 1,
             ),
         )
         val heartRateResponse = client.readRecords(
@@ -127,11 +139,13 @@ class HealthConnectNutritionExporter(private val context: Context) {
             .maxByOrNull { it.time }
             ?.beatsPerMinute
             ?.toLong()
+        val activeCalories = aggregateResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inCalories
+        val latestTotalCalories = caloriesBurnedResponse.records.firstOrNull()?.energy?.inCalories
 
         return HealthDashboardMetrics(
             steps = aggregateResponse[StepsRecord.COUNT_TOTAL],
             heartRateBpm = latestHeartRate,
-            caloriesBurned = aggregateResponse[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inCalories,
+            caloriesBurned = activeCalories ?: latestTotalCalories,
         )
     }
 

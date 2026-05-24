@@ -14,7 +14,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.philipcosgrave.calorietracker.BuildConfig
 import com.philipcosgrave.calorietracker.data.auth.CognitoAuthRepository
 import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
@@ -22,6 +25,7 @@ import com.philipcosgrave.calorietracker.data.health.HealthConnectNutritionExpor
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
 import com.philipcosgrave.calorietracker.data.readFoodItems
 import com.philipcosgrave.calorietracker.data.readStringList
+import com.philipcosgrave.calorietracker.data.remote.CanadianNutrientFileLookupService
 import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
@@ -77,6 +81,7 @@ fun CalorieTrackerApp(
     openExternalUri: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val database = remember { LocalRepositoryFactory.database(context) }
     val authRepository = remember { CognitoAuthRepository(context) }
     val localStore = remember {
@@ -94,6 +99,7 @@ fun CalorieTrackerApp(
     val scope = rememberCoroutineScope()
     val syncService = remember { ApiSyncService(localStore) }
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
+    val canadianNutrientFileLookupService = remember { CanadianNutrientFileLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -386,6 +392,24 @@ fun CalorieTrackerApp(
         onAuthCallbackConsumed()
     }
 
+    LaunchedEffect(screen) {
+        if (screen == AppScreen.Home) {
+            refreshState()
+        }
+    }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, screen) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && screen == AppScreen.Home) {
+                scope.launch { refreshState() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -522,11 +546,11 @@ fun CalorieTrackerApp(
                 remoteSearchResults = remoteSearchResults,
                 remoteSearchQuery = remoteSearchQuery,
                 isSearchingRemote = isSearchingRemote,
-                onSearchOpenFoodFacts = { query ->
+                onSearchCanadianNutrientFile = { query ->
                     remoteSearchQuery = query.trim()
                     isSearchingRemote = true
                     scope.launch {
-                        remoteSearchResults = openFoodFactsLookupService.searchFoodsByName(remoteSearchQuery)
+                        remoteSearchResults = canadianNutrientFileLookupService.searchFoodsByName(remoteSearchQuery)
                         isSearchingRemote = false
                     }
                 },

@@ -41,6 +41,7 @@ import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
+import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
@@ -120,7 +121,11 @@ fun LogFoodScreen(
                 }
             }
         }
-        DateStepper(selectedDate, { selectedDate = it }, darkMode = isDarkTheme)
+        DatePillsRow(
+            selectedDate = selectedDate,
+            today = LocalDate.now(),
+            onDateChange = { if (!it.isAfter(LocalDate.now())) selectedDate = it },
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, true) }, modifier = Modifier.weight(1f)) {
                 Text("Log & add more")

@@ -62,7 +62,7 @@ fun AddFoodScreen(
     remoteSearchResults: List<FoodItem>,
     remoteSearchQuery: String,
     isSearchingRemote: Boolean,
-    onSearchOpenFoodFacts: (String) -> Unit,
+    onSearchCanadianNutrientFile: (String) -> Unit,
     onImportRemoteFood: (FoodItem) -> Unit,
     onDeleteFood: (FoodItem) -> Unit,
     onEditFood: (FoodItem) -> Unit,
@@ -197,11 +197,11 @@ fun AddFoodScreen(
                             .padding(14.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            TextButton(onClick = { onSearchOpenFoodFacts(search) }) {
-                                Text("Search Open Food Facts", color = AppBlue, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = { onSearchCanadianNutrientFile(search) }) {
+                                Text("Search Canadian Nutrient File", color = AppBlue, fontWeight = FontWeight.Bold)
                             }
                             Text(
-                                "Packaged foods scan better when a barcode is available.",
+                                "Scanning a barcode is still better when that option is available.",
                                 color = AppMuted,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -209,9 +209,9 @@ fun AddFoodScreen(
                     }
 
                     if (isSearchingRemote) {
-                        Text("Searching Open Food Facts...", color = AppMuted)
+                        Text("Searching Canadian Nutrient File...", color = AppMuted)
                     } else if (showingRemoteResultsForCurrentSearch && remoteSearchResults.isNotEmpty()) {
-                        Text("Open Food Facts", fontWeight = FontWeight.Bold, color = AppMuted)
+                        Text("Canadian Nutrient File", fontWeight = FontWeight.Bold, color = AppMuted)
                         remoteSearchResults.forEach { item ->
                             FoodSearchRow(
                                 item = item,
@@ -223,9 +223,9 @@ fun AddFoodScreen(
                     } else {
                         Text(
                             if (showingRemoteResultsForCurrentSearch) {
-                                "No Open Food Facts matches found."
+                                "No Canadian Nutrient File matches found."
                             } else {
-                                "No Open Food Facts matches loaded yet."
+                                "No Canadian Nutrient File matches loaded yet."
                             },
                             color = AppMuted,
                         )
@@ -254,7 +254,7 @@ private fun AddFoodScreenPreview() {
             remoteSearchResults = emptyList(),
             remoteSearchQuery = "",
             isSearchingRemote = false,
-            onSearchOpenFoodFacts = {},
+            onSearchCanadianNutrientFile = {},
             onImportRemoteFood = {},
             onDeleteFood = {},
             onEditFood = {},
