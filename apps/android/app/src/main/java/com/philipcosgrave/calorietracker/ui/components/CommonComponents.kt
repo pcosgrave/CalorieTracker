@@ -357,10 +357,12 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
     Box(modifier = modifier) {
         OutlinedTextField(
             value = value,
-            onValueChange = onChange,
+            onValueChange = {},
             label = { Text("Unit") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
+            readOnly = true,
+            singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AppBlue,
                 unfocusedBorderColor = appBorderColor(),
