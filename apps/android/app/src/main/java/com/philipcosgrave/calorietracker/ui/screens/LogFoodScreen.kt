@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
@@ -40,6 +42,7 @@ import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
@@ -86,7 +89,16 @@ fun LogFoodScreen(
         Text("NUTRITION FACTS", color = colorScheme.primary, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Serving size", color = colorScheme.onBackground)
-            OutlinedTextField(amount, { amount = it }, modifier = Modifier.weight(1f))
+            OutlinedTextField(
+                amount,
+                {
+                    if (isDigitsOnlyInput(it)) {
+                        amount = it
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
             UnitPicker(unit, { unit = it }, Modifier.weight(1f))
             Text("${formatNumber(adjusted.calories)} cals.", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
         }
@@ -149,12 +161,15 @@ private fun EditableRecipeLogComponent(
         OutlinedTextField(
             value = amountText,
             onValueChange = {
-                amountText = it
-                onAmountChange(it)
+                if (isDigitsOnlyInput(it)) {
+                    amountText = it
+                    onAmountChange(it)
+                }
             },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(84.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         CompactUnitPicker(
             value = component.unit,

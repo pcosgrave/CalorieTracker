@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.Meal
@@ -40,9 +42,20 @@ fun QuickCaloriesScreen(
         Text("Quick Calories", style = MaterialTheme.typography.headlineMedium)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                DateStepper(selectedDate, { selectedDate = it })
-                OutlinedTextField(calories, { calories = it }, label = { Text("Calories") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(calories,
+                    {
+                        if (it.isEmpty() || it.all { it.isDigit() })
+                        {
+                            calories = it
+                        }
+                    },
+                    label = { Text("Calories") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    modifier = Modifier.fillMaxWidth())
                 MealPicker(meal, { meal = it })
+                DateStepper(selectedDate, { selectedDate = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Cancel") }
                     Button(

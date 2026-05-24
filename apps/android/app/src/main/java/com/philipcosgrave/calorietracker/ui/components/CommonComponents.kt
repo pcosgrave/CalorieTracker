@@ -1,6 +1,7 @@
 package com.philipcosgrave.calorietracker.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,17 +10,24 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -51,13 +61,25 @@ import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+val AppBlue = Color(0xFF1677F0)
+val AppBackground = Color(0xFFF3F6FB)
+val AppCard = Color(0xFFFFFFFF)
+val AppMuted = Color(0xFF7B8594)
+val AppBorder = Color(0xFFD9DFEA)
+val AppBorderStrong = Color(0xFFC4CBD8)
+val AppSuccess = Color(0xFF36C15B)
+val AppSoft = Color(0xFFF6F8FC)
+
+fun isDigitsOnlyInput(value: String): Boolean = value.isEmpty() || value.all { it.isDigit() }
+
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(AppBackground)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         content = content,
     )
@@ -104,19 +126,27 @@ fun Metric(value: String, label: String, modifier: Modifier = Modifier) {
 @Composable
 fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
     val nutrients = entry.food.nutrients.scale(entry.servingMultiplier)
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCard),
+    ) {
         Row(
             modifier = Modifier
                 .clickable(onClick = onEdit)
-                .padding(12.dp),
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(entry.food.name, fontWeight = FontWeight.Bold)
-                Text("${entry.food.brand.ifBlank { "No brand" }} - ${entry.food.servingLabel} x ${formatNumber(entry.servingMultiplier)}")
+                Text(entry.food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${entry.food.brand.ifBlank { entry.food.servingLabel }} • ${formatNumber(entry.servingMultiplier)} serving",
+                    color = AppMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
-            Text("${formatNumber(nutrients.calories)} cal", fontWeight = FontWeight.Bold)
+            Text("${formatNumber(nutrients.calories)} cal", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             OverflowMenu(onEdit = onEdit, onDelete = onDelete)
         }
     }
@@ -130,26 +160,32 @@ fun FoodSearchRow(
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCard),
+    ) {
         Row(
             modifier = Modifier
                 .clickable(onClick = onClick)
-                .padding(12.dp),
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            KindIcon(item.kind)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.name, fontWeight = FontWeight.Bold)
+                Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    listOf(item.brand, item.componentSummary()).filter { it.isNotBlank() }.joinToString(" - "),
-                    style = MaterialTheme.typography.bodySmall,
+                    buildList {
+                        if (item.kind == FoodKind.Recipe) add("Recipe")
+                        add(item.servingLabel)
+                        if (item.brand.isNotBlank()) add(item.brand)
+                        if (showCalories) add("${formatNumber(item.nutrients.calories)} cal")
+                    }.joinToString(" • "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMuted,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(item.servingLabel, style = MaterialTheme.typography.bodySmall)
-                if (showCalories) Text("${formatNumber(item.nutrients.calories)} cal", fontWeight = FontWeight.Bold)
-            }
+            if (showCalories) Text("${formatNumber(item.nutrients.calories)}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             if (onEdit != null && onDelete != null) {
                 OverflowMenu(onEdit = onEdit, onDelete = onDelete)
             }
@@ -171,28 +207,32 @@ fun RecipeComponentRow(
             addAll(measurementUnits.filterNot { it in this })
         }
     }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AppSoft),
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                KindIcon(component.item.kind)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(component.item.name, fontWeight = FontWeight.Bold)
-                    Text(component.item.servingLabel, style = MaterialTheme.typography.bodySmall)
-                    if (component.item.components.isNotEmpty()) {
-                        Text(component.item.componentSummary(), style = MaterialTheme.typography.bodySmall)
-                    }
+                    Text(component.item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("${formatNumber(component.item.nutrients.calories)} cal", style = MaterialTheme.typography.bodySmall, color = AppMuted)
                 }
-                TextButton(onClick = onRemove) { Text("Remove") }
+                TextButton(onClick = onRemove) { Text("-", color = Color(0xFFFF5449), style = MaterialTheme.typography.titleMedium) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = amount,
                     onValueChange = {
-                        amount = it
-                        onChange(component.copy(amount = it.toDoubleOrNull() ?: component.amount))
+                        if (isDigitsOnlyInput(it)) {
+                            amount = it
+                            onChange(component.copy(amount = it.toDoubleOrNull() ?: component.amount))
+                        }
                     },
                     label = { Text("Amount") },
                     modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp),
                 )
                 UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)
             }
@@ -216,7 +256,7 @@ fun KindIcon(kind: FoodKind) {
 fun OverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }) { Text("...") }
+        TextButton(onClick = { expanded = true }) { Text("⋯", color = AppMuted) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("Edit") }, onClick = { expanded = false; onEdit() })
             DropdownMenuItem(text = { Text("Delete") }, onClick = { expanded = false; onDelete() })
@@ -272,6 +312,11 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
             onValueChange = onChange,
             label = { Text("Unit") },
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AppBlue,
+                unfocusedBorderColor = AppBorder,
+            ),
         )
         Box(modifier = Modifier.fillMaxSize().clickable { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -280,6 +325,96 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
             }
         }
     }
+}
+
+@Composable
+fun AppFormField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = modifier,
+        keyboardOptions = keyboardOptions,
+        shape = RoundedCornerShape(16.dp),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = AppBlue,
+            unfocusedBorderColor = AppBorder,
+            focusedContainerColor = AppCard,
+            unfocusedContainerColor = AppCard,
+        ),
+    )
+}
+
+@Composable
+fun AppPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AppBlue, disabledContainerColor = Color(0xFFCAD1DB)),
+    ) {
+        Text(text, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun AppCardContainer(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCard),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+fun AppSegmentedControl(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelectedIndexChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(20.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        options.forEachIndexed { index, label ->
+            val selected = selectedIndex == index
+            val shape: Shape = RoundedCornerShape(16.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .background(if (selected) AppBlue else AppSoft, shape)
+                    .border(1.dp, if (selected) AppBlue else AppBorderStrong, shape)
+                    .clickable { onSelectedIndexChange(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, fontWeight = FontWeight.Bold, color = if (selected) Color.White else AppMuted)
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionDivider() {
+    HorizontalDivider(color = AppBorder)
 }
 
 @Composable
