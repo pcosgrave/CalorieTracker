@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.componentSummary
+import com.philipcosgrave.calorietracker.domain.compatibleMeasurementUnits
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.measurementUnits
 import com.philipcosgrave.calorietracker.domain.scale
@@ -251,8 +252,8 @@ fun RecipeComponentRow(
     val availableUnits = remember(component.unit, component.item.servingUnit) {
         buildList {
             if (component.unit.isNotBlank()) add(component.unit)
+            addAll(compatibleMeasurementUnits(component.item.servingUnit).filterNot { it in this })
             if (component.item.servingUnit.isNotBlank() && component.item.servingUnit !in this) add(component.item.servingUnit)
-            addAll(measurementUnits.filterNot { it in this })
         }
     }
     Card(

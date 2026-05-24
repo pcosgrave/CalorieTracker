@@ -34,7 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
-import com.philipcosgrave.calorietracker.domain.measurementUnits
+import com.philipcosgrave.calorietracker.domain.compatibleMeasurementUnits
+import com.philipcosgrave.calorietracker.domain.convertAmount
 import com.philipcosgrave.calorietracker.domain.scale
 import com.philipcosgrave.calorietracker.domain.withAdjustedComponents
 import com.philipcosgrave.calorietracker.model.FoodItem
@@ -65,8 +66,12 @@ fun LogFoodScreen(
     var selectedDate by remember { mutableStateOf(date) }
     var components by remember(food.id) { mutableStateOf(food.components) }
     val amountNumber = amount.toDoubleOrNull()?.coerceAtLeast(0.1) ?: food.servingQuantity
+    val availableUnits = remember(food.servingUnit) { compatibleMeasurementUnits(food.servingUnit) }
     val adjustedFood = if (components.isEmpty()) food else food.withAdjustedComponents(components)
-    val adjusted = adjustedFood.nutrients.scale(amountNumber / adjustedFood.servingQuantity.coerceAtLeast(0.1))
+    val convertedAmount =
+        convertAmount(amountNumber, unit, adjustedFood.servingUnit)
+            ?: if (unit == adjustedFood.servingUnit) amountNumber else adjustedFood.servingQuantity
+    val adjusted = adjustedFood.nutrients.scale(convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1))
 
     fun updateComponent(index: Int, amountText: String? = null, unitValue: String? = null) {
         components = components.mapIndexed { componentIndex, component ->
@@ -102,7 +107,7 @@ fun LogFoodScreen(
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
-            UnitPicker(unit, { unit = it }, Modifier.weight(1f))
+            UnitPicker(unit, { unit = it }, Modifier.weight(1f), availableUnits)
             Text("${formatNumber(adjusted.calories)} cals.", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,10 +132,10 @@ fun LogFoodScreen(
             onDateChange = { if (!it.isAfter(LocalDate.now())) selectedDate = it },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, true) }, modifier = Modifier.weight(1f)) {
+            Button(onClick = { onLog(meal, selectedDate, adjustedFood, convertedAmount, true) }, modifier = Modifier.weight(1f)) {
                 Text("Log & add more")
             }
-            Button(onClick = { onLog(meal, selectedDate, adjustedFood, amountNumber, false) }, modifier = Modifier.weight(1f)) {
+            Button(onClick = { onLog(meal, selectedDate, adjustedFood, convertedAmount, false) }, modifier = Modifier.weight(1f)) {
                 Text("Log this")
             }
         }
@@ -147,8 +152,8 @@ private fun EditableRecipeLogComponent(
     val unitOptions = remember(component.unit, component.item.servingUnit) {
         buildList {
             if (component.unit.isNotBlank()) add(component.unit)
+            addAll(compatibleMeasurementUnits(component.item.servingUnit).filterNot { it in this })
             if (component.item.servingUnit.isNotBlank() && component.item.servingUnit !in this) add(component.item.servingUnit)
-            addAll(measurementUnits.filterNot { it in this })
         }
     }
 

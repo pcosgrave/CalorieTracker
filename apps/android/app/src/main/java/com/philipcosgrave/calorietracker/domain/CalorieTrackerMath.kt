@@ -10,30 +10,11 @@ import com.philipcosgrave.calorietracker.model.Totals
 import java.util.UUID
 import kotlin.math.round
 
-val measurementUnits = listOf(
-    "bar",
-    "bottle",
-    "box",
-    "can",
-    "container",
-    "cup",
-    "fl oz",
-    "gram",
-    "jar",
-    "kg",
-    "lb",
-    "liter",
-    "milligram",
-    "ml",
-    "oz",
-    "package",
-    "pint",
-    "quart",
-    "service",
-    "serving",
-    "tbsp",
-    "tsp",
-)
+private val volumeUnits = listOf("tsp", "tbsp", "fl oz", "cup", "pint", "quart", "ml", "liter")
+private val massUnits = listOf("milligram", "gram", "kg", "oz", "lb")
+private val itemUnits = listOf("bar", "bottle", "box", "can", "container", "jar", "package", "service", "serving")
+
+val measurementUnits = volumeUnits + massUnits + itemUnits
 
 private val conversionGroups = listOf(
     mapOf("tsp" to 1.0, "tbsp" to 3.0, "fl oz" to 6.0, "cup" to 48.0, "pint" to 96.0, "quart" to 192.0, "ml" to 0.202884, "liter" to 202.884),
@@ -54,6 +35,16 @@ fun convertAmount(amount: Double, fromUnit: String, toUnit: String): Double? {
     if (fromUnit == toUnit) return amount
     val group = conversionGroups.firstOrNull { it.containsKey(fromUnit) && it.containsKey(toUnit) } ?: return null
     return amount * (group[fromUnit] ?: return null) / (group[toUnit] ?: return null)
+}
+
+fun compatibleMeasurementUnits(baseUnit: String): List<String> {
+    if (baseUnit.isBlank()) return listOf("serving")
+    val group = conversionGroups.firstOrNull { it.containsKey(baseUnit) }
+    return if (group != null) {
+        group.keys.sortedBy { unit -> measurementUnits.indexOf(unit).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+    } else {
+        listOf(baseUnit)
+    }
 }
 
 fun totalComponents(components: List<RecipeComponent>): Totals =
