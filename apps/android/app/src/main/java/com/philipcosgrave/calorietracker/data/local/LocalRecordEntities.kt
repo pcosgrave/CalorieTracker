@@ -63,3 +63,15 @@ data class SyncOutboxEntity(
     val payloadJson: String?,
     val baseVersion: Long?,
 )
+
+@Entity(
+    tableName = "weight_records",
+    indices = [Index(value = ["ownerUserId", "loggedOn"])],
+)
+data class WeightRecordEntity(
+    @PrimaryKey val recordId: String,
+    val ownerUserId: String,
+    val loggedOn: String,
+    val weightKg: Double,
+    val updatedAt: String,
+)

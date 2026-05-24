@@ -45,6 +45,8 @@ import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.components.appBorderColor
+import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
@@ -97,7 +99,7 @@ fun RecipeBuilderScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF4F6FA), RoundedCornerShape(18.dp)),
+                    .background(appSoftColor(), RoundedCornerShape(18.dp)),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Text("Nutrition", color = AppMuted)
@@ -156,7 +158,7 @@ private fun DashedAddCard(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, AppBorder, RoundedCornerShape(18.dp))
+            .border(1.dp, appBorderColor(), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 20.dp),
     ) {

@@ -5,12 +5,14 @@ import androidx.compose.runtime.Composable
 import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
+import com.philipcosgrave.calorietracker.model.HealthDashboardMetrics
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.model.Totals
+import com.philipcosgrave.calorietracker.model.WeightEntry
 import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
 import com.philipcosgrave.calorietracker.ui.theme.CalorieTrackerTheme
 import java.time.LocalDate
@@ -102,8 +104,22 @@ object PreviewData {
         lastSuccessfulSyncAt = "2026-05-21T09:30:00Z",
         calorieTargetMin = 1800,
         calorieTargetMax = 2200,
+        weightUnit = SyncSettings.WeightUnit.Kilograms,
+        goalWeightKg = 79.5,
     )
     val healthConnectAvailability: HealthConnectAvailability = HealthConnectAvailability.Available
+    val healthMetrics: HealthDashboardMetrics = HealthDashboardMetrics(
+        steps = 8246,
+        heartRateBpm = 68,
+        caloriesBurned = 510.0,
+    )
+    val weightEntries: List<WeightEntry> = listOf(
+        WeightEntry(id = "weight-1", date = date.minusDays(24), weightKg = 84.3),
+        WeightEntry(id = "weight-2", date = date.minusDays(18), weightKg = 83.9),
+        WeightEntry(id = "weight-3", date = date.minusDays(11), weightKg = 83.1),
+        WeightEntry(id = "weight-4", date = date.minusDays(4), weightKg = 82.7),
+        WeightEntry(id = "weight-5", date = date, weightKg = 82.4),
+    )
 
     @Composable
     fun Theme(content: @Composable () -> Unit) {

@@ -61,3 +61,15 @@ interface SyncOutboxDao {
     @Query("DELETE FROM sync_outbox")
     suspend fun clear()
 }
+
+@Dao
+interface WeightRecordDao {
+    @Query("SELECT * FROM weight_records WHERE ownerUserId = :ownerUserId ORDER BY loggedOn ASC, updatedAt ASC")
+    suspend fun listAll(ownerUserId: String): List<WeightRecordEntity>
+
+    @Query("SELECT * FROM weight_records WHERE ownerUserId = :ownerUserId ORDER BY loggedOn DESC, updatedAt DESC LIMIT 1")
+    suspend fun latest(ownerUserId: String): WeightRecordEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: WeightRecordEntity)
+}

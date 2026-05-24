@@ -30,6 +30,7 @@ import com.philipcosgrave.calorietracker.data.repository.RoomBarcodeAliasReposit
 import com.philipcosgrave.calorietracker.data.repository.RoomDiaryRepository
 import com.philipcosgrave.calorietracker.data.repository.RoomFoodRepository
 import com.philipcosgrave.calorietracker.data.repository.RoomSyncOutboxRepository
+import com.philipcosgrave.calorietracker.data.repository.RoomWeightRepository
 import com.philipcosgrave.calorietracker.data.sync.ApiSyncService
 import com.philipcosgrave.calorietracker.data.seedFoods
 import com.philipcosgrave.calorietracker.data.seedRecipes
@@ -45,6 +46,7 @@ import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
+import com.philipcosgrave.calorietracker.model.HealthDashboardMetrics
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
@@ -53,14 +55,18 @@ import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
+import com.philipcosgrave.calorietracker.model.WeightEntry
 import com.philipcosgrave.calorietracker.ui.screens.AddFoodScreen
 import com.philipcosgrave.calorietracker.ui.screens.BarcodeScannerScreen
 import com.philipcosgrave.calorietracker.ui.screens.DiaryScreen
+import com.philipcosgrave.calorietracker.ui.screens.HomeScreen
 import com.philipcosgrave.calorietracker.ui.screens.LogFoodScreen
+import com.philipcosgrave.calorietracker.ui.screens.LogWeightScreen
 import com.philipcosgrave.calorietracker.ui.screens.NewIngredientScreen
 import com.philipcosgrave.calorietracker.ui.screens.QuickCaloriesScreen
 import com.philipcosgrave.calorietracker.ui.screens.RecipeBuilderScreen
 import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
+import com.philipcosgrave.calorietracker.ui.screens.WeightScreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -79,6 +85,7 @@ fun CalorieTrackerApp(
             foodRepository = RoomFoodRepository(database.foodRecordDao()),
             barcodeAliasRepository = RoomBarcodeAliasRepository(database.barcodeAliasDao()),
             diaryRepository = RoomDiaryRepository(database.diaryRecordDao()),
+            weightRepository = RoomWeightRepository(database.weightRecordDao()),
             syncOutboxRepository = RoomSyncOutboxRepository(database.syncOutboxDao()),
             syncStateRepository = DataStoreSyncStateRepository(context),
             authRepository = authRepository,
@@ -92,10 +99,11 @@ fun CalorieTrackerApp(
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var recipes by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var diary by remember { mutableStateOf<List<DiaryEntry>>(emptyList()) }
+    var weights by remember { mutableStateOf<List<WeightEntry>>(emptyList()) }
     var hiddenSeedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var screen by remember { mutableStateOf(AppScreen.Diary) }
-    var previousScreen by remember { mutableStateOf(AppScreen.Diary) }
+    var screen by remember { mutableStateOf(AppScreen.Home) }
+    var previousScreen by remember { mutableStateOf(AppScreen.Home) }
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var recipeDraft by remember { mutableStateOf(RecipeDraft()) }
     var parentRecipeDraft by remember { mutableStateOf<RecipeDraft?>(null) }
@@ -114,6 +122,7 @@ fun CalorieTrackerApp(
     var healthConnectAvailability by remember { mutableStateOf(HealthConnectAvailability.Unavailable) }
     var healthConnectPermissionGranted by remember { mutableStateOf(false) }
     var healthConnectExportEnabled by remember { mutableStateOf(false) }
+    var healthMetrics by remember { mutableStateOf(HealthDashboardMetrics()) }
     var remoteSearchResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var remoteSearchQuery by remember { mutableStateOf("") }
     var isSearchingRemote by remember { mutableStateOf(false) }
@@ -123,6 +132,7 @@ fun CalorieTrackerApp(
         customFoods = foodRecords.filter { it.food.kind == FoodKind.Ingredient }.map { it.food }
         recipes = foodRecords.filter { it.food.kind == FoodKind.Recipe }.map { it.food }
         diary = localStore.diaryRepository.list().filter { it.sync.deletedAt == null }.map { it.entry }
+        weights = localStore.weightRepository.list(localStore.currentOwnerUserId())
         hiddenSeedIds = localStore.hiddenSeedIds()
         syncSettings = localStore.syncStateRepository.getSettings()
         pendingChangeCount = localStore.syncOutboxRepository.listPendingChanges().size
@@ -130,8 +140,11 @@ fun CalorieTrackerApp(
         healthConnectAvailability = healthConnectExporter.availability()
         healthConnectPermissionGranted =
             healthConnectAvailability == HealthConnectAvailability.Available &&
-                healthConnectExporter.hasWriteNutritionPermission()
+                healthConnectExporter.hasRequestedPermissions()
         healthConnectExportEnabled = localStore.isHealthConnectExportEnabled()
+        healthMetrics =
+            if (healthConnectPermissionGranted) healthConnectExporter.readTodayMetrics()
+            else HealthDashboardMetrics()
     }
 
     val healthPermissionsLauncher = rememberLauncherForActivityResult(
@@ -139,7 +152,7 @@ fun CalorieTrackerApp(
     ) { grantedPermissions ->
         scope.launch {
             val granted =
-                HealthConnectNutritionExporter.writeNutritionPermission in grantedPermissions
+                HealthConnectNutritionExporter.requestedPermissions.all { it in grantedPermissions }
             if (granted) {
                 localStore.setHealthConnectExportEnabled(true)
             }
@@ -272,6 +285,64 @@ fun CalorieTrackerApp(
         }
     }
 
+    suspend fun saveWeightEntry(date: LocalDate, weightKg: Double) {
+        val entry = WeightEntry(
+            id = createId("weight"),
+            date = date,
+            weightKg = weightKg,
+        )
+        localStore.weightRepository.save(
+            localStore.currentOwnerUserId(),
+            entry,
+        )
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            runCatching { healthConnectExporter.exportWeightEntry(entry) }
+        }
+    }
+
+    suspend fun importWeightHistoryFromHealthConnect() {
+        val ownerUserId = localStore.currentOwnerUserId()
+        val existing = localStore.weightRepository.list(ownerUserId)
+        val existingKeys = existing.map { "${it.date}:${it.weightKg}" }.toSet()
+        healthConnectExporter.importWeightEntries()
+            .filterNot { "${it.date}:${it.weightKg}" in existingKeys }
+            .forEach { entry ->
+                localStore.weightRepository.save(ownerUserId, entry)
+            }
+    }
+
+    suspend fun importNutritionHistoryFromHealthConnect() {
+        val importedEntries = healthConnectExporter.importNutritionEntries()
+        val existingIds = localStore.diaryRepository.list().map { it.entry.id }.toSet()
+        importedEntries
+            .filterNot { it.id in existingIds }
+            .forEach { entry ->
+                val deviceId = localStore.deviceId()
+                val updatedAt = nowIsoString()
+                val record = DiaryEntryRecord(
+                    entry = entry,
+                    sync = createSyncMetadata(
+                        recordId = entry.id,
+                        deviceId = deviceId,
+                        updatedAt = updatedAt,
+                    ).copy(syncStatus = com.philipcosgrave.calorietracker.model.SyncStatus.PendingPush),
+                )
+                localStore.diaryRepository.save(record)
+                localStore.syncOutboxRepository.enqueue(
+                    createChangeEnvelope(
+                        entityType = SyncEntityType.DiaryEntry,
+                        operation = SyncOperation.Upsert,
+                        deviceId = record.sync.originDeviceId,
+                        recordId = record.sync.recordId,
+                        payload = record,
+                    ),
+                )
+            }
+    }
+
     suspend fun findFoodByBarcode(barcode: String): FoodItem? {
         localStore.foodRepository.getByBarcode(barcode)?.food?.let { return it }
         localStore.barcodeAliasRepository.getByBarcode(barcode)?.let { alias ->
@@ -312,12 +383,28 @@ fun CalorieTrackerApp(
         color = MaterialTheme.colorScheme.background,
     ) {
         when (screen) {
+            AppScreen.Home -> HomeScreen(
+                caloriesLogged = diary.filter { it.date == selectedDate }.sumOf {
+                    it.food.nutrients.calories * it.servingMultiplier
+                },
+                healthMetrics = healthMetrics,
+                latestWeightKg = weights.maxByOrNull { it.date }?.weightKg,
+                weightUnit = syncSettings.weightUnit,
+                onOpenFoodLog = { screen = AppScreen.Diary },
+                onOpenWeight = { screen = AppScreen.Weight },
+                onOpenSyncSettings = {
+                    previousScreen = AppScreen.Home
+                    screen = AppScreen.SyncSettings
+                },
+            )
+
             AppScreen.Diary -> DiaryScreen(
                 selectedDate = selectedDate,
                 entries = diary,
                 targetRangeMin = syncSettings.calorieTargetMin,
                 targetRangeMax = syncSettings.calorieTargetMax,
                 onDateChange = { selectedDate = it },
+                onBack = { screen = AppScreen.Home },
                 onAddFood = { screen = AppScreen.AddFood },
                 onOpenSyncSettings = {
                     previousScreen = AppScreen.Diary
@@ -336,6 +423,28 @@ fun CalorieTrackerApp(
                         saveDiaryEntry(updated)
                         refreshState()
                     }
+                },
+            )
+
+            AppScreen.Weight -> WeightScreen(
+                weights = weights,
+                weightUnit = syncSettings.weightUnit,
+                goalWeightKg = syncSettings.goalWeightKg,
+                onBack = { screen = AppScreen.Home },
+                onLogWeight = { screen = AppScreen.LogWeight },
+            )
+
+            AppScreen.LogWeight -> LogWeightScreen(
+                initialDate = selectedDate,
+                weightUnit = syncSettings.weightUnit,
+                onBack = { screen = AppScreen.Weight },
+                onSave = { date, weightKg ->
+                    selectedDate = date
+                    scope.launch {
+                        saveWeightEntry(date, weightKg)
+                        refreshState()
+                    }
+                    screen = AppScreen.Weight
                 },
             )
 
@@ -509,6 +618,18 @@ fun CalorieTrackerApp(
                 onSetHealthConnectExportEnabled = { enabled ->
                     scope.launch {
                         localStore.setHealthConnectExportEnabled(enabled)
+                        refreshState()
+                    }
+                },
+                onImportWeightHistory = {
+                    scope.launch {
+                        importWeightHistoryFromHealthConnect()
+                        refreshState()
+                    }
+                },
+                onImportNutritionHistory = {
+                    scope.launch {
+                        importNutritionHistoryFromHealthConnect()
                         refreshState()
                     }
                 },

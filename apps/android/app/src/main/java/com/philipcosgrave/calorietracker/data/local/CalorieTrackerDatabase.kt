@@ -9,8 +9,9 @@ import androidx.room.RoomDatabase
         BarcodeAliasEntity::class,
         DiaryRecordEntity::class,
         SyncOutboxEntity::class,
+        WeightRecordEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class CalorieTrackerDatabase : RoomDatabase() {
@@ -18,4 +19,5 @@ abstract class CalorieTrackerDatabase : RoomDatabase() {
     abstract fun barcodeAliasDao(): BarcodeAliasDao
     abstract fun diaryRecordDao(): DiaryRecordDao
     abstract fun syncOutboxDao(): SyncOutboxDao
+    abstract fun weightRecordDao(): WeightRecordDao
 }

@@ -42,6 +42,8 @@ import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SortMenu
+import com.philipcosgrave.calorietracker.ui.components.appBorderColor
+import com.philipcosgrave.calorietracker.ui.components.appCardColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
@@ -97,7 +99,7 @@ fun AddFoodScreen(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(Color.White, CircleShape),
+                        .background(appCardColor(), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     TextButton(onClick = { addMenuExpanded = true }) {
@@ -190,8 +192,8 @@ fun AddFoodScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(18.dp))
-                            .border(1.dp, AppBorder, RoundedCornerShape(18.dp))
+                            .background(appCardColor(), RoundedCornerShape(18.dp))
+                            .border(1.dp, appBorderColor(), RoundedCornerShape(18.dp))
                             .padding(14.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

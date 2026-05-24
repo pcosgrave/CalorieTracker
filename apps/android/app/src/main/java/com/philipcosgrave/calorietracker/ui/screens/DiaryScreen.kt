@@ -38,10 +38,12 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
-import com.philipcosgrave.calorietracker.ui.components.AppSoft
 import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
 import com.philipcosgrave.calorietracker.ui.components.DiaryEntryRow
 import com.philipcosgrave.calorietracker.ui.components.Page
+import com.philipcosgrave.calorietracker.ui.components.PageHeader
+import com.philipcosgrave.calorietracker.ui.components.appBorderColor
+import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
@@ -54,6 +56,7 @@ fun DiaryScreen(
     targetRangeMin: Int,
     targetRangeMax: Int,
     onDateChange: (LocalDate) -> Unit,
+    onBack: () -> Unit,
     onAddFood: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
@@ -85,18 +88,23 @@ fun DiaryScreen(
     var editingEntry by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Page {
-        AppCardContainer {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DatePillsRow(
-                    selectedDate = selectedDate,
-                    today = today,
-                    onDateChange = onDateChange,
-                    modifier = Modifier.weight(1f),
-                )
+        PageHeader(
+            title = "Food Log",
+            onBack = onBack,
+            actions = {
                 TextButton(onClick = onOpenSyncSettings) {
                     Text("...", color = AppMuted, style = MaterialTheme.typography.titleLarge)
                 }
-            }
+            },
+        )
+
+        AppCardContainer {
+            DatePillsRow(
+                selectedDate = selectedDate,
+                today = today,
+                onDateChange = onDateChange,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             AppCardContainer(
                 modifier = Modifier
@@ -106,7 +114,7 @@ fun DiaryScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
-                        .background(AppSoft, RoundedCornerShape(32.dp))
+                        .background(appSoftColor(), RoundedCornerShape(32.dp))
                         .padding(horizontal = 20.dp, vertical = 15.dp),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -212,7 +220,7 @@ private fun IntakeRangeBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(16.dp)
-                    .background(Color(0xFFD7DAE5), RoundedCornerShape(999.dp)),
+                    .background(appBorderColor(), RoundedCornerShape(999.dp)),
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -303,12 +311,12 @@ private fun MacroStat(value: String, label: String, modifier: Modifier = Modifie
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(Color(0xFFE4E8F0)),
-        )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(appBorderColor()),
+                )
         Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Text(label, color = AppMuted, style = MaterialTheme.typography.labelMedium)
     }
@@ -324,6 +332,7 @@ private fun DiaryScreenPreview() {
             targetRangeMin = PreviewData.syncSettings.calorieTargetMin,
             targetRangeMax = PreviewData.syncSettings.calorieTargetMax,
             onDateChange = {},
+            onBack = {},
             onAddFood = {},
             onOpenSyncSettings = {},
             onDeleteEntry = {},

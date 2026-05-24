@@ -65,22 +65,42 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 val AppBlue = Color(0xFF1677F0)
+val AppSuccess = Color(0xFF36C15B)
 val AppBackground = Color(0xFFF3F6FB)
 val AppCard = Color(0xFFFFFFFF)
 val AppMuted = Color(0xFF7B8594)
 val AppBorder = Color(0xFFD9DFEA)
 val AppBorderStrong = Color(0xFFC4CBD8)
-val AppSuccess = Color(0xFF36C15B)
 val AppSoft = Color(0xFFF6F8FC)
 
+@Composable
+fun appBackgroundColor(): Color = MaterialTheme.colorScheme.background
+
+@Composable
+fun appCardColor(): Color = MaterialTheme.colorScheme.surface
+
+@Composable
+fun appMutedColor(): Color = MaterialTheme.colorScheme.onSurfaceVariant
+
+@Composable
+fun appBorderColor(): Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+
+@Composable
+fun appBorderStrongColor(): Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.48f)
+
+@Composable
+fun appSoftColor(): Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+
 fun isDigitsOnlyInput(value: String): Boolean = value.isEmpty() || value.all { it.isDigit() }
+fun isDecimalNumberInput(value: String): Boolean =
+    value.isEmpty() || Regex("""^\d*(\.\d{0,2})?$""").matches(value)
 
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppBackground)
+            .background(appBackgroundColor())
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -148,7 +168,7 @@ fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCard),
+        colors = CardDefaults.cardColors(containerColor = appCardColor()),
     ) {
         Row(
             modifier = Modifier
@@ -183,7 +203,7 @@ fun FoodSearchRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCard),
+        colors = CardDefaults.cardColors(containerColor = appCardColor()),
     ) {
         Row(
             modifier = Modifier
@@ -205,7 +225,7 @@ fun FoodSearchRow(
                         if (showCalories) add("${formatNumber(item.nutrients.calories)} cal")
                     }.joinToString(" • "),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppMuted,
+                    color = appMutedColor(),
                 )
             }
             if (onEdit != null && onDelete != null) {
@@ -232,13 +252,13 @@ fun RecipeComponentRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = AppSoft),
+        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(component.item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("${formatNumber(component.item.nutrients.calories)} cal", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+                    Text("${formatNumber(component.item.nutrients.calories)} cal", style = MaterialTheme.typography.bodySmall, color = appMutedColor())
                 }
                 TextButton(onClick = onRemove) { Text("-", color = Color(0xFFFF5449), style = MaterialTheme.typography.titleMedium) }
             }
@@ -337,7 +357,7 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AppBlue,
-                unfocusedBorderColor = AppBorder,
+                unfocusedBorderColor = appBorderColor(),
             ),
         )
         Box(modifier = Modifier.fillMaxSize().clickable { expanded = true })
@@ -367,9 +387,9 @@ fun AppFormField(
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = AppBlue,
-            unfocusedBorderColor = AppBorder,
-            focusedContainerColor = AppCard,
-            unfocusedContainerColor = AppCard,
+            unfocusedBorderColor = appBorderColor(),
+            focusedContainerColor = appCardColor(),
+            unfocusedContainerColor = appCardColor(),
         ),
     )
 }
@@ -392,7 +412,7 @@ fun AppCardContainer(modifier: Modifier = Modifier, content: @Composable ColumnS
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCard),
+        colors = CardDefaults.cardColors(containerColor = appCardColor()),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -412,7 +432,7 @@ fun AppSegmentedControl(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(20.dp))
+            .background(appCardColor(), RoundedCornerShape(20.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -423,8 +443,8 @@ fun AppSegmentedControl(
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
-                    .background(if (selected) AppBlue else AppSoft, shape)
-                    .border(1.dp, if (selected) AppBlue else AppBorderStrong, shape)
+                    .background(if (selected) AppBlue else appSoftColor(), shape)
+                    .border(1.dp, if (selected) AppBlue else appBorderStrongColor(), shape)
                     .clickable { onSelectedIndexChange(index) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -436,7 +456,7 @@ fun AppSegmentedControl(
 
 @Composable
 fun SectionDivider() {
-    HorizontalDivider(color = AppBorder)
+    HorizontalDivider(color = appBorderColor())
 }
 
 @Composable
@@ -522,7 +542,7 @@ fun DatePillsRow(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .background(if (selected) AppBlue else Color(0xFFF1F4F9), RoundedCornerShape(14.dp))
+                    .background(if (selected) AppBlue else appSoftColor(), RoundedCornerShape(14.dp))
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {

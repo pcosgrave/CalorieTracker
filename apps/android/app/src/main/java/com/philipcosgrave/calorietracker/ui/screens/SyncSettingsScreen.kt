@@ -32,7 +32,6 @@ import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
 import com.philipcosgrave.calorietracker.model.AuthSession
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
-import com.philipcosgrave.calorietracker.ui.components.AppBorder
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
@@ -40,6 +39,9 @@ import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SectionDivider
+import com.philipcosgrave.calorietracker.ui.components.appCardColor
+import com.philipcosgrave.calorietracker.ui.components.appSoftColor
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
@@ -58,12 +60,18 @@ fun SyncSettingsScreen(
     onSignOut: () -> Unit,
     onConnectHealthConnect: () -> Unit,
     onSetHealthConnectExportEnabled: (Boolean) -> Unit,
+    onImportWeightHistory: () -> Unit,
+    onImportNutritionHistory: () -> Unit,
 ) {
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
     var apiBaseUrl by remember(settings) { mutableStateOf(settings.apiBaseUrl.orEmpty()) }
     var backupMode by remember(settings) { mutableStateOf(settings.backupMode) }
     var calorieTargetMin by remember(settings) { mutableStateOf(settings.calorieTargetMin.toString()) }
     var calorieTargetMax by remember(settings) { mutableStateOf(settings.calorieTargetMax.toString()) }
+    var weightUnit by remember(settings) { mutableStateOf(settings.weightUnit) }
+    var goalWeightText by remember(settings) {
+        mutableStateOf(settings.goalWeightKg?.let { formatWeightForUnit(it, settings.weightUnit) } ?: "")
+    }
 
     Page {
         PageHeader("Settings", onBack = onBack)
@@ -74,7 +82,7 @@ fun SyncSettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF6F8FC), RoundedCornerShape(18.dp)),
+                    .background(appSoftColor(), RoundedCornerShape(18.dp)),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Text("Health Connect", color = AppMuted)
@@ -111,6 +119,21 @@ fun SyncSettingsScreen(
                     }
                     Switch(checked = healthConnectExportEnabled, onCheckedChange = onSetHealthConnectExportEnabled)
                 }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(
+                        onClick = onImportWeightHistory,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Import weight", color = AppBlue, textAlign = TextAlign.Center)
+                    }
+                    TextButton(
+                        onClick = onImportNutritionHistory,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Import food logs", color = AppBlue, textAlign = TextAlign.Center)
+                    }
+                }
             }
 
             SectionDivider()
@@ -139,6 +162,33 @@ fun SyncSettingsScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
             }
+
+            SectionDivider()
+            Text("Weight", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Weight Unit", modifier = Modifier.weight(1f), color = AppMuted)
+                WeightUnitPicker(
+                    value = weightUnit,
+                    onChange = { nextUnit ->
+                        val currentValue = goalWeightText.toDoubleOrNull()
+                        val currentKg = currentValue?.let { convertWeightToKg(it, weightUnit) }
+                        weightUnit = nextUnit
+                        goalWeightText = currentKg?.let { formatWeightForUnit(it, nextUnit) } ?: ""
+                    },
+                )
+            }
+
+            AppFormField(
+                value = goalWeightText,
+                onValueChange = {
+                    if (isDecimalNumberInput(it)) {
+                        goalWeightText = it
+                    }
+                },
+                label = "Goal Weight (${weightUnitLabel(weightUnit)})",
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
 
             SectionDivider()
             Row(verticalAlignment = Alignment.Top) {
@@ -189,6 +239,8 @@ fun SyncSettingsScreen(
                                     calorieTargetMax.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMax,
                                     calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
                                 ),
+                                weightUnit = weightUnit,
+                                goalWeightKg = goalWeightText.toDoubleOrNull()?.let { convertWeightToKg(it, weightUnit) },
                             ),
                         )
                     },
@@ -207,6 +259,24 @@ fun SyncSettingsScreen(
     }
 }
 
+private fun formatWeightForUnit(weightKg: Double, unit: SyncSettings.WeightUnit): String =
+    when (unit) {
+        SyncSettings.WeightUnit.Kilograms -> weightKg
+        SyncSettings.WeightUnit.Pounds -> weightKg * 2.2046226218
+    }.let { java.lang.String.format(java.util.Locale.US, "%.1f", it).trimEnd('0').trimEnd('.') }
+
+private fun convertWeightToKg(value: Double, unit: SyncSettings.WeightUnit): Double =
+    when (unit) {
+        SyncSettings.WeightUnit.Kilograms -> value
+        SyncSettings.WeightUnit.Pounds -> value / 2.2046226218
+    }
+
+private fun weightUnitLabel(unit: SyncSettings.WeightUnit): String =
+    when (unit) {
+        SyncSettings.WeightUnit.Kilograms -> "kg"
+        SyncSettings.WeightUnit.Pounds -> "lb"
+    }
+
 @Composable
 private fun BackupModePicker(value: SyncSettings.BackupMode, onChange: (SyncSettings.BackupMode) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -214,7 +284,7 @@ private fun BackupModePicker(value: SyncSettings.BackupMode, onChange: (SyncSett
         TextButton(
             onClick = { expanded = true },
             modifier = Modifier
-                .background(Color.White, RoundedCornerShape(14.dp)),
+                .background(appCardColor(), RoundedCornerShape(14.dp)),
         ) {
             Text(
                 when (value) {
@@ -231,6 +301,43 @@ private fun BackupModePicker(value: SyncSettings.BackupMode, onChange: (SyncSett
                     onClick = {
                         expanded = false
                         onChange(mode)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeightUnitPicker(value: SyncSettings.WeightUnit, onChange: (SyncSettings.WeightUnit) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .background(appCardColor(), RoundedCornerShape(14.dp)),
+        ) {
+            Text(
+                when (value) {
+                    SyncSettings.WeightUnit.Kilograms -> "kg"
+                    SyncSettings.WeightUnit.Pounds -> "lb"
+                },
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SyncSettings.WeightUnit.entries.forEach { unit ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            when (unit) {
+                                SyncSettings.WeightUnit.Kilograms -> "Kilograms (kg)"
+                                SyncSettings.WeightUnit.Pounds -> "Pounds (lb)"
+                            },
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onChange(unit)
                     },
                 )
             }
@@ -256,6 +363,8 @@ private fun SyncSettingsScreenPreview() {
             onSignOut = {},
             onConnectHealthConnect = {},
             onSetHealthConnectExportEnabled = {},
+            onImportWeightHistory = {},
+            onImportNutritionHistory = {},
         )
     }
 }

@@ -10,6 +10,7 @@ import com.philipcosgrave.calorietracker.model.SyncCursor
 import com.philipcosgrave.calorietracker.model.SyncPullResponse
 import com.philipcosgrave.calorietracker.model.SyncPushResponse
 import com.philipcosgrave.calorietracker.model.SyncSettings
+import com.philipcosgrave.calorietracker.model.WeightEntry
 import java.time.LocalDate
 
 interface FoodRepository {
@@ -33,6 +34,12 @@ interface DiaryRepository {
     suspend fun getById(recordId: String): DiaryEntryRecord?
     suspend fun save(record: DiaryEntryRecord)
     suspend fun softDelete(recordId: String, deletedAt: String)
+}
+
+interface WeightRepository {
+    suspend fun list(ownerUserId: String): List<WeightEntry>
+    suspend fun latest(ownerUserId: String): WeightEntry?
+    suspend fun save(ownerUserId: String, entry: WeightEntry)
 }
 
 interface SyncOutboxRepository {

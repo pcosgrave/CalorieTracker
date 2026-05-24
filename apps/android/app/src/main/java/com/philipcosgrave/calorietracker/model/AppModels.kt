@@ -69,3 +69,21 @@ data class Totals(
     val carbs: Double = 0.0,
     val fat: Double = 0.0,
 )
+
+data class WeightEntry(
+    val id: String,
+    val date: LocalDate,
+    val weightKg: Double,
+)
+
+enum class WeightChartRange(val label: String) {
+    Daily("Daily"),
+    Weekly("Weekly"),
+    Monthly("Monthly"),
+}
+
+data class HealthDashboardMetrics(
+    val steps: Long? = null,
+    val heartRateBpm: Long? = null,
+    val caloriesBurned: Double? = null,
+)

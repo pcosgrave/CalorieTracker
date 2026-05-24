@@ -60,11 +60,18 @@ data class SyncSettings(
     val lastSuccessfulSyncAt: String? = null,
     val calorieTargetMin: Int = 1800,
     val calorieTargetMax: Int = 2200,
+    val weightUnit: WeightUnit = WeightUnit.Kilograms,
+    val goalWeightKg: Double? = null,
 ) {
     enum class BackupMode {
         Disabled,
         ManualBackup,
         AutomaticBackup,
+    }
+
+    enum class WeightUnit {
+        Kilograms,
+        Pounds,
     }
 }
 

@@ -18,6 +18,8 @@ import com.philipcosgrave.calorietracker.data.local.FoodRecordEntity
 import com.philipcosgrave.calorietracker.data.local.SyncOutboxDao
 import com.philipcosgrave.calorietracker.data.local.SyncOutboxEntity
 import com.philipcosgrave.calorietracker.data.local.SyncPreferencesKeys
+import com.philipcosgrave.calorietracker.data.local.WeightRecordDao
+import com.philipcosgrave.calorietracker.data.local.WeightRecordEntity
 import com.philipcosgrave.calorietracker.data.local.barcodeAliasRecordPayloadFromJson
 import com.philipcosgrave.calorietracker.data.local.barcodeAliasRecordPayloadToJson
 import com.philipcosgrave.calorietracker.data.local.diaryEntryFromJsonString as parseDiaryEntry
@@ -39,6 +41,7 @@ import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncMetadata
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
+import com.philipcosgrave.calorietracker.model.WeightEntry
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
@@ -167,6 +170,38 @@ class RoomDiaryRepository(private val dao: DiaryRecordDao) : DiaryRepository {
     }
 }
 
+class RoomWeightRepository(private val dao: WeightRecordDao) : WeightRepository {
+    override suspend fun list(ownerUserId: String): List<WeightEntry> =
+        dao.listAll(ownerUserId).map { entity ->
+            WeightEntry(
+                id = entity.recordId,
+                date = LocalDate.parse(entity.loggedOn),
+                weightKg = entity.weightKg,
+            )
+        }
+
+    override suspend fun latest(ownerUserId: String): WeightEntry? =
+        dao.latest(ownerUserId)?.let { entity ->
+            WeightEntry(
+                id = entity.recordId,
+                date = LocalDate.parse(entity.loggedOn),
+                weightKg = entity.weightKg,
+            )
+        }
+
+    override suspend fun save(ownerUserId: String, entry: WeightEntry) {
+        dao.upsert(
+            WeightRecordEntity(
+                recordId = entry.id,
+                ownerUserId = ownerUserId,
+                loggedOn = entry.date.toString(),
+                weightKg = entry.weightKg,
+                updatedAt = java.time.Instant.now().toString(),
+            ),
+        )
+    }
+}
+
 class RoomSyncOutboxRepository(private val dao: SyncOutboxDao) : SyncOutboxRepository {
     override suspend fun listPendingChanges(): List<SyncChangeEnvelope<*>> =
         dao.listAll().map { entity ->
@@ -220,6 +255,8 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
     private fun lastSuccessfulSyncAtKey(userId: String) = stringPreferencesKey("last_successful_sync_at.$userId")
     private fun calorieTargetMinKey(userId: String) = stringPreferencesKey("calorie_target_min.$userId")
     private fun calorieTargetMaxKey(userId: String) = stringPreferencesKey("calorie_target_max.$userId")
+    private fun weightUnitKey(userId: String) = stringPreferencesKey("weight_unit.$userId")
+    private fun goalWeightKgKey(userId: String) = stringPreferencesKey("goal_weight_kg.$userId")
     private fun lastPulledAtKey(userId: String) = stringPreferencesKey("last_pulled_at.$userId")
     private fun lastAcknowledgedChangeIdKey(userId: String) = stringPreferencesKey("last_acknowledged_change_id.$userId")
 
@@ -254,6 +291,9 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             lastSuccessfulSyncAt = prefs[lastSuccessfulSyncAtKey(userId)],
             calorieTargetMin = prefs[calorieTargetMinKey(userId)]?.toIntOrNull() ?: 1800,
             calorieTargetMax = prefs[calorieTargetMaxKey(userId)]?.toIntOrNull() ?: 2200,
+            weightUnit = prefs[weightUnitKey(userId)]?.let { SyncSettings.WeightUnit.valueOf(it) }
+                ?: SyncSettings.WeightUnit.Kilograms,
+            goalWeightKg = prefs[goalWeightKgKey(userId)]?.toDoubleOrNull(),
         )
     }
 
@@ -269,6 +309,12 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             }
             prefs[calorieTargetMinKey(userId)] = settings.calorieTargetMin.toString()
             prefs[calorieTargetMaxKey(userId)] = settings.calorieTargetMax.toString()
+            prefs[weightUnitKey(userId)] = settings.weightUnit.name
+            if (settings.goalWeightKg == null) {
+                prefs.remove(goalWeightKgKey(userId))
+            } else {
+                prefs[goalWeightKgKey(userId)] = settings.goalWeightKg.toString()
+            }
             settings.lastSuccessfulSyncAt?.let { prefs[lastSuccessfulSyncAtKey(userId)] = it }
         }
     }
@@ -279,6 +325,7 @@ class AndroidLocalStore(
     val foodRepository: FoodRepository,
     val barcodeAliasRepository: BarcodeAliasRepository,
     val diaryRepository: DiaryRepository,
+    val weightRepository: WeightRepository,
     val syncOutboxRepository: SyncOutboxRepository,
     val syncStateRepository: SyncStateRepository,
     val authRepository: AuthRepository,
