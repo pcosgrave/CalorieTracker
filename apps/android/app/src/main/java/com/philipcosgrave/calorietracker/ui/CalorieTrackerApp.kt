@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -203,7 +204,7 @@ fun CalorieTrackerApp(
     ) { grantedPermissions ->
         scope.launch {
             val granted =
-                HealthConnectNutritionExporter.requestedPermissions.all { it in grantedPermissions }
+                healthConnectExporter.requestedPermissions().all { it in grantedPermissions }
             if (granted) {
                 localStore.setHealthConnectExportEnabled(true)
             }
@@ -527,11 +528,11 @@ fun CalorieTrackerApp(
             localStore.currentOwnerUserId(),
             weightEntry,
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
-            healthConnectPermissionGranted &&
-            healthConnectExportEnabled
-        ) {
+        if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
             runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
+                .onFailure { error ->
+                    Log.e("HealthConnectWeight", "Failed to export weight entry ${weightEntry.id}", error)
+                }
         }
     }
 
@@ -540,31 +541,31 @@ fun CalorieTrackerApp(
             localStore.currentOwnerUserId(),
             entry.id,
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
-            healthConnectPermissionGranted &&
-            healthConnectExportEnabled
-        ) {
+        if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
             runCatching { healthConnectExporter.deleteWeightEntry(entry.id) }
+                .onFailure { error ->
+                    Log.e("HealthConnectWeight", "Failed to delete weight entry ${entry.id}", error)
+                }
         }
     }
 
-    suspend fun importWeightHistoryFromHealthConnect() {
+    suspend fun importWeightHistoryFromHealthConnect(): Pair<Int, Int> {
         val ownerUserId = localStore.currentOwnerUserId()
         val existing = localStore.weightRepository.list(ownerUserId)
         val existingKeys = existing.map { "${it.date}:${it.weightKg}" }.toSet()
-        healthConnectExporter.importWeightEntries()
-            .filterNot { "${it.date}:${it.weightKg}" in existingKeys }
-            .forEach { entry ->
+        val importedEntries = healthConnectExporter.importWeightEntries()
+        val newEntries = importedEntries.filterNot { "${it.date}:${it.weightKg}" in existingKeys }
+        newEntries.forEach { entry ->
                 localStore.weightRepository.save(ownerUserId, entry)
-            }
+        }
+        return newEntries.size to (importedEntries.size - newEntries.size)
     }
 
-    suspend fun importNutritionHistoryFromHealthConnect() {
+    suspend fun importNutritionHistoryFromHealthConnect(): Pair<Int, Int> {
         val importedEntries = healthConnectExporter.importNutritionEntries()
         val existingIds = localStore.diaryRepository.list().map { it.entry.id }.toSet()
-        importedEntries
-            .filterNot { it.id in existingIds }
-            .forEach { entry ->
+        val newEntries = importedEntries.filterNot { it.id in existingIds }
+        newEntries.forEach { entry ->
                 val deviceId = localStore.deviceId()
                 val updatedAt = nowIsoString()
                 val record = DiaryEntryRecord(
@@ -585,7 +586,8 @@ fun CalorieTrackerApp(
                         payload = record,
                     ),
                 )
-            }
+        }
+        return newEntries.size to (importedEntries.size - newEntries.size)
     }
 
     suspend fun findFoodByBarcode(barcode: String): FoodItem? {
@@ -615,7 +617,19 @@ fun CalorieTrackerApp(
         if (callback.startsWith(BuildConfig.COGNITO_ANDROID_REDIRECT_URI)) {
             runCatching {
                 authRepository.completeSignIn(android.net.Uri.parse(callback))
+            }.onSuccess {
+                resetTo(AppScreen.SyncSettings)
+            }.onFailure { error ->
+                Log.e("AuthCallback", "Sign in failed for callback: $callback", error)
+                Toast.makeText(
+                    context,
+                    error.message ?: "Sign in failed",
+                    Toast.LENGTH_LONG,
+                ).show()
+                navigateTo(AppScreen.SyncSettings)
             }
+        } else if (callback.startsWith(BuildConfig.COGNITO_ANDROID_LOGOUT_URI)) {
+            resetTo(AppScreen.SyncSettings)
         }
         refreshState()
         onAuthCallbackConsumed()
@@ -921,7 +935,7 @@ fun CalorieTrackerApp(
                 onConnectHealthConnect = {
                     when (healthConnectAvailability) {
                         HealthConnectAvailability.Available -> {
-                            healthPermissionsLauncher.launch(HealthConnectNutritionExporter.requestedPermissions)
+                            healthPermissionsLauncher.launch(healthConnectExporter.requestedPermissions())
                         }
 
                         HealthConnectAvailability.UpdateRequired -> {
@@ -939,14 +953,24 @@ fun CalorieTrackerApp(
                 },
                 onImportWeightHistory = {
                     scope.launch {
-                        importWeightHistoryFromHealthConnect()
+                        val (importedCount, skippedCount) = importWeightHistoryFromHealthConnect()
                         refreshState()
+                        Toast.makeText(
+                            context,
+                            "Imported $importedCount weight entr${if (importedCount == 1) "y" else "ies"}, skipped $skippedCount duplicate${if (skippedCount == 1) "" else "s"}",
+                            Toast.LENGTH_LONG,
+                        ).show()
                     }
                 },
                 onImportNutritionHistory = {
                     scope.launch {
-                        importNutritionHistoryFromHealthConnect()
+                        val (importedCount, skippedCount) = importNutritionHistoryFromHealthConnect()
                         refreshState()
+                        Toast.makeText(
+                            context,
+                            "Imported $importedCount food log${if (importedCount == 1) "" else "s"}, skipped $skippedCount duplicate${if (skippedCount == 1) "" else "s"}",
+                            Toast.LENGTH_LONG,
+                        ).show()
                     }
                 },
             )

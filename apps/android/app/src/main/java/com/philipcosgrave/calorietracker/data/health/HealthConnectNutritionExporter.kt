@@ -2,13 +2,17 @@ package com.philipcosgrave.calorietracker.data.health
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_HISTORY
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.MealType
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -32,6 +36,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlin.reflect.KClass
 
 enum class HealthConnectAvailability {
     Available,
@@ -60,7 +65,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
         val readWeightPermission: String =
             HealthPermission.getReadPermission(WeightRecord::class)
 
-        val requestedPermissions: Set<String> = setOf(
+        val baseRequestedPermissions: Set<String> = setOf(
             writeNutritionPermission,
             readNutritionPermission,
             writeWeightPermission,
@@ -101,7 +106,20 @@ class HealthConnectNutritionExporter(private val context: Context) {
         readNutritionPermission in grantedPermissions()
 
     suspend fun hasRequestedPermissions(): Boolean =
-        requestedPermissions.all { it in grantedPermissions() }
+        requestedPermissions().all { it in grantedPermissions() }
+
+    fun isHistoryPermissionAvailable(): Boolean =
+        availability() == HealthConnectAvailability.Available &&
+            client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_HISTORY) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+
+    fun requestedPermissions(): Set<String> =
+        buildSet {
+            addAll(baseRequestedPermissions)
+            if (isHistoryPermissionAvailable()) {
+                add(PERMISSION_READ_HEALTH_DATA_HISTORY)
+            }
+        }
 
     suspend fun readTodayMetrics(): HealthDashboardMetrics {
         if (!hasRequestedPermissions()) return HealthDashboardMetrics()
@@ -217,18 +235,21 @@ class HealthConnectNutritionExporter(private val context: Context) {
     suspend fun importWeightEntries(): List<WeightEntry> {
         if (readWeightPermission !in grantedPermissions()) return emptyList()
 
-        val response = client.readRecords(
-            ReadRecordsRequest(
-                recordType = WeightRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(
-                    LocalDate.of(2000, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant(),
-                    java.time.Instant.now(),
-                ),
-                ascendingOrder = true,
-                pageSize = 1000,
+        val records = readAllRecords(
+            recordType = WeightRecord::class,
+            timeRangeFilter = TimeRangeFilter.between(
+                LocalDate.of(2000, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant(),
+                java.time.Instant.now(),
             ),
         )
-        return response.records.map { record ->
+        val oldestDate = records.minByOrNull { it.time }?.time?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        val newestDate = records.maxByOrNull { it.time }?.time?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        val originPackages = records.map { it.metadata.dataOrigin.packageName }.distinct().sorted()
+        Log.d(
+            "HealthConnectWeight",
+            "Read ${records.size} WeightRecord(s) from Health Connect. Oldest=$oldestDate Newest=$newestDate Origins=$originPackages",
+        )
+        return records.map { record ->
             WeightEntry(
                 id = record.metadata.clientRecordId ?: "hc-weight-${record.metadata.id}",
                 date = record.time.atZone(ZoneId.systemDefault()).toLocalDate(),
@@ -240,18 +261,14 @@ class HealthConnectNutritionExporter(private val context: Context) {
     suspend fun importNutritionEntries(): List<DiaryEntry> {
         if (!hasReadNutritionPermission()) return emptyList()
 
-        val response = client.readRecords(
-            ReadRecordsRequest(
-                recordType = NutritionRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(
-                    LocalDate.of(2000, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant(),
-                    java.time.Instant.now(),
-                ),
-                ascendingOrder = true,
-                pageSize = 1000,
+        val records = readAllRecords(
+            recordType = NutritionRecord::class,
+            timeRangeFilter = TimeRangeFilter.between(
+                LocalDate.of(2000, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant(),
+                java.time.Instant.now(),
             ),
         )
-        return response.records.map { record ->
+        return records.map { record ->
             DiaryEntry(
                 id = record.metadata.clientRecordId ?: "hc-nutrition-${record.metadata.id}",
                 food = FoodItem(
@@ -277,5 +294,31 @@ class HealthConnectNutritionExporter(private val context: Context) {
                 servingMultiplier = 1.0,
             )
         }
+    }
+
+    private suspend fun <T : Record> readAllRecords(
+        recordType: KClass<T>,
+        timeRangeFilter: TimeRangeFilter,
+        ascendingOrder: Boolean = true,
+        pageSize: Int = 1000,
+    ): List<T> {
+        val allRecords = mutableListOf<T>()
+        var pageToken: String? = null
+
+        do {
+            val response = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = recordType,
+                    timeRangeFilter = timeRangeFilter,
+                    ascendingOrder = ascendingOrder,
+                    pageSize = pageSize,
+                    pageToken = pageToken,
+                ),
+            )
+            allRecords.addAll(response.records)
+            pageToken = response.pageToken
+        } while (pageToken != null)
+
+        return allRecords
     }
 }

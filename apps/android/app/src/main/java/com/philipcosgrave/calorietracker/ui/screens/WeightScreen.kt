@@ -39,6 +39,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppSegmentedControl
+import com.philipcosgrave.calorietracker.ui.components.OverflowMenu
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.ScrollablePillSelector
@@ -142,7 +143,7 @@ fun WeightScreen(
             } else {
                 WeightTrendChart(
                     points = chartPoints.map { it.second },
-                    labels = chartPoints.map { it.first },
+                    labels = displayedChartLabels(chartPoints.map { it.first }, range),
                     goalValue = goalWeightKg?.let { convertWeightFromKg(it, weightUnit) },
                     unitLabel = weightUnitLabel(weightUnit),
                 )
@@ -299,8 +300,13 @@ private fun WeightTrendChart(
             return@AppCardContainer
         }
 
-        val minValue = listOfNotNull(points.minOrNull(), goalValue).minOrNull() ?: 0.0
-        val maxValue = listOfNotNull(points.maxOrNull(), goalValue).maxOrNull() ?: minValue
+        val rawMinValue = listOfNotNull(points.minOrNull(), goalValue).minOrNull() ?: 0.0
+        val rawMaxValue = listOfNotNull(points.maxOrNull(), goalValue).maxOrNull() ?: rawMinValue
+        val rawSpan = (rawMaxValue - rawMinValue).takeIf { it > 0.1 } ?: 1.0
+        val lowerPadding = goalValue?.let { maxOf(rawSpan * 0.2, 1.0) } ?: maxOf(rawSpan * 0.1, 0.5)
+        val upperPadding = maxOf(rawSpan * 0.1, 0.5)
+        val minValue = goalValue?.let { minOf(rawMinValue, it - lowerPadding) } ?: (rawMinValue - lowerPadding)
+        val maxValue = maxOf(rawMaxValue, (goalValue ?: rawMaxValue) + upperPadding)
         val span = (maxValue - minValue).takeIf { it > 0.1 } ?: 1.0
         val topTick = maxValue
         val middleTick = minValue + (span / 2.0)
@@ -370,7 +376,7 @@ private fun WeightTrendChart(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    labels.take(5).forEach { label ->
+                    labels.forEach { label ->
                         Text(label, color = AppMuted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -395,45 +401,27 @@ private fun WeightHistoryRow(
     onEdit: (WeightEntry) -> Unit,
     onDelete: (WeightEntry) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                "${formatNumber(convertWeightFromKg(entry.weightKg, weightUnit))} ${weightUnitLabel(weightUnit)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                Text(
+                    "${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    "${formatNumber(convertWeightFromKg(entry.weightKg, weightUnit))} ${weightUnitLabel(weightUnit)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            OverflowMenu(
+                onEdit = { onEdit(entry) },
+                onDelete = { onDelete(entry) },
             )
         }
-        WeightEntryActions(entry = entry, onEdit = onEdit, onDelete = onDelete)
         SectionDivider()
-    }
-}
-
-@Composable
-private fun WeightEntryActions(
-    entry: WeightEntry,
-    onEdit: (WeightEntry) -> Unit,
-    onDelete: (WeightEntry) -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { onEdit(entry) }) {
-            Text("Edit", color = AppBlue, fontWeight = FontWeight.Medium)
-        }
-        TextButton(onClick = { onDelete(entry) }) {
-            Text("Delete", color = androidx.compose.ui.graphics.Color(0xFFFF6B5C), fontWeight = FontWeight.Medium)
-        }
-    }
 }
 
 private fun buildChartPoints(
@@ -460,6 +448,30 @@ private fun buildChartPoints(
                 .map { (date, items) ->
                     date.dayOfMonth.toString() to convertWeightFromKg(items.last().weightKg, weightUnit)
                 }
+        }
+    }
+}
+
+private fun displayedChartLabels(labels: List<String>, range: WeightChartRange): List<String> {
+    if (labels.isEmpty()) return labels
+    return when (range) {
+        WeightChartRange.Daily -> labels
+        WeightChartRange.Weekly -> labels
+        WeightChartRange.Monthly -> {
+            val maxVisibleLabels = 7
+            if (labels.size <= maxVisibleLabels) {
+                labels
+            } else {
+                val step = ((labels.size - 1).toDouble() / (maxVisibleLabels - 1)).toInt().coerceAtLeast(1)
+                labels.mapIndexed { index, label ->
+                    when {
+                        index == 0 -> label
+                        index == labels.lastIndex -> label
+                        index % step == 0 -> label
+                        else -> ""
+                    }
+                }
+            }
         }
     }
 }
