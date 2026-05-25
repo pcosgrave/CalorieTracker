@@ -69,3 +69,22 @@ variable "api_stage_name" {
   type        = string
   default     = "prod"
 }
+
+variable "google_client_id" {
+  description = "Optional Google OAuth client ID for Cognito federation."
+  type        = string
+  default     = null
+}
+
+variable "google_client_secret" {
+  description = "Optional Google OAuth client secret for Cognito federation."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "google_authorize_scopes" {
+  description = "OAuth scopes requested from Google through Cognito."
+  type        = string
+  default     = "openid email profile"
+}

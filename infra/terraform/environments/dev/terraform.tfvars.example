@@ -12,10 +12,12 @@ web_logout_urls = [
 ]
 
 android_callback_urls = [
+  "bitewise-dev://auth/callback",
   "bitewise://auth/callback",
 ]
 
 android_logout_urls = [
+  "bitewise-dev://signout",
   "bitewise://signout",
 ]
 

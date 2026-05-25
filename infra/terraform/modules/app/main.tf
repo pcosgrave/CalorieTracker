@@ -16,6 +16,13 @@ locals {
   }
 
   cognito_domain_prefix = coalesce(var.cognito_domain_prefix, replace(local.name_prefix, "/[^a-zA-Z0-9-]/", "-"))
+  google_provider_enabled = (
+    var.google_client_id != null &&
+    trimspace(var.google_client_id) != "" &&
+    var.google_client_secret != null &&
+    trimspace(var.google_client_secret) != ""
+  )
+  supported_identity_providers = local.google_provider_enabled ? ["COGNITO", "Google"] : ["COGNITO"]
 }
 
 data "aws_region" "current" {}
@@ -58,6 +65,27 @@ resource "aws_cognito_user_pool_domain" "main" {
   user_pool_id = aws_cognito_user_pool.main.id
 }
 
+resource "aws_cognito_identity_provider" "google" {
+  count = local.google_provider_enabled ? 1 : 0
+
+  user_pool_id  = aws_cognito_user_pool.main.id
+  provider_name = "Google"
+  provider_type = "Google"
+
+  provider_details = {
+    authorize_scopes = var.google_authorize_scopes
+    client_id        = var.google_client_id
+    client_secret    = var.google_client_secret
+  }
+
+  attribute_mapping = {
+    email          = "email"
+    email_verified = "email_verified"
+    name           = "name"
+    username       = "sub"
+  }
+}
+
 resource "aws_cognito_user_pool_client" "web" {
   name         = "${local.name_prefix}-web"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -69,13 +97,15 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
   callback_urls                        = var.web_callback_urls
   logout_urls                          = var.web_logout_urls
-  supported_identity_providers         = ["COGNITO"]
+  supported_identity_providers         = local.supported_identity_providers
 
   explicit_auth_flows = [
     "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_PASSWORD_AUTH",
     "ALLOW_USER_SRP_AUTH",
   ]
+
+  depends_on = [aws_cognito_identity_provider.google]
 }
 
 resource "aws_cognito_user_pool_client" "android" {
@@ -89,13 +119,15 @@ resource "aws_cognito_user_pool_client" "android" {
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
   callback_urls                        = var.android_callback_urls
   logout_urls                          = var.android_logout_urls
-  supported_identity_providers         = ["COGNITO"]
+  supported_identity_providers         = local.supported_identity_providers
 
   explicit_auth_flows = [
     "ALLOW_REFRESH_TOKEN_AUTH",
     "ALLOW_USER_PASSWORD_AUTH",
     "ALLOW_USER_SRP_AUTH",
   ]
+
+  depends_on = [aws_cognito_identity_provider.google]
 }
 
 resource "aws_dynamodb_table" "products" {
