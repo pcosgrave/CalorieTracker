@@ -27,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
+import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
 import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
@@ -48,7 +49,7 @@ fun QuickCaloriesScreen(
 
     Page {
         PageHeader("Quick Calories", onBack = onBack)
-        Card(modifier = Modifier.fillMaxWidth()) {
+        AppCardContainer(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(calories,
                     {

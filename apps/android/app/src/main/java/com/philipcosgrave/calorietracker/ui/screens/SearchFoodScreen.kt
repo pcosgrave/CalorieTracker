@@ -99,11 +99,11 @@ fun SearchFoodScreen(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(appCardColor(), CircleShape),
+                        .background(AppBlue, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     TextButton(onClick = { addMenuExpanded = true }) {
-                        Text("+", color = AppBlue, style = MaterialTheme.typography.titleLarge)
+                        Text("+", color = Color.White, style = MaterialTheme.typography.titleLarge)
                     }
                     DropdownMenu(expanded = addMenuExpanded, onDismissRequest = { addMenuExpanded = false }) {
                         DropdownMenuItem(

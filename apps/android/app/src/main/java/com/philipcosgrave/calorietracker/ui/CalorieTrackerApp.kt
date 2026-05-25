@@ -113,6 +113,7 @@ fun CalorieTrackerApp(
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var recipeDraft by remember { mutableStateOf(RecipeDraft()) }
     var parentRecipeDraft by remember { mutableStateOf<RecipeDraft?>(null) }
+    var returnToRecipeAfterIngredientSave by remember { mutableStateOf(false) }
     var editingFood by remember { mutableStateOf<FoodItem?>(null) }
     var editingWeight by remember { mutableStateOf<WeightEntry?>(null) }
     var syncSettings by remember {
@@ -516,6 +517,7 @@ fun CalorieTrackerApp(
                 },
                 onAddIngredient = {
                     editingFood = null
+                    returnToRecipeAfterIngredientSave = false
                     screen = AppScreen.AddIngredient
                 },
                 onAddRecipe = {
@@ -719,7 +721,12 @@ fun CalorieTrackerApp(
 
             AppScreen.AddIngredient -> AddIngredientScreen(
                 existing = editingFood,
-                onBack = { screen = AppScreen.SearchFood },
+                onBack = {
+                    editingFood = null
+                    val nextScreen = if (returnToRecipeAfterIngredientSave) AppScreen.RecipeBuilder else AppScreen.SearchFood
+                    returnToRecipeAfterIngredientSave = false
+                    screen = nextScreen
+                },
                 onSave = { item ->
                     if (item.kind == FoodKind.Recipe) {
                         recipes = listOf(item) + recipes.filterNot { it.id == item.id }
@@ -731,7 +738,17 @@ fun CalorieTrackerApp(
                         saveFood(item)
                         refreshState()
                     }
-                    screen = if (parentRecipeDraft != null) AppScreen.RecipeBuilder else AppScreen.SearchFood
+                    editingFood = null
+                    if (returnToRecipeAfterIngredientSave && item.kind == FoodKind.Ingredient) {
+                        recipeDraft = recipeDraft.copy(
+                            components = recipeDraft.components + RecipeComponent(item, item.servingQuantity, item.servingUnit),
+                        )
+                        returnToRecipeAfterIngredientSave = false
+                        screen = AppScreen.RecipeBuilder
+                    } else {
+                        returnToRecipeAfterIngredientSave = false
+                        screen = if (parentRecipeDraft != null) AppScreen.RecipeBuilder else AppScreen.SearchFood
+                    }
                 },
             )
 
@@ -741,11 +758,13 @@ fun CalorieTrackerApp(
                 onDraftChange = { recipeDraft = it },
                 onBack = {
                     parentRecipeDraft = null
+                    returnToRecipeAfterIngredientSave = false
                     editingFood = null
                     screen = AppScreen.SearchFood
                 },
                 onAddIngredient = {
                     editingFood = null
+                    returnToRecipeAfterIngredientSave = true
                     screen = AppScreen.AddIngredient
                 },
                 onStartNestedRecipe = {

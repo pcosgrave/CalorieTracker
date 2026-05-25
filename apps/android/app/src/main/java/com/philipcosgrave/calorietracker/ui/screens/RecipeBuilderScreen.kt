@@ -1,20 +1,19 @@
 package com.philipcosgrave.calorietracker.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,12 +39,12 @@ import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
+import com.philipcosgrave.calorietracker.ui.components.SectionDivider
 import com.philipcosgrave.calorietracker.ui.components.FoodSearchRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
-import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
@@ -111,7 +110,13 @@ fun RecipeBuilderScreen(
                 }
             }
 
-            Text("Ingredients", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Ingredients", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
             draft.components.forEachIndexed { index, component ->
                 RecipeComponentRow(
                     component = component,
@@ -123,15 +128,31 @@ fun RecipeBuilderScreen(
                     },
                 )
             }
-
             AppPrimaryButton(
                 text = "Save Recipe",
                 onClick = { onSave(draft) },
                 enabled = draft.name.isNotBlank() && draft.components.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             )
+            SectionDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppFormField(search, { search = it }, "Search ingredients or recipes...", Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .padding(start = 10.dp)
+                        .size(42.dp)
+                        .background(AppBlue, CircleShape)
+                        .clickable(onClick = onAddIngredient),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("+", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+            }
 
-            AppFormField(search, { search = it }, "Search ingredients or recipes...", Modifier.fillMaxWidth())
             results.take(6).forEach { item ->
                 FoodSearchRow(
                     item = item,
@@ -146,22 +167,6 @@ fun RecipeBuilderScreen(
                     },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun DashedAddCard(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, appBorderColor(), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("+", style = MaterialTheme.typography.titleLarge)
-            Text(label, color = AppMuted)
         }
     }
 }
