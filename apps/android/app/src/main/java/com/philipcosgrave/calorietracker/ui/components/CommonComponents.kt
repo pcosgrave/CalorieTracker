@@ -175,7 +175,8 @@ fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = appCardColor()),
+        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
+        border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
     ) {
         Row(
             modifier = Modifier
@@ -376,7 +377,12 @@ fun UnitPicker(value: String, onChange: (String) -> Unit, modifier: Modifier = M
                 unfocusedBorderColor = appBorderColor(),
             ),
         )
-        Box(modifier = Modifier.fillMaxSize().clickable { expanded = true })
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable { expanded = true },
+        )
+
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             units.forEach { unit ->
                 DropdownMenuItem(text = { Text(unit) }, onClick = { expanded = false; onChange(unit) })
