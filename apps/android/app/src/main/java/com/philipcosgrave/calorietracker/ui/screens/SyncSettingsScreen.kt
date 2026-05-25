@@ -225,13 +225,6 @@ fun SyncSettingsScreen(
                 Text("Sign in to sync against your private cloud backup.", color = AppMuted)
             }
 
-            AppFormField(
-                value = apiBaseUrl,
-                onValueChange = { apiBaseUrl = it },
-                label = "Developer API",
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Backup Mode", modifier = Modifier.weight(1f), color = AppMuted)
                 BackupModePicker(value = backupMode, onChange = { backupMode = it })

@@ -282,7 +282,6 @@ private fun DailyWeightSummary(
                     color = AppMuted,
                 )
             }
-            WeightEntryActions(entry = entry, onEdit = onEdit, onDelete = onDelete)
         }
     }
 }
