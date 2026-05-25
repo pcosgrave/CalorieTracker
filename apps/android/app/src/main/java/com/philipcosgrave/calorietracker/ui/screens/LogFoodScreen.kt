@@ -47,7 +47,9 @@ import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
@@ -100,12 +102,13 @@ fun LogFoodScreen(
             OutlinedTextField(
                 amount,
                 {
-                    if (isDigitsOnlyInput(it)) {
-                        amount = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        amount = normalized
                     }
                 },
                 modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
             UnitPicker(unit, { unit = it }, Modifier.weight(1f), availableUnits)
             Text("${formatNumber(adjusted.calories)} cals.", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
@@ -173,15 +176,16 @@ private fun EditableRecipeLogComponent(
         OutlinedTextField(
             value = amountText,
             onValueChange = {
-                if (isDigitsOnlyInput(it)) {
-                    amountText = it
-                    onAmountChange(it)
+                val normalized = normalizeDecimalNumberInput(it)
+                if (isDecimalNumberInput(normalized)) {
+                    amountText = normalized
+                    onAmountChange(normalized)
                 }
             },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(84.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         CompactUnitPicker(
             value = component.unit,

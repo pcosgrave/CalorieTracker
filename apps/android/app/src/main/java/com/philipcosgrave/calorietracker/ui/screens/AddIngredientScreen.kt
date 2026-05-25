@@ -33,7 +33,9 @@ import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
 @Composable
@@ -56,10 +58,11 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(servingQuantity, {
-                    if (isDigitsOnlyInput(it)) {
-                        servingQuantity = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        servingQuantity = normalized
                     }
-                }, "Serving Size", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Serving Size", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                 UnitPicker(
                     value = servingUnit,
                     onChange = { servingUnit = it },
@@ -68,10 +71,11 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(calories, {
-                    if (isDigitsOnlyInput(it)) {
-                        calories = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        calories = normalized
                     }
-                }, "Calories (kcal)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Calories (kcal)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                 AppFormField(barcode, {
                     if (isDigitsOnlyInput(it)) {
                         barcode = it
@@ -80,22 +84,25 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(protein, {
-                    if (isDigitsOnlyInput(it)) {
-                        protein = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        protein = normalized
                     }
-                }, "Protein (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Protein (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                 AppFormField(carbs, {
-                    if (isDigitsOnlyInput(it)) {
-                        carbs = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        carbs = normalized
                     }
-                }, "Carbs (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Carbs (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             }
             Box(modifier = Modifier.fillMaxWidth()) {
                 AppFormField(fat, {
-                    if (isDigitsOnlyInput(it)) {
-                        fat = it
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        fat = normalized
                     }
-                }, "Fat (g)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Fat (g)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             }
 
             AppPrimaryButton(

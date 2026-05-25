@@ -33,6 +33,8 @@ import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
@@ -53,14 +55,15 @@ fun QuickCaloriesScreen(
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(calories,
                     {
-                        if (it.isEmpty() || it.all { it.isDigit() })
+                        val normalized = normalizeDecimalNumberInput(it)
+                        if (isDecimalNumberInput(normalized))
                         {
-                            calories = it
+                            calories = normalized
                         }
                     },
                     label = { Text("Calories") },
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
+                        keyboardType = KeyboardType.Decimal
                     ),
                     modifier = Modifier.fillMaxWidth())
                 MealPicker(meal, { meal = it })

@@ -101,6 +101,7 @@ fun appSoftColor(): Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha 
 fun isDigitsOnlyInput(value: String): Boolean = value.isEmpty() || value.all { it.isDigit() }
 fun isDecimalNumberInput(value: String): Boolean =
     value.isEmpty() || Regex("""^\d*(\.\d{0,2})?$""").matches(value)
+fun normalizeDecimalNumberInput(value: String): String = if (value.startsWith(".")) "0$value" else value
 
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) {
@@ -273,14 +274,15 @@ fun RecipeComponentRow(
                 OutlinedTextField(
                     value = amount,
                     onValueChange = {
-                        if (isDigitsOnlyInput(it)) {
-                            amount = it
-                            onChange(component.copy(amount = it.toDoubleOrNull() ?: component.amount))
+                        val normalized = normalizeDecimalNumberInput(it)
+                        if (isDecimalNumberInput(normalized)) {
+                            amount = normalized
+                            onChange(component.copy(amount = normalized.toDoubleOrNull() ?: component.amount))
                         }
                     },
                     label = { Text("Amount") },
                     modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = RoundedCornerShape(14.dp),
                 )
                 UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)

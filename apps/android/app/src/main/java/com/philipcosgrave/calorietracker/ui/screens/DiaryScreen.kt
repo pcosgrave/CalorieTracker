@@ -44,7 +44,9 @@ import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 import kotlin.math.max
@@ -366,13 +368,14 @@ private fun EditEntryCard(entry: DiaryEntry, onCancel: () -> Unit, onSave: (Diar
         com.philipcosgrave.calorietracker.ui.components.AppFormField(
             value = servings,
             onValueChange = {
-                if (isDigitsOnlyInput(it)) {
-                    servings = it
+                val normalized = normalizeDecimalNumberInput(it)
+                if (isDecimalNumberInput(normalized)) {
+                    servings = normalized
                 }
             },
             label = "Servings",
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel", color = AppMuted) }

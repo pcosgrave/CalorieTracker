@@ -46,7 +46,9 @@ import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.RecipeComponentRow
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
+import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
 @Composable
@@ -84,13 +86,14 @@ fun RecipeBuilderScreen(
                 AppFormField(
                     draft.servingQuantity,
                     {
-                        if (isDigitsOnlyInput(it)) {
-                            onDraftChange(draft.copy(servingQuantity = it))
+                        val normalized = normalizeDecimalNumberInput(it)
+                        if (isDecimalNumberInput(normalized)) {
+                            onDraftChange(draft.copy(servingQuantity = normalized))
                         }
                     },
                     "Servings",
                     Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
                 UnitPicker(draft.servingUnit, { onDraftChange(draft.copy(servingUnit = it)) }, Modifier.weight(1f), draftServingUnits)
             }

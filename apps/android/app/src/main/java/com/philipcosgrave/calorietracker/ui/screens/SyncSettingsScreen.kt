@@ -44,6 +44,7 @@ import com.philipcosgrave.calorietracker.ui.components.appCardColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
+import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import kotlinx.coroutines.delay
 
@@ -201,10 +202,11 @@ fun SyncSettingsScreen(
             }
 
             AppFormField(
-                value = goalWeightText,
-                onValueChange = {
-                    if (isDecimalNumberInput(it)) {
-                        goalWeightText = it
+                    value = goalWeightText,
+                    onValueChange = {
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        goalWeightText = normalized
                     }
                 },
                 label = "Goal Weight (${weightUnitLabel(weightUnit)})",
