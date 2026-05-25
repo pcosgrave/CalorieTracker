@@ -37,6 +37,7 @@ import com.philipcosgrave.calorietracker.data.readFoodItems
 import com.philipcosgrave.calorietracker.data.readStringList
 import com.philipcosgrave.calorietracker.data.remote.CanadianNutrientFileLookupService
 import com.philipcosgrave.calorietracker.data.remote.CloudFoodCatalogService
+import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
@@ -115,6 +116,7 @@ fun CalorieTrackerApp(
     val syncService = remember { ApiSyncService(localStore) }
     val canadianNutrientFileLookupService = remember { CanadianNutrientFileLookupService() }
     val cloudFoodCatalogService = remember { CloudFoodCatalogService(localStore) }
+    val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
     val textToSpeech = remember(context) { TextToSpeech(context, null) }
 
@@ -867,6 +869,11 @@ fun CalorieTrackerApp(
                             } else {
                                 null
                             }
+                            val openFoodFactsFood = if (personalCloudFood == null && communityFood == null) {
+                                runCatching { openFoodFactsLookupService.lookupFoodByBarcode(barcode) }.getOrNull()
+                            } else {
+                                null
+                            }
 
                             when {
                                 personalCloudFood != null -> {
@@ -874,6 +881,9 @@ fun CalorieTrackerApp(
                                 }
                                 communityFood != null -> {
                                     beginImportRemoteFood(communityFood, openLogAfterSave = true)
+                                }
+                                openFoodFactsFood != null -> {
+                                    beginImportRemoteFood(openFoodFactsFood, openLogAfterSave = true)
                                 }
                                 else -> {
                                     editingFood = FoodItem(
