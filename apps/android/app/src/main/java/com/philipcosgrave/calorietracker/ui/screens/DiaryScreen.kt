@@ -58,6 +58,7 @@ fun DiaryScreen(
     onDateChange: (LocalDate) -> Unit,
     onBack: () -> Unit,
     onAddFood: () -> Unit,
+    onVoiceLog: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onUpdateEntry: (DiaryEntry) -> Unit,
@@ -139,15 +140,30 @@ fun DiaryScreen(
                     fat = totals.fat,
                 )
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .size(60.dp)
-                        .background(AppBlue, CircleShape),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onAddFood) {
-                        Text("+", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .background(AppBlue, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(onClick = onAddFood) {
+                            Text("+", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(appSoftColor(), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(onClick = onVoiceLog) {
+                            Text("\uD83C\uDFA4", color = AppBlue, style = MaterialTheme.typography.titleLarge)
+                        }
                     }
                 }
             }
@@ -334,6 +350,7 @@ private fun DiaryScreenPreview() {
             onDateChange = {},
             onBack = {},
             onAddFood = {},
+            onVoiceLog = {},
             onOpenSyncSettings = {},
             onDeleteEntry = {},
             onUpdateEntry = {},

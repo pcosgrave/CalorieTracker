@@ -1,6 +1,13 @@
 package com.philipcosgrave.calorietracker.ui
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +50,10 @@ import com.philipcosgrave.calorietracker.domain.createChangeEnvelope
 import com.philipcosgrave.calorietracker.domain.createFoodRecord
 import com.philipcosgrave.calorietracker.domain.createId
 import com.philipcosgrave.calorietracker.domain.createSyncMetadata
+import com.philipcosgrave.calorietracker.domain.convertAmount
+import com.philipcosgrave.calorietracker.domain.inferMealForTime
 import com.philipcosgrave.calorietracker.domain.nowIsoString
+import com.philipcosgrave.calorietracker.domain.parseVoiceFoodCommand
 import com.philipcosgrave.calorietracker.domain.toFoodItem
 import com.philipcosgrave.calorietracker.domain.toRecipeDraft
 import com.philipcosgrave.calorietracker.model.DiaryEntry
@@ -73,6 +83,8 @@ import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
 import com.philipcosgrave.calorietracker.ui.screens.WeightScreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
+import java.util.Locale
 
 @Composable
 fun CalorieTrackerApp(
@@ -101,6 +113,7 @@ fun CalorieTrackerApp(
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
     val canadianNutrientFileLookupService = remember { CanadianNutrientFileLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
+    val textToSpeech = remember(context) { TextToSpeech(context, null) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var recipes by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -135,6 +148,11 @@ fun CalorieTrackerApp(
     var remoteSearchQuery by remember { mutableStateOf("") }
     var isSearchingRemote by remember { mutableStateOf(false) }
 
+    fun speakUnknownIngredient() {
+        Toast.makeText(context, "Unknown ingredient", Toast.LENGTH_SHORT).show()
+        textToSpeech.speak("Unknown ingredient", TextToSpeech.QUEUE_FLUSH, null, "unknown-ingredient")
+    }
+
     suspend fun refreshState() {
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
         customFoods = foodRecords.filter { it.food.kind == FoodKind.Ingredient }.map { it.food }
@@ -166,6 +184,186 @@ fun CalorieTrackerApp(
             }
             refreshState()
         }
+    }
+
+    fun levenshteinDistance(a: String, b: String): Int {
+        val dp = Array(a.length + 1) { IntArray(b.length + 1) }
+
+        for (i in 0..a.length) {
+            dp[i][0] = i
+        }
+
+        for (j in 0..b.length) {
+            dp[0][j] = j
+        }
+
+        for (i in 1..a.length) {
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+
+                dp[i][j] = minOf(
+                    dp[i - 1][j] + 1,      // deletion
+                    dp[i][j - 1] + 1,      // insertion
+                    dp[i - 1][j - 1] + cost // substitution
+                )
+            }
+        }
+
+        return dp[a.length][b.length]
+    }
+
+    fun findVoiceIngredient(query: String): FoodItem? {
+        val normalizedQuery = query
+            .lowercase()
+            .trim()
+
+        val candidates = (customFoods + seedFoods)
+            .filter { it.kind == FoodKind.Ingredient }
+
+        // Exact match
+        candidates.firstOrNull {
+            it.name.equals(normalizedQuery, ignoreCase = true)
+        }?.let { return it }
+
+        // Partial match
+        candidates.firstOrNull {
+            it.name.contains(normalizedQuery, ignoreCase = true) ||
+                    normalizedQuery.contains(it.name.lowercase())
+        }?.let { return it }
+
+        // Fuzzy match
+        val threshold = when {
+            normalizedQuery.length <= 4 -> 1
+            normalizedQuery.length <= 7 -> 2
+            else -> 3
+        }
+
+        val fuzzyMatch = candidates
+            .map { food ->
+                val distance = levenshteinDistance(
+                    normalizedQuery,
+                    food.name.lowercase()
+                )
+
+                food to distance
+            }
+            .minByOrNull { it.second }
+
+        return if (fuzzyMatch != null && fuzzyMatch.second <= threshold) {
+            fuzzyMatch.first
+        } else {
+            null
+        }
+    }
+
+    suspend fun saveDiaryEntry(entry: DiaryEntry) {
+        val deviceId = localStore.deviceId()
+        val existing = localStore.diaryRepository.getById(entry.id)
+        val updatedAt = nowIsoString()
+        val record = existing?.copy(
+            entry = entry,
+            sync = existing.sync.copy(
+                version = existing.sync.version + 1,
+                updatedAt = updatedAt,
+            ),
+        ) ?: DiaryEntryRecord(
+            entry = entry,
+            sync = createSyncMetadata(
+                recordId = entry.id,
+                deviceId = deviceId,
+                updatedAt = updatedAt,
+            ).copy(syncStatus = com.philipcosgrave.calorietracker.model.SyncStatus.PendingPush),
+        )
+        localStore.diaryRepository.save(record)
+        localStore.syncOutboxRepository.enqueue(
+            createChangeEnvelope(
+                entityType = SyncEntityType.DiaryEntry,
+                operation = SyncOperation.Upsert,
+                deviceId = record.sync.originDeviceId,
+                recordId = record.sync.recordId,
+                payload = record,
+                baseVersion = existing?.sync?.version,
+            ),
+        )
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            runCatching { healthConnectExporter.exportEntry(record) }
+        }
+    }
+
+    suspend fun handleVoiceFoodTranscript(transcript: String) {
+        val command = parseVoiceFoodCommand(transcript)
+        if (command == null) {
+            speakUnknownIngredient()
+            return
+        }
+        val ingredient = findVoiceIngredient(command.ingredientQuery)
+        if (ingredient == null) {
+            speakUnknownIngredient()
+            return
+        }
+
+        val convertedAmount =
+            if (command.unit.isBlank()) {
+                ingredient.servingQuantity
+            } else {
+                convertAmount(command.amount, command.unit, ingredient.servingUnit)
+                    ?: if (command.unit == ingredient.servingUnit) {
+                        command.amount
+                    } else {
+                        null
+                    }
+            }
+
+        if (convertedAmount == null) {
+            speakUnknownIngredient()
+            return
+        }
+
+        val today = LocalDate.now()
+        val meal = inferMealForTime(LocalTime.now())
+        val entry = DiaryEntry(
+            id = createId("entry"),
+            food = ingredient,
+            date = today,
+            meal = meal,
+            servingMultiplier = convertedAmount / ingredient.servingQuantity.coerceAtLeast(0.1),
+        )
+        diary = listOf(entry) + diary
+        selectedDate = today
+        saveDiaryEntry(entry)
+        refreshState()
+    }
+
+    val speechRecognitionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val spokenText = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            .orEmpty()
+        if (spokenText.isBlank()) {
+            speakUnknownIngredient()
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            handleVoiceFoodTranscript(spokenText)
+        }
+    }
+
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) return@rememberLauncherForActivityResult
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.CANADA.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like: Add 30 grams onion")
+        }
+        speechRecognitionLauncher.launch(intent)
     }
 
     suspend fun ensureSeedRecipes(deviceId: String) {
@@ -225,43 +423,6 @@ fun CalorieTrackerApp(
                 baseVersion = existing.sync.version,
             ),
         )
-    }
-
-    suspend fun saveDiaryEntry(entry: DiaryEntry) {
-        val deviceId = localStore.deviceId()
-        val existing = localStore.diaryRepository.getById(entry.id)
-        val updatedAt = nowIsoString()
-        val record = existing?.copy(
-            entry = entry,
-            sync = existing.sync.copy(
-                version = existing.sync.version + 1,
-                updatedAt = updatedAt,
-            ),
-        ) ?: DiaryEntryRecord(
-            entry = entry,
-            sync = createSyncMetadata(
-                recordId = entry.id,
-                deviceId = deviceId,
-                updatedAt = updatedAt,
-            ).copy(syncStatus = com.philipcosgrave.calorietracker.model.SyncStatus.PendingPush),
-        )
-        localStore.diaryRepository.save(record)
-        localStore.syncOutboxRepository.enqueue(
-            createChangeEnvelope(
-                entityType = SyncEntityType.DiaryEntry,
-                operation = SyncOperation.Upsert,
-                deviceId = record.sync.originDeviceId,
-                recordId = record.sync.recordId,
-                payload = record,
-                baseVersion = existing?.sync?.version,
-            ),
-        )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
-            healthConnectPermissionGranted &&
-            healthConnectExportEnabled
-        ) {
-            runCatching { healthConnectExporter.exportEntry(record) }
-        }
     }
 
     suspend fun deleteDiaryEntry(entry: DiaryEntry) {
@@ -400,6 +561,7 @@ fun CalorieTrackerApp(
     }
 
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, screen) {
+        textToSpeech.language = Locale.CANADA
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && screen == AppScreen.Home) {
                 scope.launch { refreshState() }
@@ -408,6 +570,8 @@ fun CalorieTrackerApp(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            textToSpeech.stop()
+            textToSpeech.shutdown()
         }
     }
 
@@ -441,6 +605,9 @@ fun CalorieTrackerApp(
                 onDateChange = { selectedDate = it },
                 onBack = { screen = AppScreen.Home },
                 onAddFood = { screen = AppScreen.SearchFood },
+                onVoiceLog = {
+                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                },
                 onOpenSyncSettings = {
                     previousScreen = AppScreen.Diary
                     screen = AppScreen.SyncSettings
