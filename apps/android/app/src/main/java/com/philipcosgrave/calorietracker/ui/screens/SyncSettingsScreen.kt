@@ -58,6 +58,7 @@ fun SyncSettingsScreen(
     onSave: (SyncSettings) -> Unit,
     onSyncNow: () -> Unit,
     onSignIn: () -> Unit,
+    onSignInWithGoogle: () -> Unit,
     onSignOut: () -> Unit,
     onConnectHealthConnect: () -> Unit,
     onSetHealthConnectExportEnabled: (Boolean) -> Unit,
@@ -246,6 +247,15 @@ fun SyncSettingsScreen(
                 Text(if (authSession != null) "Sign out" else "Sign in", color = AppMuted)
             }
 
+            if (authSession == null) {
+                TextButton(
+                    onClick = onSignInWithGoogle,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Sign in with Google", color = AppBlue)
+                }
+            }
+
             TextButton(
                 onClick = onSyncNow,
                 enabled = authSession != null && syncEnabled && apiBaseUrl.isNotBlank(),
@@ -358,6 +368,7 @@ private fun SyncSettingsScreenPreview() {
             onSave = {},
             onSyncNow = {},
             onSignIn = {},
+            onSignInWithGoogle = {},
             onSignOut = {},
             onConnectHealthConnect = {},
             onSetHealthConnectExportEnabled = {},

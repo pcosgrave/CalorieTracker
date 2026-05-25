@@ -39,7 +39,7 @@ class CognitoAuthRepository(private val context: Context) : AuthRepository {
 
     override suspend fun currentOwnerUserId(): String = currentSession()?.userSub ?: GUEST_USER_ID
 
-    override suspend fun beginSignIn(returnToPath: String): Uri {
+    override suspend fun beginSignIn(returnToPath: String, provider: String?): Uri {
         val verifier = randomBase64Url(32)
         val state = randomBase64Url(24)
         context.syncPreferencesDataStore.edit { prefs ->
@@ -57,6 +57,11 @@ class CognitoAuthRepository(private val context: Context) : AuthRepository {
             .appendQueryParameter("code_challenge", sha256Base64Url(verifier))
             .appendQueryParameter("state", state)
             .appendQueryParameter("returnTo", returnToPath)
+            .apply {
+                if (!provider.isNullOrBlank()) {
+                    appendQueryParameter("identity_provider", provider)
+                }
+            }
             .build()
     }
 

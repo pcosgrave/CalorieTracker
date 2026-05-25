@@ -67,7 +67,7 @@ interface SyncTransport {
 interface AuthRepository {
     suspend fun currentSession(): AuthSession?
     suspend fun currentOwnerUserId(): String
-    suspend fun beginSignIn(returnToPath: String = "/settings"): Uri
+    suspend fun beginSignIn(returnToPath: String = "/settings", provider: String? = null): Uri
     suspend fun completeSignIn(callbackUri: Uri): AuthSession
     suspend fun signOut(): Uri
     suspend fun refreshSessionIfNeeded(): AuthSession?

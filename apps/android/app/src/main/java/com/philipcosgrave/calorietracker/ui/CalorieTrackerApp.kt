@@ -905,6 +905,12 @@ fun CalorieTrackerApp(
                         openExternalUri(uri.toString())
                     }
                 },
+                onSignInWithGoogle = {
+                    scope.launch {
+                        val uri = authRepository.beginSignIn(provider = "Google")
+                        openExternalUri(uri.toString())
+                    }
+                },
                 onSignOut = {
                     scope.launch {
                         val uri = authRepository.signOut()

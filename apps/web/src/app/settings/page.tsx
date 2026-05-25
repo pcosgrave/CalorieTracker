@@ -140,6 +140,11 @@ export default function SettingsPage() {
               <Link className={styles.textButton} href={authUser ? "/api/auth/logout" : "/api/auth/login?returnTo=/settings"}>
                 {authUser ? "Sign out" : "Sign in"}
               </Link>
+              {!authUser ? (
+                <Link className={styles.textButton} href="/api/auth/login?returnTo=/settings&provider=Google">
+                  Sign in with Google
+                </Link>
+              ) : null}
               <button type="button" onClick={save}>
                 Save
               </button>
