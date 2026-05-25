@@ -11,7 +11,7 @@ export type CognitoConfig = {
 
 const defaultConfig: CognitoConfig = {
   region: "us-east-1",
-  domain: "philip-calorie-tracker-dev",
+  domain: "cosgravelabs-bitewise-dev",
   userPoolId: "us-east-1_WYQwdC4oO",
   webClientId: "vq2ov6pm1e7oub9h8r2g5924s",
   androidClientId: "bb27drot68rek496i4tmrn2ik",

@@ -29,7 +29,7 @@ class HealthConnectPermissionsRationaleActivity : ComponentActivity() {
                     ) {
                         Text("Health Connect access", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "CalorieTracker only writes nutrition entries that you log in this app. " +
+                            "BiteWise only writes nutrition entries that you log in this app. " +
                                 "We use Health Connect so your meals can appear in other connected health apps on your device.",
                         )
                         Text(

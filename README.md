@@ -1,6 +1,6 @@
-# CalorieTracker
+# BiteWise
 
-Temporary project name for a local-first calorie tracking app.
+Local-first calorie and weight tracking app by Cosgrave Labs.
 
 ## Phase 1
 
@@ -153,12 +153,20 @@ Open `apps/android` in Android Studio, let Gradle sync, then run the `app` confi
 
 Before the Android app can talk to AWS/Cognito, create a local `apps/android/secure.properties` file from `apps/android/secure.properties.example` and fill in the real `CT_*` values. That file is ignored by git on purpose.
 
-The current Android app is also a static shell. It includes the temporary package name and declares the ML Kit barcode scanning dependency, but the camera scanner and persistence are not wired yet.
-
-The temporary Android package name is:
+For the current BiteWise setup, the Android callback/logout scheme should be:
 
 ```text
-com.philipcosgrave.calorietracker
+bitewise://auth/callback
+bitewise://signout
+```
+
+The current Android app is also a static shell. It includes the temporary package name and declares the ML Kit barcode scanning dependency, but the camera scanner and persistence are not wired yet.
+
+The Android app currently ships with:
+
+```text
+applicationId: com.cosgravelabs.bitewise
+display name: BiteWise
 ```
 
 If running Gradle from the command line on macOS, use Android Studio's bundled JDK:
@@ -215,6 +223,11 @@ infra/terraform/environments/dev
 ```
 
 It targets `us-east-1` by default and defines the initial Cognito, DynamoDB, and S3 resources. Google federation is not wired yet because it needs real Google OAuth credentials.
+
+If you rename the Cognito hosted domain prefix, update:
+- `infra/terraform/environments/dev/terraform.tfvars`
+- `apps/android/secure.properties`
+- any Google OAuth redirect URI that points to `https://<domain>.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`
 
 ## Windows Troubleshooting
 

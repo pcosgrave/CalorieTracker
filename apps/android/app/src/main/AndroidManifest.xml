@@ -17,7 +17,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="CalorieTracker"
+        android:label="BiteWise"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <meta-data
@@ -59,7 +59,7 @@
                 <data
                     android:host="auth"
                     android:path="/callback"
-                    android:scheme="calorietracker" />
+                    android:scheme="bitewise" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -69,7 +69,7 @@
 
                 <data
                     android:host="signout"
-                    android:scheme="calorietracker" />
+                    android:scheme="bitewise" />
             </intent-filter>
         </activity>
     </application>
