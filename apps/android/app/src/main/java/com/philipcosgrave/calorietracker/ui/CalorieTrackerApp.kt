@@ -919,7 +919,15 @@ fun CalorieTrackerApp(
                 },
                 onSyncNow = {
                     scope.launch {
-                        syncService.syncNow()
+                        runCatching { syncService.syncNow() }
+                            .onFailure { error ->
+                                Log.e("CloudSync", "Manual sync failed", error)
+                                Toast.makeText(
+                                    context,
+                                    error.message ?: "Sync failed",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         refreshState()
                     }
                 },

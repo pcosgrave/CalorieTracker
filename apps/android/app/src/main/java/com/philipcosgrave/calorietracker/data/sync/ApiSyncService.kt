@@ -20,6 +20,8 @@ import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncPullResponse
 import com.philipcosgrave.calorietracker.model.SyncPushResponse
 import com.philipcosgrave.calorietracker.model.SyncStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -27,7 +29,7 @@ import java.net.URL
 import java.time.LocalDate
 
 class ApiSyncService(private val localStore: AndroidLocalStore) {
-    suspend fun syncNow(): SyncSummary {
+    suspend fun syncNow(): SyncSummary = withContext(Dispatchers.IO) {
         val settings = localStore.syncStateRepository.getSettings()
         require(settings.syncEnabled && !settings.apiBaseUrl.isNullOrBlank()) {
             "Sync is disabled or API base URL is missing"
@@ -46,7 +48,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         localStore.syncStateRepository.saveCursor(pullResponse.cursor)
         localStore.syncStateRepository.saveSettings(settings.copy(lastSuccessfulSyncAt = nowIsoString()))
 
-        return SyncSummary(pushResponse.acceptedChangeIds.size, pullResponse.changes.size)
+        SyncSummary(pushResponse.acceptedChangeIds.size, pullResponse.changes.size)
     }
 
     private suspend fun applyIncomingChanges(response: SyncPullResponse) {
