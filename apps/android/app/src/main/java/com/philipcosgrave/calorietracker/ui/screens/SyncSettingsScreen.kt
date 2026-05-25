@@ -36,6 +36,7 @@ import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppFormField
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
+import com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.SectionDivider
@@ -135,8 +136,8 @@ fun SyncSettingsScreen(
             if (healthConnectPermissionGranted) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Mirror meal logs")
-                        Text("Write new, edited, and deleted diary logs to Health Connect.", color = AppMuted)
+                        Text("Mirror Health Connect data")
+                        Text("Write meal logs and weight entries to Health Connect.", color = AppMuted)
                     }
                     Switch(checked = healthConnectExportEnabled, onCheckedChange = onSetHealthConnectExportEnabled)
                 }
@@ -229,26 +230,6 @@ fun SyncSettingsScreen(
                 Text("Backup Mode", modifier = Modifier.weight(1f), color = AppMuted)
                 BackupModePicker(value = backupMode, onChange = { backupMode = it })
             }
-
-            Text("Pending local changes: $pendingChangeCount", color = AppMuted)
-            Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}", color = AppMuted)
-
-            TextButton(
-                onClick = if (authSession != null) onSignOut else onSignIn,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (authSession != null) "Sign out" else "Sign in", color = AppMuted)
-            }
-
-            if (authSession == null) {
-                TextButton(
-                    onClick = onSignInWithGoogle,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Sign in with Google", color = AppBlue)
-                }
-            }
-
             TextButton(
                 onClick = onSyncNow,
                 enabled = authSession != null && syncEnabled && apiBaseUrl.isNotBlank(),
@@ -256,6 +237,34 @@ fun SyncSettingsScreen(
             ) {
                 Text("Sync now", color = AppBlue)
             }
+            Text("Pending local changes: $pendingChangeCount", color = AppMuted)
+            Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}", color = AppMuted)
+
+            if (authSession == null) {
+                AppPrimaryButton(
+                    text = "Sign in",
+                    onClick = onSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    onClick = onSignInWithGoogle,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Sign in with Google", color = AppBlue)
+                }
+            } else {
+                AppPrimaryButton(
+                    text = "Sign out",
+                    onClick = onSignOut,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Cloud sync is connected to your signed-in account.",
+                    color = AppMuted,
+                )
+            }
+
+
         }
     }
 }
