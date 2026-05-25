@@ -9,7 +9,9 @@ import com.philipcosgrave.calorietracker.data.local.SyncPreferencesKeys
 import com.philipcosgrave.calorietracker.data.local.syncPreferencesDataStore
 import com.philipcosgrave.calorietracker.data.repository.AuthRepository
 import com.philipcosgrave.calorietracker.model.AuthSession
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -168,18 +170,19 @@ class CognitoAuthRepository(private val context: Context) : AuthRepository {
         }
     }
 
-    private fun postForm(url: String, params: Map<String, String>): JSONObject {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-        connection.doOutput = true
-        val body = params.entries.joinToString("&") { "${Uri.encode(it.key)}=${Uri.encode(it.value)}" }
-        connection.outputStream.use { output ->
-            output.write(body.toByteArray())
+    private suspend fun postForm(url: String, params: Map<String, String>): JSONObject =
+        withContext(Dispatchers.IO) {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            connection.doOutput = true
+            val body = params.entries.joinToString("&") { "${Uri.encode(it.key)}=${Uri.encode(it.value)}" }
+            connection.outputStream.use { output ->
+                output.write(body.toByteArray())
+            }
+            val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(responseText)
         }
-        val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-        return JSONObject(responseText)
-    }
 }
 
 private fun randomBase64Url(byteCount: Int): String {
