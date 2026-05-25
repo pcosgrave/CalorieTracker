@@ -303,7 +303,10 @@ fun KindIcon(kind: FoodKind) {
 }
 
 @Composable
-fun OverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+fun OverflowMenu(
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         Box(

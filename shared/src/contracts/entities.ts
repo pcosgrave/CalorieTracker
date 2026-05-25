@@ -68,3 +68,21 @@ export interface BarcodeLookupResponse {
   found: boolean;
   product?: FoodProduct | undefined;
 }
+
+export interface FoodSearchResponse {
+  products: FoodProduct[];
+}
+
+export interface PublishCommunityFoodRequest {
+  productId?: string | undefined;
+  barcode?: string | undefined;
+  name: string;
+  brand?: string | undefined;
+  serving: Serving;
+  nutrients: Nutrients;
+}
+
+export interface PublishCommunityFoodResponse {
+  product: FoodProduct;
+  existed: boolean;
+}

@@ -39,6 +39,7 @@ data class FoodItem(
     val components: List<RecipeComponent> = emptyList(),
     val frequency: Int = 0,
     val lastUsedDaysAgo: Int = 0,
+    val isUserCreated: Boolean = true,
 )
 
 data class RecipeComponent(

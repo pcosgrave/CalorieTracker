@@ -69,6 +69,7 @@ class CanadianNutrientFileLookupService {
             servingQuantity = serving.quantity,
             servingUnit = serving.unit,
             nutrients = nutrients.scale(serving.conversionFactor),
+            isUserCreated = false,
         )
     }
 

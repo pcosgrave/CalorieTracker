@@ -51,6 +51,7 @@ import java.time.LocalDate
 fun SearchFoodScreen(
     date: LocalDate,
     foods: List<FoodItem>,
+    isSignedIn: Boolean,
     onBack: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onQuickCalories: () -> Unit,
@@ -59,13 +60,16 @@ fun SearchFoodScreen(
     onAddRecipe: () -> Unit,
     onSelectFood: (FoodItem) -> Unit,
     onQuickLogFood: (FoodItem) -> Unit,
-    remoteSearchResults: List<FoodItem>,
+    personalOnlineResults: List<FoodItem>,
+    communityResults: List<FoodItem>,
+    canadianResults: List<FoodItem>,
     remoteSearchQuery: String,
     isSearchingRemote: Boolean,
-    onSearchCanadianNutrientFile: (String) -> Unit,
+    onSearchOnlineFoods: (String) -> Unit,
     onImportRemoteFood: (FoodItem) -> Unit,
     onDeleteFood: (FoodItem) -> Unit,
     onEditFood: (FoodItem) -> Unit,
+    onPublishToCommunity: (FoodItem) -> Unit,
 ) {
     var search by remember { mutableStateOf("") }
     var activeKind by remember { mutableStateOf(FoodKind.Ingredient) }
@@ -197,11 +201,20 @@ fun SearchFoodScreen(
                             .padding(14.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            TextButton(onClick = { onSearchCanadianNutrientFile(search) }) {
-                                Text("Search Canadian Nutrient File", color = AppBlue, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = { onSearchOnlineFoods(search) }) {
+                                Text(
+                                    if (isSignedIn) "Search online foods"
+                                    else "Sign in to search saved and community foods",
+                                    color = AppBlue,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                             Text(
-                                "Scanning a barcode is still better when that option is available.",
+                                if (isSignedIn) {
+                                    "Search order: your cloud foods, then community foods, then the Canadian Nutrient File."
+                                } else {
+                                    "Sign in from Settings to search your saved foods and the community catalog. Scanning a barcode is still better when available."
+                                },
                                 color = AppMuted,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -209,23 +222,51 @@ fun SearchFoodScreen(
                     }
 
                     if (isSearchingRemote) {
-                        Text("Searching Canadian Nutrient File...", color = AppMuted)
-                    } else if (showingRemoteResultsForCurrentSearch && remoteSearchResults.isNotEmpty()) {
-                        Text("Canadian Nutrient File", fontWeight = FontWeight.Bold, color = AppMuted)
-                        remoteSearchResults.forEach { item ->
-                            FoodSearchRow(
-                                item = item,
-                                showCalories = true,
-                                onClick = { onImportRemoteFood(item) },
-                                onDoubleClick = { onImportRemoteFood(item) },
-                            )
+                        Text("Searching online foods...", color = AppMuted)
+                    } else if (showingRemoteResultsForCurrentSearch &&
+                        (personalOnlineResults.isNotEmpty() || communityResults.isNotEmpty() || canadianResults.isNotEmpty())
+                    ) {
+                        if (personalOnlineResults.isNotEmpty()) {
+                            Text("Your cloud foods", fontWeight = FontWeight.Bold, color = AppMuted)
+                            personalOnlineResults.forEach { item ->
+                                FoodSearchRow(
+                                    item = item,
+                                    showCalories = true,
+                                    onClick = { onImportRemoteFood(item) },
+                                    onDoubleClick = { onImportRemoteFood(item) },
+                                )
+                            }
+                        }
+
+                        if (communityResults.isNotEmpty()) {
+                            Text("Community foods", fontWeight = FontWeight.Bold, color = AppMuted)
+                            communityResults.forEach { item ->
+                                FoodSearchRow(
+                                    item = item,
+                                    showCalories = true,
+                                    onClick = { onImportRemoteFood(item) },
+                                    onDoubleClick = { onImportRemoteFood(item) },
+                                )
+                            }
+                        }
+
+                        if (canadianResults.isNotEmpty()) {
+                            Text("Canadian Nutrient File", fontWeight = FontWeight.Bold, color = AppMuted)
+                            canadianResults.forEach { item ->
+                                FoodSearchRow(
+                                    item = item,
+                                    showCalories = true,
+                                    onClick = { onImportRemoteFood(item) },
+                                    onDoubleClick = { onImportRemoteFood(item) },
+                                )
+                            }
                         }
                     } else {
                         Text(
                             if (showingRemoteResultsForCurrentSearch) {
-                                "No Canadian Nutrient File matches found."
+                                "No online or Canadian Nutrient File matches found."
                             } else {
-                                "No Canadian Nutrient File matches loaded yet."
+                                "No online food matches loaded yet."
                             },
                             color = AppMuted,
                         )
@@ -243,6 +284,7 @@ private fun SearchFoodScreenPreview() {
         SearchFoodScreen(
             date = PreviewData.date,
             foods = PreviewData.foods,
+            isSignedIn = true,
             onBack = {},
             onOpenSyncSettings = {},
             onQuickCalories = {},
@@ -251,13 +293,16 @@ private fun SearchFoodScreenPreview() {
             onAddRecipe = {},
             onSelectFood = {},
             onQuickLogFood = {},
-            remoteSearchResults = emptyList(),
+            personalOnlineResults = emptyList(),
+            communityResults = emptyList(),
+            canadianResults = emptyList(),
             remoteSearchQuery = "",
             isSearchingRemote = false,
-            onSearchCanadianNutrientFile = {},
+            onSearchOnlineFoods = {},
             onImportRemoteFood = {},
             onDeleteFood = {},
             onEditFood = {},
+            onPublishToCommunity = {},
         )
     }
 }

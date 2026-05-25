@@ -353,6 +353,82 @@ resource "aws_lambda_function" "foods_lookup" {
   tags = local.tags
 }
 
+resource "aws_lambda_function" "foods_search" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-search"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/foods.search"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "foods_community_lookup" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-community-lookup"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/foods.lookupCommunity"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "foods_community_search" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-community-search"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/foods.searchCommunity"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "foods_community_publish" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-community-publish"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/foods.publishCommunity"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
 resource "aws_lambda_function" "diary_create" {
   count = var.create_api ? 1 : 0
 
@@ -493,6 +569,46 @@ resource "aws_api_gateway_resource" "foods_barcode_value" {
   path_part   = "{barcode}"
 }
 
+resource "aws_api_gateway_resource" "foods_search" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods[0].id
+  path_part   = "search"
+}
+
+resource "aws_api_gateway_resource" "foods_community" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods[0].id
+  path_part   = "community"
+}
+
+resource "aws_api_gateway_resource" "foods_community_search" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods_community[0].id
+  path_part   = "search"
+}
+
+resource "aws_api_gateway_resource" "foods_community_lookup" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods_community[0].id
+  path_part   = "lookup"
+}
+
+resource "aws_api_gateway_resource" "foods_community_lookup_value" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods_community_lookup[0].id
+  path_part   = "{barcode}"
+}
+
 resource "aws_api_gateway_resource" "diary" {
   count = var.create_api ? 1 : 0
 
@@ -558,6 +674,46 @@ resource "aws_api_gateway_method" "foods_barcode_get" {
 
   rest_api_id   = aws_api_gateway_rest_api.main[0].id
   resource_id   = aws_api_gateway_resource.foods_barcode_value[0].id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "foods_search_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_search[0].id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "foods_community_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_community[0].id
+  http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "foods_community_search_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_community_search[0].id
+  http_method   = "GET"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "foods_community_lookup_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_community_lookup_value[0].id
   http_method   = "GET"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
@@ -646,6 +802,50 @@ resource "aws_api_gateway_integration" "foods_barcode_get" {
   uri                     = aws_lambda_function.foods_lookup[0].invoke_arn
 }
 
+resource "aws_api_gateway_integration" "foods_search_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_search[0].id
+  http_method             = aws_api_gateway_method.foods_search_get[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_search[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "foods_community_post" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_community[0].id
+  http_method             = aws_api_gateway_method.foods_community_get[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_community_publish[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "foods_community_search_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_community_search[0].id
+  http_method             = aws_api_gateway_method.foods_community_search_get[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_community_search[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "foods_community_lookup_get" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_community_lookup_value[0].id
+  http_method             = aws_api_gateway_method.foods_community_lookup_get[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_community_lookup[0].invoke_arn
+}
+
 resource "aws_api_gateway_integration" "diary_post" {
   count = var.create_api ? 1 : 0
 
@@ -731,6 +931,46 @@ resource "aws_lambda_permission" "apigw_foods_lookup" {
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "apigw_foods_search" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsSearch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_search[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_foods_community_publish" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsCommunityPublish"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_community_publish[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_foods_community_search" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsCommunitySearch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_community_search[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_foods_community_lookup" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsCommunityLookup"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_community_lookup[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
 resource "aws_lambda_permission" "apigw_diary_create" {
   count = var.create_api ? 1 : 0
 
@@ -791,6 +1031,10 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.foods_get[0].id,
       aws_api_gateway_integration.foods_post[0].id,
       aws_api_gateway_integration.foods_barcode_get[0].id,
+      aws_api_gateway_integration.foods_search_get[0].id,
+      aws_api_gateway_integration.foods_community_post[0].id,
+      aws_api_gateway_integration.foods_community_search_get[0].id,
+      aws_api_gateway_integration.foods_community_lookup_get[0].id,
       aws_api_gateway_integration.diary_post[0].id,
       aws_api_gateway_integration.weights_get[0].id,
       aws_api_gateway_integration.weights_post[0].id,

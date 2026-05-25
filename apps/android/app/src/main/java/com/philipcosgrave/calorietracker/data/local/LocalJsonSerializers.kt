@@ -147,6 +147,7 @@ private fun FoodItem.toJson(): JSONObject {
         .put("components", componentsJson)
         .put("frequency", frequency)
         .put("lastUsedDaysAgo", lastUsedDaysAgo)
+        .put("isUserCreated", isUserCreated)
 }
 
 private fun RecipeComponent.toJson(): JSONObject =
@@ -176,6 +177,7 @@ private fun foodItemFromJson(json: JSONObject): FoodItem {
         components = List(componentsJson.length()) { index -> recipeComponentFromJson(componentsJson.getJSONObject(index)) },
         frequency = json.optInt("frequency"),
         lastUsedDaysAgo = json.optInt("lastUsedDaysAgo"),
+        isUserCreated = json.optBoolean("isUserCreated", true),
     )
 }
 

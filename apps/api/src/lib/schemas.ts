@@ -25,6 +25,15 @@ export const createFoodProductSchema = z.object({
   nutrients: nutrientsSchema,
 });
 
+export const publishCommunityFoodSchema = z.object({
+  productId: z.string().min(1).optional(),
+  barcode: z.string().min(4).max(32).optional(),
+  name: z.string().min(1),
+  brand: z.string().min(1).optional(),
+  serving: servingSchema,
+  nutrients: nutrientsSchema,
+});
+
 export const createDiaryEntrySchema = z.object({
   productId: z.string().min(1),
   loggedAt: z.string().datetime(),
