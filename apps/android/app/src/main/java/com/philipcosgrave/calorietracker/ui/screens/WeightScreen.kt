@@ -87,8 +87,22 @@ fun WeightScreen(
             else -> selectedEntries
         }
     }
-    val chartPoints = remember(selectedEntries, range, weightUnit) {
-        buildChartPoints(selectedEntries, range, weightUnit)
+    val chartPoints = remember(
+        weights,
+        range,
+        weightUnit,
+        selectedDailyDate,
+        selectedWeekStart,
+        selectedMonthStart,
+    ) {
+        buildChartPoints(
+            weights = weights,
+            range = range,
+            weightUnit = weightUnit,
+            selectedDailyDate = selectedDailyDate,
+            selectedWeekStart = selectedWeekStart,
+            selectedMonthStart = selectedMonthStart,
+        )
     }
     val latest = if (range == WeightChartRange.Daily) effectiveDailyEntry else selectedEntries.maxByOrNull { it.date }
 
@@ -289,19 +303,20 @@ private fun DailyWeightSummary(
 
 @Composable
 private fun WeightTrendChart(
-    points: List<Double>,
+    points: List<Double?>,
     labels: List<String>,
     goalValue: Double?,
     unitLabel: String,
 ) {
     AppCardContainer {
-        if (points.isEmpty()) {
+        val knownPoints = points.filterNotNull()
+        if (knownPoints.isEmpty()) {
             Text("No weights logged for this period.", color = AppMuted)
             return@AppCardContainer
         }
 
-        val rawMinValue = listOfNotNull(points.minOrNull(), goalValue).minOrNull() ?: 0.0
-        val rawMaxValue = listOfNotNull(points.maxOrNull(), goalValue).maxOrNull() ?: rawMinValue
+        val rawMinValue = listOfNotNull(knownPoints.minOrNull(), goalValue).minOrNull() ?: 0.0
+        val rawMaxValue = listOfNotNull(knownPoints.maxOrNull(), goalValue).maxOrNull() ?: rawMinValue
         val rawSpan = (rawMaxValue - rawMinValue).takeIf { it > 0.1 } ?: 1.0
         val lowerPadding = goalValue?.let { maxOf(rawSpan * 0.2, 1.0) } ?: maxOf(rawSpan * 0.1, 0.5)
         val upperPadding = maxOf(rawSpan * 0.1, 0.5)
@@ -338,7 +353,7 @@ private fun WeightTrendChart(
                     val bottomPad = 26f
                     val usableWidth = size.width - leftPad - rightPad
                     val usableHeight = size.height - topPad - bottomPad
-                    val stepX = if (points.size == 1) 0f else usableWidth / (points.size - 1)
+                    val stepX = if (points.size <= 1) 0f else usableWidth / (points.size - 1)
 
                     repeat(3) { index ->
                         val y = topPad + usableHeight * (index / 2f)
@@ -362,14 +377,24 @@ private fun WeightTrendChart(
                     }
 
                     val path = Path()
+                    var hasKnownPoint = false
                     points.forEachIndexed { index, value ->
-                        val normalized = ((value - minValue) / span).toFloat()
                         val x = leftPad + stepX * index
-                        val y = topPad + usableHeight - usableHeight * normalized
-                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                        drawCircle(color = AppBlue, radius = 7f, center = Offset(x, y))
+                        if (value != null) {
+                            val normalized = ((value - minValue) / span).toFloat()
+                            val y = topPad + usableHeight - usableHeight * normalized
+                            if (!hasKnownPoint) {
+                                path.moveTo(x, y)
+                                hasKnownPoint = true
+                            } else {
+                                path.lineTo(x, y)
+                            }
+                            drawCircle(color = AppBlue, radius = 7f, center = Offset(x, y))
+                        }
                     }
-                    drawPath(path = path, color = AppBlue, style = Stroke(width = 6f))
+                    if (hasKnownPoint) {
+                        drawPath(path = path, color = AppBlue, style = Stroke(width = 6f))
+                    }
                 }
 
                 Row(
@@ -425,29 +450,41 @@ private fun WeightHistoryRow(
 }
 
 private fun buildChartPoints(
-    entries: List<WeightEntry>,
+    weights: List<WeightEntry>,
     range: WeightChartRange,
     weightUnit: SyncSettings.WeightUnit,
-): List<Pair<String, Double>> {
-    if (entries.isEmpty()) return emptyList()
+    selectedDailyDate: LocalDate,
+    selectedWeekStart: LocalDate,
+    selectedMonthStart: LocalDate,
+): List<Pair<String, Double?>> {
+    if (weights.isEmpty()) return emptyList()
+    val weightsByDate = weights
+        .groupBy { it.date }
+        .mapValues { (_, items) -> items.maxByOrNull { it.date } }
+
     return when (range) {
         WeightChartRange.Daily -> emptyList()
         WeightChartRange.Weekly -> {
-            entries
-                .groupBy { it.date }
-                .toSortedMap()
-                .map { (date, items) ->
-                    date.dayOfWeek.name.take(3) to convertWeightFromKg(items.last().weightKg, weightUnit)
+            val weekStart = selectedWeekStart.minusDays(1)
+            val weekEnd = selectedWeekStart.plusDays(6)
+            generateSequence(weekStart) { current ->
+                current.takeIf { it.isBefore(weekEnd) }?.plusDays(1)
+            }.map { date ->
+                date.dayOfWeek.name.take(3) to weightsByDate[date]?.let { entry ->
+                    convertWeightFromKg(entry.weightKg, weightUnit)
                 }
+            }.toList()
         }
 
         WeightChartRange.Monthly -> {
-            entries
-                .groupBy { it.date }
-                .toSortedMap()
-                .map { (date, items) ->
-                    date.dayOfMonth.toString() to convertWeightFromKg(items.last().weightKg, weightUnit)
+            val monthEnd = selectedMonthStart.plusMonths(1).minusDays(1)
+            generateSequence(selectedMonthStart) { current ->
+                current.takeIf { it.isBefore(monthEnd) }?.plusDays(1)
+            }.map { date ->
+                date.dayOfMonth.toString() to weightsByDate[date]?.let { entry ->
+                    convertWeightFromKg(entry.weightKg, weightUnit)
                 }
+            }.toList()
         }
     }
 }
