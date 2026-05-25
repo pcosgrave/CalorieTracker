@@ -1,6 +1,6 @@
 # Terraform
 
-This directory now scaffolds a first-pass AWS `dev` environment for:
+This directory now scaffolds AWS environments for:
 
 - Amazon Cognito user pool and hosted domain
 - Web and Android Cognito app clients
@@ -12,12 +12,15 @@ This directory now scaffolds a first-pass AWS `dev` environment for:
 ## Layout
 
 - `modules/app`: the shared infrastructure module
-- `environments/dev`: the first deployable environment
+- `environments/dev`: the local testing / development environment
+- `environments/prod`: the production scaffold for future publishing
 
 Helpful local files:
 
 - `environments/dev/backend.hcl.example`: example remote-state backend config
 - `environments/dev/terraform.tfvars.example`: example environment values
+- `environments/prod/backend.hcl.example`: example prod remote-state backend config
+- `environments/prod/terraform.tfvars.example`: example prod environment values
 - `../../scripts/bootstrap-terraform-backend.ps1`: one-time S3/DynamoDB backend bootstrap
 
 ## Current Deployment Model
@@ -60,9 +63,20 @@ From the repo root:
 
 ```powershell
 .\scripts\build-api-lambda.ps1
-terraform -chdir=infra/terraform/environments/dev init -backend-config=backend.hcl
-terraform -chdir=infra/terraform/environments/dev plan -var-file=terraform.tfvars
-terraform -chdir=infra/terraform/environments/dev apply -var-file=terraform.tfvars
+terraform -chdir=infra/terraform/environments/dev init -backend-config="backend.hcl"
+terraform -chdir=infra/terraform/environments/dev plan -var-file="terraform.tfvars"
+terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfvars"
+```
+
+## Prod Apply Flow
+
+When you are ready to separate production from dev, the equivalent prod flow is:
+
+```powershell
+.\scripts\build-api-lambda.ps1
+terraform -chdir=infra/terraform/environments/prod init -backend-config="backend.hcl"
+terraform -chdir=infra/terraform/environments/prod plan -var-file="terraform.tfvars"
+terraform -chdir=infra/terraform/environments/prod apply -var-file="terraform.tfvars"
 ```
 
 ## First-Time Operator Checklist
@@ -117,19 +131,19 @@ Copy-Item infra\terraform\environments\dev\terraform.tfvars.example infra\terraf
 10. Initialize Terraform using the remote backend:
 
 ```powershell
-terraform -chdir=infra/terraform/environments/dev init -backend-config=backend.hcl
+terraform -chdir=infra/terraform/environments/dev init -backend-config="backend.hcl"
 ```
 
 11. Review the plan:
 
 ```powershell
-terraform -chdir=infra/terraform/environments/dev plan -var-file=terraform.tfvars
+terraform -chdir=infra/terraform/environments/dev plan -var-file="terraform.tfvars"
 ```
 
 12. Apply when the plan looks right:
 
 ```powershell
-terraform -chdir=infra/terraform/environments/dev apply -var-file=terraform.tfvars
+terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfvars"
 ```
 
 13. Capture the outputs you’ll need for the apps:
@@ -156,3 +170,4 @@ After apply, useful outputs include:
 - The Android and web apps still need Cognito client integration and token handling.
 - The Lambda package currently vendors `zod` and the shared package, while relying on the AWS Lambda Node.js runtime's included AWS SDK v3. See AWS Lambda Node.js runtime docs for the runtime-included SDK behavior: [Building Lambda functions with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html).
 - `backend.hcl` and `terraform.tfvars` are intended to stay local and are ignored by git.
+- Right now it is fine to keep both Android flavors pointed at the `dev` Terraform environment until you are ready to stand up real production AWS resources.

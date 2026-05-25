@@ -8,6 +8,12 @@ val secureProperties = Properties().apply {
         secureFile.inputStream().use(::load)
     }
 }
+val releaseProperties = Properties().apply {
+    val releaseFile = rootProject.file("release.properties")
+    if (releaseFile.exists()) {
+        releaseFile.inputStream().use(::load)
+    }
+}
 
 fun requiredSecureConfig(key: String): String =
     (secureProperties.getProperty(key)
@@ -18,6 +24,47 @@ fun requiredSecureConfig(key: String): String =
             "Missing Android secure config '$key'. " +
                 "Define it in apps/android/secure.properties, as a Gradle property, or as an environment variable.",
         )
+
+fun requiredSecureConfig(vararg keys: String): String {
+    keys.forEach { key ->
+        val value =
+            (secureProperties.getProperty(key)
+                ?: providers.gradleProperty(key).orNull
+                ?: providers.environmentVariable(key).orNull)
+                ?.takeIf { it.isNotBlank() }
+        if (value != null) {
+            return value
+        }
+    }
+
+    error(
+        "Missing Android secure config. Tried keys: ${keys.joinToString(", ")}. " +
+            "Define one of them in apps/android/secure.properties, as a Gradle property, or as an environment variable.",
+    )
+}
+
+fun configForFlavor(flavorPrefix: String, legacyKey: String): String =
+    requiredSecureConfig("${flavorPrefix}_$legacyKey", legacyKey)
+
+fun schemeFromUri(uri: String): String =
+    uri.substringBefore("://").takeIf { it.isNotBlank() }
+        ?: error("Unable to derive URI scheme from '$uri'.")
+
+fun releaseConfig(key: String): String? =
+    (releaseProperties.getProperty(key)
+        ?: providers.gradleProperty(key).orNull
+        ?: providers.environmentVariable(key).orNull)
+        ?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = releaseConfig("BW_UPLOAD_STORE_FILE")
+val releaseStorePassword = releaseConfig("BW_UPLOAD_STORE_PASSWORD")
+val releaseKeyAlias = releaseConfig("BW_UPLOAD_KEY_ALIAS")
+val releaseKeyPassword = releaseConfig("BW_UPLOAD_KEY_PASSWORD")
+val hasReleaseSigningConfig =
+    !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
 
 plugins {
     id("com.android.application")
@@ -36,13 +83,48 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "AWS_REGION", "\"${requiredSecureConfig("CT_AWS_REGION")}\"")
-        buildConfigField("String", "COGNITO_DOMAIN", "\"${requiredSecureConfig("CT_COGNITO_DOMAIN")}\"")
-        buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${requiredSecureConfig("CT_COGNITO_USER_POOL_ID")}\"")
-        buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_CLIENT_ID")}\"")
-        buildConfigField("String", "SYNC_API_BASE_URL", "\"${requiredSecureConfig("CT_SYNC_API_BASE_URL")}\"")
-        buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_REDIRECT_URI")}\"")
-        buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"${requiredSecureConfig("CT_COGNITO_ANDROID_LOGOUT_URI")}\"")
+    }
+
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+
+            val redirectUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_LOGOUT_URI")
+
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_DEV", "CT_AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_DEV", "CT_COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_DEV", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
+            buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
+            manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
+            manifestPlaceholders["authLogoutScheme"] = schemeFromUri(logoutUri)
+            resValue("string", "app_name", "BiteWise Dev")
+        }
+
+        create("prod") {
+            dimension = "environment"
+
+            val redirectUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_LOGOUT_URI")
+
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_PROD", "CT_AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_PROD", "CT_COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_PROD", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
+            buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
+            manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
+            manifestPlaceholders["authLogoutScheme"] = schemeFromUri(logoutUri)
+            resValue("string", "app_name", "BiteWise")
+        }
     }
 
     buildFeatures {
@@ -53,6 +135,26 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 }
 

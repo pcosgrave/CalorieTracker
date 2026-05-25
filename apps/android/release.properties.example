@@ -1,0 +1,4 @@
+BW_UPLOAD_STORE_FILE=C:\\path\\to\\bitewise-upload-key.jks
+BW_UPLOAD_STORE_PASSWORD=replace-with-store-password
+BW_UPLOAD_KEY_ALIAS=replace-with-key-alias
+BW_UPLOAD_KEY_PASSWORD=replace-with-key-password

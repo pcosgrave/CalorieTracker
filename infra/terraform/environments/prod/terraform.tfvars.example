@@ -1,0 +1,27 @@
+aws_region = "us-east-1"
+
+app_name    = "bitewise"
+environment = "prod"
+
+web_callback_urls = [
+  "https://app.bitewise.example/auth/callback",
+]
+
+web_logout_urls = [
+  "https://app.bitewise.example/",
+]
+
+android_callback_urls = [
+  "bitewise://auth/callback",
+]
+
+android_logout_urls = [
+  "bitewise://signout",
+]
+
+cognito_domain_prefix = "replace-with-a-unique-prod-cognito-domain-prefix"
+
+lambda_runtime         = "nodejs22.x"
+lambda_memory_mb       = 512
+lambda_timeout_seconds = 15
+api_stage_name         = "prod"

@@ -1,3 +1,4 @@
+# Shared fallback values. These are optional once the flavor-specific values below are set.
 CT_AWS_REGION=us-east-1
 CT_COGNITO_DOMAIN=your-cognito-domain-prefix
 CT_COGNITO_USER_POOL_ID=us-east-1_example
@@ -5,3 +6,21 @@ CT_COGNITO_ANDROID_CLIENT_ID=your-android-client-id
 CT_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/dev
 CT_COGNITO_ANDROID_REDIRECT_URI=bitewise://auth/callback
 CT_COGNITO_ANDROID_LOGOUT_URI=bitewise://signout
+
+# Dev flavor: installs alongside prod and should point at your testing stack.
+CT_DEV_AWS_REGION=us-east-1
+CT_DEV_COGNITO_DOMAIN=cosgravelabs-bitewise-dev
+CT_DEV_COGNITO_USER_POOL_ID=us-east-1_example
+CT_DEV_COGNITO_ANDROID_CLIENT_ID=your-dev-android-client-id
+CT_DEV_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/dev
+CT_DEV_COGNITO_ANDROID_REDIRECT_URI=bitewise-dev://auth/callback
+CT_DEV_COGNITO_ANDROID_LOGOUT_URI=bitewise-dev://signout
+
+# Prod flavor: use these values for the Google-verified / publishable setup.
+CT_PROD_AWS_REGION=us-east-1
+CT_PROD_COGNITO_DOMAIN=cosgravelabs-bitewise
+CT_PROD_COGNITO_USER_POOL_ID=us-east-1_example
+CT_PROD_COGNITO_ANDROID_CLIENT_ID=your-prod-android-client-id
+CT_PROD_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/prod
+CT_PROD_COGNITO_ANDROID_REDIRECT_URI=bitewise://auth/callback
+CT_PROD_COGNITO_ANDROID_LOGOUT_URI=bitewise://signout
