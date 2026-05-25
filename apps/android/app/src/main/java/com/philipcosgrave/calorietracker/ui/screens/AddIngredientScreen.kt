@@ -37,7 +37,7 @@ import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
 @Composable
-fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodItem) -> Unit) {
+fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodItem) -> Unit) {
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var brand by remember(existing?.id) { mutableStateOf(existing?.brand.orEmpty()) }
     var barcode by remember(existing?.id) { mutableStateOf(existing?.barcode.orEmpty()) }
@@ -122,19 +122,15 @@ fun NewIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-
-            TextButton(onClick = onBack) {
-                Text("Cancel", color = AppMuted)
-            }
         }
     }
 }
 
 @Preview(showBackground = true, widthDp = 412, heightDp = 900)
 @Composable
-private fun NewIngredientScreenPreview() {
+private fun AddIngredientScreenPreview() {
     PreviewData.Theme {
-        NewIngredientScreen(
+        AddIngredientScreen(
             existing = PreviewData.food,
             onBack = {},
             onSave = {},

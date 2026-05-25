@@ -124,8 +124,12 @@ fun RecipeBuilderScreen(
                 )
             }
 
-            DashedAddCard("Tap + or Search to add items", onClick = onAddIngredient)
-            DashedAddCard("Tap + or Search to add items", onClick = onStartNestedRecipe)
+            AppPrimaryButton(
+                text = "Save Recipe",
+                onClick = { onSave(draft) },
+                enabled = draft.name.isNotBlank() && draft.components.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             AppFormField(search, { search = it }, "Search ingredients or recipes...", Modifier.fillMaxWidth())
             results.take(6).forEach { item ->
@@ -142,13 +146,6 @@ fun RecipeBuilderScreen(
                     },
                 )
             }
-
-            AppPrimaryButton(
-                text = "Save Recipe",
-                onClick = { onSave(draft) },
-                enabled = draft.name.isNotBlank() && draft.components.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }

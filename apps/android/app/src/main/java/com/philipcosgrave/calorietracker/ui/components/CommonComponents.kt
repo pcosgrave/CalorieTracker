@@ -180,7 +180,7 @@ fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
         Row(
             modifier = Modifier
                 .clickable(onClick = onEdit)
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(start = 18.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -210,7 +210,8 @@ fun FoodSearchRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = appCardColor()),
+        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
+        border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
     ) {
         Row(
             modifier = Modifier
@@ -218,9 +219,9 @@ fun FoodSearchRow(
                     onClick = onClick,
                     onDoubleClick = onDoubleClick,
                 )
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(start = 18.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
@@ -267,9 +268,7 @@ fun RecipeComponentRow(
                     Text(component.item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Text("${formatNumber(component.item.nutrients.calories)} cal", style = MaterialTheme.typography.bodySmall, color = appMutedColor())
                 }
-                TextButton(onClick = onRemove) { Text("-", color = Color(0xFFFF5449), style = MaterialTheme.typography.titleMedium) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+
                 OutlinedTextField(
                     value = amount,
                     onValueChange = {
@@ -284,6 +283,7 @@ fun RecipeComponentRow(
                     shape = RoundedCornerShape(14.dp),
                 )
                 UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)
+                TextButton(onClick = onRemove) { Text("\uD83D\uDDD1", color = Color(0xFFFF5449), style = MaterialTheme.typography.titleMedium) }
             }
         }
     }
@@ -305,7 +305,14 @@ fun KindIcon(kind: FoodKind) {
 fun OverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }) { Text("\u22EE", color = AppMuted) }
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clickable { expanded = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("\u22EE", color = AppMuted)
+        }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("Edit") }, onClick = { expanded = false; onEdit() })
             DropdownMenuItem(text = { Text("Delete") }, onClick = { expanded = false; onDelete() })

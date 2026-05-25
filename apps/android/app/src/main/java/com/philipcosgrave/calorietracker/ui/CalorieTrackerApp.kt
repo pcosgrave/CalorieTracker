@@ -60,13 +60,13 @@ import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.model.WeightEntry
-import com.philipcosgrave.calorietracker.ui.screens.AddFoodScreen
+import com.philipcosgrave.calorietracker.ui.screens.SearchFoodScreen
 import com.philipcosgrave.calorietracker.ui.screens.BarcodeScannerScreen
 import com.philipcosgrave.calorietracker.ui.screens.DiaryScreen
 import com.philipcosgrave.calorietracker.ui.screens.HomeScreen
 import com.philipcosgrave.calorietracker.ui.screens.LogFoodScreen
 import com.philipcosgrave.calorietracker.ui.screens.LogWeightScreen
-import com.philipcosgrave.calorietracker.ui.screens.NewIngredientScreen
+import com.philipcosgrave.calorietracker.ui.screens.AddIngredientScreen
 import com.philipcosgrave.calorietracker.ui.screens.QuickCaloriesScreen
 import com.philipcosgrave.calorietracker.ui.screens.RecipeBuilderScreen
 import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
@@ -439,7 +439,7 @@ fun CalorieTrackerApp(
                 targetRangeMax = syncSettings.calorieTargetMax,
                 onDateChange = { selectedDate = it },
                 onBack = { screen = AppScreen.Home },
-                onAddFood = { screen = AppScreen.AddFood },
+                onAddFood = { screen = AppScreen.SearchFood },
                 onOpenSyncSettings = {
                     previousScreen = AppScreen.Diary
                     screen = AppScreen.SyncSettings
@@ -502,12 +502,12 @@ fun CalorieTrackerApp(
                 },
             )
 
-            AppScreen.AddFood -> AddFoodScreen(
+            AppScreen.SearchFood -> SearchFoodScreen(
                 date = selectedDate,
                 foods = customFoods + recipes + seedFoods.filterNot { hiddenSeedIds.contains(it.id) },
                 onBack = { screen = AppScreen.Diary },
                 onOpenSyncSettings = {
-                    previousScreen = AppScreen.AddFood
+                    previousScreen = AppScreen.SearchFood
                     screen = AppScreen.SyncSettings
                 },
                 onQuickCalories = { screen = AppScreen.QuickCalories },
@@ -516,7 +516,7 @@ fun CalorieTrackerApp(
                 },
                 onAddIngredient = {
                     editingFood = null
-                    screen = AppScreen.NewIngredient
+                    screen = AppScreen.AddIngredient
                 },
                 onAddRecipe = {
                     recipeDraft = RecipeDraft()
@@ -587,13 +587,13 @@ fun CalorieTrackerApp(
                         screen = AppScreen.RecipeBuilder
                     } else {
                         editingFood = item
-                        screen = AppScreen.NewIngredient
+                        screen = AppScreen.AddIngredient
                     }
                 },
             )
 
             AppScreen.BarcodeScanner -> BarcodeScannerScreen(
-                onBack = { screen = AppScreen.AddFood },
+                onBack = { screen = AppScreen.SearchFood },
                 onBarcodeDetected = { barcode ->
                     scope.launch {
                         val found = findFoodByBarcode(barcode)
@@ -618,7 +618,7 @@ fun CalorieTrackerApp(
                                     servingUnit = "serving",
                                     nutrients = Nutrients(calories = 0.0),
                                 )
-                                screen = AppScreen.NewIngredient
+                                screen = AppScreen.AddIngredient
                             }
                         }
                     }
@@ -691,7 +691,7 @@ fun CalorieTrackerApp(
 
             AppScreen.QuickCalories -> QuickCaloriesScreen(
                 date = selectedDate,
-                onBack = { screen = AppScreen.AddFood },
+                onBack = { screen = AppScreen.SearchFood },
                 onSave = { calories, meal, date ->
                     val entry = DiaryEntry(
                         id = createId("entry"),
@@ -717,9 +717,9 @@ fun CalorieTrackerApp(
                 },
             )
 
-            AppScreen.NewIngredient -> NewIngredientScreen(
+            AppScreen.AddIngredient -> AddIngredientScreen(
                 existing = editingFood,
-                onBack = { screen = AppScreen.AddFood },
+                onBack = { screen = AppScreen.SearchFood },
                 onSave = { item ->
                     if (item.kind == FoodKind.Recipe) {
                         recipes = listOf(item) + recipes.filterNot { it.id == item.id }
@@ -731,7 +731,7 @@ fun CalorieTrackerApp(
                         saveFood(item)
                         refreshState()
                     }
-                    screen = if (parentRecipeDraft != null) AppScreen.RecipeBuilder else AppScreen.AddFood
+                    screen = if (parentRecipeDraft != null) AppScreen.RecipeBuilder else AppScreen.SearchFood
                 },
             )
 
@@ -742,11 +742,11 @@ fun CalorieTrackerApp(
                 onBack = {
                     parentRecipeDraft = null
                     editingFood = null
-                    screen = AppScreen.AddFood
+                    screen = AppScreen.SearchFood
                 },
                 onAddIngredient = {
                     editingFood = null
-                    screen = AppScreen.NewIngredient
+                    screen = AppScreen.AddIngredient
                 },
                 onStartNestedRecipe = {
                     parentRecipeDraft = recipeDraft
@@ -769,7 +769,7 @@ fun CalorieTrackerApp(
                     } else {
                         recipeDraft = RecipeDraft()
                         editingFood = null
-                        screen = AppScreen.AddFood
+                        screen = AppScreen.SearchFood
                     }
                 },
             )
@@ -778,7 +778,7 @@ fun CalorieTrackerApp(
                 LogFoodScreen(
                     food = food,
                     date = selectedDate,
-                    onBack = { screen = AppScreen.AddFood },
+                onBack = { screen = AppScreen.SearchFood },
                     onLog = { meal, date, loggedFood, amount, addMore ->
                         val multiplier = amount / loggedFood.servingQuantity.coerceAtLeast(0.1)
                         val entry = DiaryEntry(
@@ -794,11 +794,11 @@ fun CalorieTrackerApp(
                             saveDiaryEntry(entry)
                             refreshState()
                         }
-                        screen = if (addMore) AppScreen.AddFood else AppScreen.Diary
+                        screen = if (addMore) AppScreen.SearchFood else AppScreen.Diary
                     },
                 )
             } ?: run {
-                screen = AppScreen.AddFood
+                screen = AppScreen.SearchFood
             }
         }
     }

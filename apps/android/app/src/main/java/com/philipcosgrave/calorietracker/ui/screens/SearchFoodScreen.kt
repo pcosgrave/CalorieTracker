@@ -48,7 +48,7 @@ import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 
 @Composable
-fun AddFoodScreen(
+fun SearchFoodScreen(
     date: LocalDate,
     foods: List<FoodItem>,
     onBack: () -> Unit,
@@ -238,9 +238,9 @@ fun AddFoodScreen(
 
 @Preview(showBackground = true, widthDp = 412, heightDp = 1000)
 @Composable
-private fun AddFoodScreenPreview() {
+private fun SearchFoodScreenPreview() {
     PreviewData.Theme {
-        AddFoodScreen(
+        SearchFoodScreen(
             date = PreviewData.date,
             foods = PreviewData.foods,
             onBack = {},
