@@ -1,0 +1,6 @@
+<resources>
+    <color name="bitewise_icon_background">#0F172A</color>
+    <color name="bitewise_icon_primary">#1D8BFF</color>
+    <color name="bitewise_icon_secondary">#7DD3FC</color>
+    <color name="bitewise_icon_highlight">#F8FAFC</color>
+</resources>
