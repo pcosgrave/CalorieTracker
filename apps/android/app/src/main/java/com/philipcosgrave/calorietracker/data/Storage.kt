@@ -32,12 +32,16 @@ fun readDiaryEntries(context: Context): List<DiaryEntry> =
         val array = JSONArray(stored)
         List(array.length()) { index ->
             val item = array.getJSONObject(index)
+            val food = foodItemFromJson(item.getJSONObject("food"))
+            val servingMultiplier = item.getDouble("servingMultiplier")
             DiaryEntry(
                 id = item.getString("id"),
-                food = foodItemFromJson(item.getJSONObject("food")),
+                food = food,
                 date = LocalDate.parse(item.getString("date")),
                 meal = Meal.valueOf(item.getString("meal")),
-                servingMultiplier = item.getDouble("servingMultiplier"),
+                servingMultiplier = servingMultiplier,
+                loggedAmount = item.optDouble("loggedAmount").takeIf { !it.isNaN() && it > 0 } ?: (food.servingQuantity * servingMultiplier),
+                loggedUnit = item.optString("loggedUnit").ifBlank { food.servingUnit },
             )
         }
     }.getOrDefault(emptyList())
@@ -51,7 +55,9 @@ fun writeDiaryEntries(context: Context, entries: List<DiaryEntry>) {
                 .put("food", entry.food.toJson())
                 .put("date", entry.date.toString())
                 .put("meal", entry.meal.name)
-                .put("servingMultiplier", entry.servingMultiplier),
+                .put("servingMultiplier", entry.servingMultiplier)
+                .put("loggedAmount", entry.loggedAmount)
+                .put("loggedUnit", entry.loggedUnit)
         )
     }
     prefs(context).edit().putString("diaryEntries", array.toString()).apply()
@@ -83,6 +89,11 @@ private fun FoodItem.toJson(): JSONObject {
         .put("nutrients", nutrients.toJson())
         .put("components", componentsJson)
         .put("frequency", frequency)
+        .put("breakfastFrequency", breakfastFrequency)
+        .put("lunchFrequency", lunchFrequency)
+        .put("dinnerFrequency", dinnerFrequency)
+        .put("snackFrequency", snackFrequency)
+        .put("lastUsedAt", lastUsedAt)
         .put("lastUsedDaysAgo", lastUsedDaysAgo)
 }
 
@@ -112,6 +123,11 @@ private fun foodItemFromJson(json: JSONObject): FoodItem {
         nutrients = nutrientsFromJson(json.getJSONObject("nutrients")),
         components = List(componentsJson.length()) { index -> recipeComponentFromJson(componentsJson.getJSONObject(index)) },
         frequency = json.optInt("frequency"),
+        breakfastFrequency = json.optInt("breakfastFrequency"),
+        lunchFrequency = json.optInt("lunchFrequency"),
+        dinnerFrequency = json.optInt("dinnerFrequency"),
+        snackFrequency = json.optInt("snackFrequency"),
+        lastUsedAt = json.optString("lastUsedAt").takeIf { it.isNotBlank() },
         lastUsedDaysAgo = json.optInt("lastUsedDaysAgo"),
     )
 }

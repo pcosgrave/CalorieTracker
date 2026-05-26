@@ -133,6 +133,7 @@ fun CalorieTrackerApp(
     var parentRecipeDraft by remember { mutableStateOf<RecipeDraft?>(null) }
     var returnToRecipeAfterIngredientSave by remember { mutableStateOf(false) }
     var editingFood by remember { mutableStateOf<FoodItem?>(null) }
+    var editingDiaryEntry by remember { mutableStateOf<DiaryEntry?>(null) }
     var editingWeight by remember { mutableStateOf<WeightEntry?>(null) }
     var openLogAfterIngredientSave by remember { mutableStateOf(false) }
     var syncSettings by remember {
@@ -284,9 +285,38 @@ fun CalorieTrackerApp(
         }
     }
 
+    suspend fun touchFoodUsage(foodId: String, meal: Meal) {
+        val deviceId = localStore.deviceId()
+        val existing = localStore.foodRepository.getById(foodId) ?: return
+        val updatedFood = existing.food.copy(
+            frequency = existing.food.frequency + 1,
+            breakfastFrequency = existing.food.breakfastFrequency + if (meal == Meal.Breakfast) 1 else 0,
+            lunchFrequency = existing.food.lunchFrequency + if (meal == Meal.Lunch) 1 else 0,
+            dinnerFrequency = existing.food.dinnerFrequency + if (meal == Meal.Dinner) 1 else 0,
+            snackFrequency = existing.food.snackFrequency + if (meal == Meal.Snack) 1 else 0,
+            lastUsedAt = nowIsoString(),
+            lastUsedDaysAgo = 0,
+        )
+        val updatedRecord = createFoodRecord(updatedFood, deviceId, existing)
+        localStore.foodRepository.save(updatedRecord)
+        localStore.syncOutboxRepository.enqueue(
+            createChangeEnvelope(
+                entityType = SyncEntityType.FoodProduct,
+                operation = SyncOperation.Upsert,
+                deviceId = deviceId,
+                recordId = updatedRecord.sync.recordId,
+                payload = updatedRecord,
+                baseVersion = existing.sync.version,
+            ),
+        )
+    }
+
     suspend fun saveDiaryEntry(entry: DiaryEntry) {
         val deviceId = localStore.deviceId()
         val existing = localStore.diaryRepository.getById(entry.id)
+        if (existing == null) {
+            touchFoodUsage(entry.food.id, entry.meal)
+        }
         val updatedAt = nowIsoString()
         val record = existing?.copy(
             entry = entry,
@@ -718,12 +748,10 @@ fun CalorieTrackerApp(
                         refreshState()
                     }
                 },
-                onUpdateEntry = { updated ->
-                    diary = diary.map { if (it.id == updated.id) updated else it }
-                    scope.launch {
-                        saveDiaryEntry(updated)
-                        refreshState()
-                    }
+                onEditEntry = { entry ->
+                    editingDiaryEntry = entry
+                    selectedFood = entry.food
+                    navigateTo(AppScreen.LogFood)
                 },
             )
 
@@ -1113,22 +1141,19 @@ fun CalorieTrackerApp(
                 LogFoodScreen(
                     food = food,
                     date = selectedDate,
-                    onBack = { popScreen() },
-                    onLog = { meal, date, loggedFood, amount, addMore ->
-                        val multiplier = amount / loggedFood.servingQuantity.coerceAtLeast(0.1)
-                        val entry = DiaryEntry(
-                            id = createId("entry"),
-                            food = loggedFood,
-                            date = date,
-                            meal = meal,
-                            servingMultiplier = multiplier,
-                        )
-                        diary = listOf(entry) + diary
-                        selectedDate = date
+                    existingEntry = editingDiaryEntry,
+                    onBack = {
+                        editingDiaryEntry = null
+                        popScreen()
+                    },
+                    onLog = { entry, addMore ->
+                        diary = listOf(entry) + diary.filterNot { it.id == entry.id }
+                        selectedDate = entry.date
                         scope.launch {
                             saveDiaryEntry(entry)
                             refreshState()
                         }
+                        editingDiaryEntry = null
                         if (addMore) {
                             popScreen()
                         } else {

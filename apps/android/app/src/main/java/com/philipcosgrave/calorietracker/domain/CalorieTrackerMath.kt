@@ -3,6 +3,7 @@ package com.philipcosgrave.calorietracker.domain
 import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
+import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
@@ -86,6 +87,14 @@ fun Totals.rounded(): Totals = Totals(
 
 fun FoodItem.componentSummary(): String =
     components.joinToString(", ") { "${it.item.name} - ${formatNumber(it.amount)} ${it.unit}" }
+
+fun FoodItem.frequencyForMeal(meal: Meal): Int =
+    when (meal) {
+        Meal.Breakfast -> breakfastFrequency
+        Meal.Lunch -> lunchFrequency
+        Meal.Dinner -> dinnerFrequency
+        Meal.Snack -> snackFrequency
+    }
 
 fun FoodItem.withAdjustedComponents(updatedComponents: List<RecipeComponent>): FoodItem {
     if (kind != FoodKind.Recipe) return this

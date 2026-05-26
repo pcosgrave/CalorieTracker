@@ -298,6 +298,8 @@ private fun diaryEntryToWireJson(record: DiaryEntryRecord, ownerUserId: String):
             Meal.Snack -> "snack"
         })
         .put("servingMultiplier", record.entry.servingMultiplier)
+        .put("loggedAmount", record.entry.loggedAmount)
+        .put("loggedUnit", record.entry.loggedUnit)
         .put("productSnapshot", foodItemToWireJson(record.entry.food, record.sync.updatedAt, ownerUserId))
         .put("createdAt", record.sync.updatedAt)
         .put("updatedAt", record.sync.updatedAt)
@@ -324,10 +326,12 @@ private fun foodItemFromWireJson(json: JSONObject): FoodItem {
     )
 }
 
-private fun diaryEntryFromWireJson(json: JSONObject): DiaryEntry =
-    DiaryEntry(
+private fun diaryEntryFromWireJson(json: JSONObject): DiaryEntry {
+    val food = foodItemFromWireJson(json.getJSONObject("productSnapshot"))
+    val servingMultiplier = json.getDouble("servingMultiplier")
+    return DiaryEntry(
         id = json.optString("entryId", json.optString("id")),
-        food = foodItemFromWireJson(json.getJSONObject("productSnapshot")),
+        food = food,
         date = LocalDate.parse(json.optString("loggedAt").take(10)),
         meal = when (json.getString("meal")) {
             "breakfast" -> Meal.Breakfast
@@ -335,8 +339,11 @@ private fun diaryEntryFromWireJson(json: JSONObject): DiaryEntry =
             "dinner" -> Meal.Dinner
             else -> Meal.Snack
         },
-        servingMultiplier = json.getDouble("servingMultiplier"),
+        servingMultiplier = servingMultiplier,
+        loggedAmount = json.optDouble("loggedAmount").takeIf { !it.isNaN() && it > 0 } ?: (food.servingQuantity * servingMultiplier),
+        loggedUnit = json.optString("loggedUnit").ifBlank { food.servingUnit },
     )
+}
 
 private fun nutrientsFromWireJson(json: JSONObject): Nutrients =
     Nutrients(

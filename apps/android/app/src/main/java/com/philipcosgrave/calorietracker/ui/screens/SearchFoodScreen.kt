@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.SortMode
+import com.philipcosgrave.calorietracker.domain.frequencyForMeal
+import com.philipcosgrave.calorietracker.domain.inferMealForTime
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppBorder
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
@@ -46,6 +48,8 @@ import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appCardColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
+import java.time.Instant
+import java.time.LocalTime
 
 @Composable
 fun SearchFoodScreen(
@@ -75,6 +79,7 @@ fun SearchFoodScreen(
     var activeKind by remember { mutableStateOf(FoodKind.Ingredient) }
     var sortMode by remember { mutableStateOf(SortMode.Recent) }
     var addMenuExpanded by remember { mutableStateOf(false) }
+    val currentMeal = remember { inferMealForTime(LocalTime.now()) }
     val results = foods
         .filter { it.kind == activeKind }
         .filter { item ->
@@ -85,7 +90,17 @@ fun SearchFoodScreen(
         }
         .let { list ->
             when (sortMode) {
-                SortMode.Recent -> list.sortedWith(compareBy<FoodItem> { it.lastUsedDaysAgo }.thenBy { it.name })
+                SortMode.Recent -> list.sortedWith(
+                    compareByDescending<FoodItem> {
+                        it.lastUsedAt?.let(Instant::parse)?.toEpochMilli() ?: Long.MIN_VALUE
+                    }.thenBy { it.lastUsedDaysAgo }.thenBy { it.name }
+                )
+                SortMode.MealTime -> list.sortedWith(
+                    compareByDescending<FoodItem> { it.frequencyForMeal(currentMeal) }
+                        .thenByDescending { it.frequency }
+                        .thenByDescending { it.lastUsedAt?.let(Instant::parse)?.toEpochMilli() ?: Long.MIN_VALUE }
+                        .thenBy { it.name }
+                )
                 SortMode.Frequency -> list.sortedWith(compareByDescending<FoodItem> { it.frequency }.thenBy { it.name })
                 SortMode.Alphabetical -> list.sortedBy { it.name }
             }
@@ -166,7 +181,7 @@ fun SearchFoodScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Recent", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(sortMode.label, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 SortMenu(value = sortMode, onChange = { sortMode = it })
             }
 

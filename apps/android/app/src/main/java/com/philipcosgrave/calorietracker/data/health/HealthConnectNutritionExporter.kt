@@ -292,6 +292,8 @@ class HealthConnectNutritionExporter(private val context: Context) {
                     else -> Meal.Snack
                 },
                 servingMultiplier = 1.0,
+                loggedAmount = 1.0,
+                loggedUnit = "entry",
             )
         }
     }

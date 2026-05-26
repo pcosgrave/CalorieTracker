@@ -14,20 +14,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,9 +38,6 @@ import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
-import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
-import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
-import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
 import kotlin.math.max
@@ -63,7 +54,7 @@ fun DiaryScreen(
     onVoiceLog: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
-    onUpdateEntry: (DiaryEntry) -> Unit,
+    onEditEntry: (DiaryEntry) -> Unit,
 ) {
     val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
@@ -88,8 +79,6 @@ fun DiaryScreen(
                 (2f / 3f) + overProgress * (1f / 3f)
             }
         }.coerceIn(0f, 1f)
-    var editingEntry by remember { mutableStateOf<DiaryEntry?>(null) }
-
     Page {
         PageHeader(
             title = "Food Log",
@@ -171,17 +160,6 @@ fun DiaryScreen(
             }
         }
 
-        editingEntry?.let { entry ->
-            EditEntryCard(
-                entry = entry,
-                onCancel = { editingEntry = null },
-                onSave = {
-                    onUpdateEntry(it)
-                    editingEntry = null
-                },
-            )
-        }
-
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Meal Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
             Meal.entries.forEach { meal ->
@@ -208,7 +186,7 @@ fun DiaryScreen(
                             Text("${formatNumber(totalsForEntries(mealEntries).calories)} cal", fontWeight = FontWeight.Bold)
                         }
                         mealEntries.forEach { entry ->
-                            DiaryEntryRow(entry = entry, onEdit = { editingEntry = entry }, onDelete = { onDeleteEntry(entry) })
+                            DiaryEntryRow(entry = entry, onEdit = { onEditEntry(entry) }, onDelete = { onDeleteEntry(entry) })
                         }
                     }
                 }
@@ -355,41 +333,7 @@ private fun DiaryScreenPreview() {
             onVoiceLog = {},
             onOpenSyncSettings = {},
             onDeleteEntry = {},
-            onUpdateEntry = {},
+            onEditEntry = {},
         )
-    }
-}
-
-@Composable
-private fun EditEntryCard(entry: DiaryEntry, onCancel: () -> Unit, onSave: (DiaryEntry) -> Unit) {
-    var servings by remember(entry.id) { mutableStateOf(formatNumber(entry.servingMultiplier)) }
-    AppCardContainer {
-        Text("Adjust serving", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        com.philipcosgrave.calorietracker.ui.components.AppFormField(
-            value = servings,
-            onValueChange = {
-                val normalized = normalizeDecimalNumberInput(it)
-                if (isDecimalNumberInput(normalized)) {
-                    servings = normalized
-                }
-            },
-            label = "Servings",
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel", color = AppMuted) }
-            com.philipcosgrave.calorietracker.ui.components.AppPrimaryButton(
-                text = "Save",
-                onClick = {
-                    onSave(
-                        entry.copy(
-                            servingMultiplier = servings.toDoubleOrNull()?.coerceAtLeast(0.1) ?: entry.servingMultiplier,
-                        ),
-                    )
-                },
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }

@@ -16,6 +16,7 @@ enum class FoodKind {
 
 enum class SortMode(val label: String) {
     Recent("Recent"),
+    MealTime("Frequent now"),
     Frequency("Frequency"),
     Alphabetical("Alphabetical"),
 }
@@ -38,6 +39,11 @@ data class FoodItem(
     val nutrients: Nutrients,
     val components: List<RecipeComponent> = emptyList(),
     val frequency: Int = 0,
+    val breakfastFrequency: Int = 0,
+    val lunchFrequency: Int = 0,
+    val dinnerFrequency: Int = 0,
+    val snackFrequency: Int = 0,
+    val lastUsedAt: String? = null,
     val lastUsedDaysAgo: Int = 0,
     val isUserCreated: Boolean = true,
 )
@@ -54,6 +60,8 @@ data class DiaryEntry(
     val date: LocalDate,
     val meal: Meal,
     val servingMultiplier: Double,
+    val loggedAmount: Double = food.servingQuantity * servingMultiplier,
+    val loggedUnit: String = food.servingUnit,
 )
 
 data class RecipeDraft(

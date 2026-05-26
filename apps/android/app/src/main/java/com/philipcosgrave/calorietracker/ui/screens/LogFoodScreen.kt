@@ -35,20 +35,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.compatibleMeasurementUnits
+import com.philipcosgrave.calorietracker.domain.createId
 import com.philipcosgrave.calorietracker.domain.convertAmount
 import com.philipcosgrave.calorietracker.domain.scale
 import com.philipcosgrave.calorietracker.domain.withAdjustedComponents
+import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.DatePillsRow
-import com.philipcosgrave.calorietracker.ui.components.DateStepper
 import com.philipcosgrave.calorietracker.ui.components.MealPicker
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.UnitPicker
 import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
-import com.philipcosgrave.calorietracker.ui.components.isDigitsOnlyInput
 import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
@@ -57,15 +57,18 @@ import java.time.LocalDate
 fun LogFoodScreen(
     food: FoodItem,
     date: LocalDate,
+    existingEntry: DiaryEntry? = null,
     onBack: () -> Unit,
-    onLog: (Meal, LocalDate, FoodItem, Double, Boolean) -> Unit,
+    onLog: (DiaryEntry, Boolean) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val isDarkTheme = colorScheme.background.luminance() < 0.5f
-    var amount by remember(food.id) { mutableStateOf(formatNumber(food.servingQuantity)) }
-    var unit by remember(food.id) { mutableStateOf(food.servingUnit) }
-    var meal by remember { mutableStateOf(Meal.Breakfast) }
-    var selectedDate by remember { mutableStateOf(date) }
+    var amount by remember(food.id, existingEntry?.id) {
+        mutableStateOf(formatNumber(existingEntry?.loggedAmount ?: food.servingQuantity))
+    }
+    var unit by remember(food.id, existingEntry?.id) { mutableStateOf(existingEntry?.loggedUnit ?: food.servingUnit) }
+    var meal by remember(existingEntry?.id) { mutableStateOf(existingEntry?.meal ?: Meal.Breakfast) }
+    var selectedDate by remember(existingEntry?.id, date) { mutableStateOf(existingEntry?.date ?: date) }
     var components by remember(food.id) { mutableStateOf(food.components) }
     val amountNumber = amount.toDoubleOrNull()?.coerceAtLeast(0.1) ?: food.servingQuantity
     val availableUnits = remember(food.servingUnit) { compatibleMeasurementUnits(food.servingUnit) }
@@ -95,7 +98,7 @@ fun LogFoodScreen(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        PageHeader("Add foods", onBack = onBack)
+        PageHeader(if (existingEntry == null) "Add foods" else "Edit foods", onBack = onBack)
         Text(food.name, style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Serving size", color = colorScheme.onBackground)
@@ -135,11 +138,43 @@ fun LogFoodScreen(
             onDateChange = { if (!it.isAfter(LocalDate.now())) selectedDate = it },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { onLog(meal, selectedDate, adjustedFood, convertedAmount, true) }, modifier = Modifier.weight(1f)) {
-                Text("Log & add more")
+            Button(
+                onClick = {
+                    onLog(
+                        com.philipcosgrave.calorietracker.model.DiaryEntry(
+                            id = existingEntry?.id ?: createId("entry"),
+                            food = adjustedFood,
+                            date = selectedDate,
+                            meal = meal,
+                            servingMultiplier = convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1),
+                            loggedAmount = amountNumber,
+                            loggedUnit = unit,
+                        ),
+                        true,
+                    )
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (existingEntry == null) "Log & add more" else "Save & add more")
             }
-            Button(onClick = { onLog(meal, selectedDate, adjustedFood, convertedAmount, false) }, modifier = Modifier.weight(1f)) {
-                Text("Log this")
+            Button(
+                onClick = {
+                    onLog(
+                        com.philipcosgrave.calorietracker.model.DiaryEntry(
+                            id = existingEntry?.id ?: createId("entry"),
+                            food = adjustedFood,
+                            date = selectedDate,
+                            meal = meal,
+                            servingMultiplier = convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1),
+                            loggedAmount = amountNumber,
+                            loggedUnit = unit,
+                        ),
+                        false,
+                    )
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (existingEntry == null) "Log this" else "Save")
             }
         }
     }
@@ -240,8 +275,9 @@ private fun LogFoodScreenPreview() {
         LogFoodScreen(
             food = PreviewData.foods.last(),
             date = PreviewData.date,
+            existingEntry = null,
             onBack = {},
-            onLog = { _, _, _, _, _ -> },
+            onLog = { _, _ -> },
         )
     }
 }

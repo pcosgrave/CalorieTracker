@@ -181,7 +181,6 @@ fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onEdit)
                 .padding(start = 18.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,7 +188,7 @@ fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${entry.food.brand.ifBlank { entry.food.servingLabel }} • ${formatNumber(entry.servingMultiplier)} serving",
+                    "${entry.food.brand.ifBlank { entry.food.servingLabel }} • ${formatNumber(entry.loggedAmount)} ${entry.loggedUnit}",
                     color = AppMuted,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -612,7 +611,8 @@ fun <T> ScrollablePillSelector(
                     Box(
                         modifier = Modifier
                             .background(if (selected) AppBlue else appSoftColor(), RoundedCornerShape(14.dp))
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp)
+                            .height(48.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         TextButton(onClick = { onSelect(option) }) {

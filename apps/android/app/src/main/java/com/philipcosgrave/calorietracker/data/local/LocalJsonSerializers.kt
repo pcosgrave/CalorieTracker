@@ -29,16 +29,22 @@ fun DiaryEntry.toJsonString(): String =
         .put("date", date.toString())
         .put("meal", meal.name)
         .put("servingMultiplier", servingMultiplier)
+        .put("loggedAmount", loggedAmount)
+        .put("loggedUnit", loggedUnit)
         .toString()
 
 fun diaryEntryFromJsonString(value: String): DiaryEntry {
     val item = JSONObject(value)
+    val food = foodItemFromJson(item.getJSONObject("food"))
+    val servingMultiplier = item.getDouble("servingMultiplier")
     return DiaryEntry(
         id = item.getString("id"),
-        food = foodItemFromJson(item.getJSONObject("food")),
+        food = food,
         date = LocalDate.parse(item.getString("date")),
         meal = Meal.valueOf(item.getString("meal")),
-        servingMultiplier = item.getDouble("servingMultiplier"),
+        servingMultiplier = servingMultiplier,
+        loggedAmount = item.optDouble("loggedAmount").takeIf { !it.isNaN() && it > 0 } ?: (food.servingQuantity * servingMultiplier),
+        loggedUnit = item.optString("loggedUnit").ifBlank { food.servingUnit },
     )
 }
 
@@ -146,6 +152,11 @@ private fun FoodItem.toJson(): JSONObject {
         .put("nutrients", nutrients.toJson())
         .put("components", componentsJson)
         .put("frequency", frequency)
+        .put("breakfastFrequency", breakfastFrequency)
+        .put("lunchFrequency", lunchFrequency)
+        .put("dinnerFrequency", dinnerFrequency)
+        .put("snackFrequency", snackFrequency)
+        .put("lastUsedAt", lastUsedAt)
         .put("lastUsedDaysAgo", lastUsedDaysAgo)
         .put("isUserCreated", isUserCreated)
 }
@@ -176,6 +187,11 @@ private fun foodItemFromJson(json: JSONObject): FoodItem {
         nutrients = nutrientsFromJson(json.getJSONObject("nutrients")),
         components = List(componentsJson.length()) { index -> recipeComponentFromJson(componentsJson.getJSONObject(index)) },
         frequency = json.optInt("frequency"),
+        breakfastFrequency = json.optInt("breakfastFrequency"),
+        lunchFrequency = json.optInt("lunchFrequency"),
+        dinnerFrequency = json.optInt("dinnerFrequency"),
+        snackFrequency = json.optInt("snackFrequency"),
+        lastUsedAt = json.optString("lastUsedAt").takeIf { it.isNotBlank() },
         lastUsedDaysAgo = json.optInt("lastUsedDaysAgo"),
         isUserCreated = json.optBoolean("isUserCreated", true),
     )
