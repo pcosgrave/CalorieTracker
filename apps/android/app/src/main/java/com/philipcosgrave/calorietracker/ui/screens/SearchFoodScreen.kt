@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,8 @@ fun SearchFoodScreen(
     date: LocalDate,
     foods: List<FoodItem>,
     isSignedIn: Boolean,
+    initialSearchQuery: String = "",
+    voiceSearchNotice: String? = null,
     onBack: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onQuickCalories: () -> Unit,
@@ -109,6 +112,12 @@ fun SearchFoodScreen(
         search.trim().length >= 3 && activeKind == FoodKind.Ingredient && results.size < 2
     val showingRemoteResultsForCurrentSearch =
         remoteSearchQuery.equals(search.trim(), ignoreCase = true)
+
+    LaunchedEffect(initialSearchQuery) {
+        if (initialSearchQuery.isNotBlank() && initialSearchQuery != search) {
+            search = initialSearchQuery
+        }
+    }
 
     Page {
         PageHeader(
@@ -178,6 +187,14 @@ fun SearchFoodScreen(
                         fontWeight = FontWeight.Bold,
                     )
                 }
+            }
+
+            if (!voiceSearchNotice.isNullOrBlank()) {
+                Text(
+                    voiceSearchNotice,
+                    color = AppMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -300,6 +317,8 @@ private fun SearchFoodScreenPreview() {
             date = PreviewData.date,
             foods = PreviewData.foods,
             isSignedIn = true,
+            initialSearchQuery = "onion",
+            voiceSearchNotice = "Showing search results for what voice logging heard.",
             onBack = {},
             onOpenSyncSettings = {},
             onQuickCalories = {},

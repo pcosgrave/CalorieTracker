@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.totalsForEntries
 import com.philipcosgrave.calorietracker.model.DiaryEntry
+import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
@@ -55,6 +56,14 @@ fun DiaryScreen(
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onEditEntry: (DiaryEntry) -> Unit,
+    voiceTranscript: String? = null,
+    voiceStatusLabel: String? = null,
+    voiceStatusMessage: String? = null,
+    voiceRetryVisible: Boolean = false,
+    voiceCandidateMatches: List<FoodItem> = emptyList(),
+    onRetryVoiceLog: () -> Unit = {},
+    onDismissVoiceFeedback: () -> Unit = {},
+    onSelectVoiceCandidate: (FoodItem) -> Unit = {},
 ) {
     val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
@@ -160,6 +169,19 @@ fun DiaryScreen(
             }
         }
 
+        if (!voiceStatusLabel.isNullOrBlank() || !voiceTranscript.isNullOrBlank() || voiceCandidateMatches.isNotEmpty()) {
+            VoiceStatusCard(
+                label = voiceStatusLabel,
+                transcript = voiceTranscript,
+                message = voiceStatusMessage,
+                candidateMatches = voiceCandidateMatches,
+                retryVisible = voiceRetryVisible,
+                onRetry = onRetryVoiceLog,
+                onDismiss = onDismissVoiceFeedback,
+                onSelectCandidate = onSelectVoiceCandidate,
+            )
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Meal Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
             Meal.entries.forEach { meal ->
@@ -191,6 +213,81 @@ fun DiaryScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun VoiceStatusCard(
+    label: String?,
+    transcript: String?,
+    message: String?,
+    candidateMatches: List<FoodItem>,
+    retryVisible: Boolean,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    onSelectCandidate: (FoodItem) -> Unit,
+) {
+    AppCardContainer(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF111827), RoundedCornerShape(24.dp)),
+    ) {
+        if (!label.isNullOrBlank()) {
+            Text(label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.White)
+        }
+        if (!transcript.isNullOrBlank()) {
+            Text("\"$transcript\"", color = Color.White, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        }
+        if (!message.isNullOrBlank()) {
+            Text(message, color = Color(0xFFD1D5DB), style = MaterialTheme.typography.bodySmall)
+        }
+        if (candidateMatches.isNotEmpty()) {
+            Text("Pick the closest match", fontWeight = FontWeight.Bold)
+            candidateMatches.forEach { item ->
+                DiaryVoiceCandidateRow(
+                    name = item.name,
+                    brand = item.brand,
+                    onSelect = { onSelectCandidate(item) },
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (retryVisible) {
+                TextButton(onClick = onRetry) {
+                    Text("Retry", color = AppBlue)
+                }
+            }
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AppMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiaryVoiceCandidateRow(
+    name: String,
+    brand: String,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(name, fontWeight = FontWeight.Bold)
+            if (brand.isNotBlank()) {
+                Text(brand, color = AppMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        TextButton(onClick = onSelect) {
+            Text("Use", color = AppBlue, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -334,6 +431,9 @@ private fun DiaryScreenPreview() {
             onOpenSyncSettings = {},
             onDeleteEntry = {},
             onEditEntry = {},
+            onRetryVoiceLog = {},
+            onDismissVoiceFeedback = {},
+            onSelectVoiceCandidate = {},
         )
     }
 }

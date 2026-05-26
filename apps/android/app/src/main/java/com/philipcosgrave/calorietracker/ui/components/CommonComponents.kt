@@ -229,8 +229,8 @@ fun FoodSearchRow(
                 Text(
                     buildList {
                         if (item.kind == FoodKind.Recipe) add("Recipe")
-                        add(item.servingLabel)
                         if (item.brand.isNotBlank()) add(item.brand)
+                        add(item.servingLabel)
                         if (showCalories) add("${formatNumber(item.nutrients.calories)} cal")
                     }.joinToString(" • "),
                     style = MaterialTheme.typography.bodyMedium,

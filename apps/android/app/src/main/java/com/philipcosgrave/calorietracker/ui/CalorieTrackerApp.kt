@@ -56,10 +56,13 @@ import com.philipcosgrave.calorietracker.domain.createId
 import com.philipcosgrave.calorietracker.domain.createSyncMetadata
 import com.philipcosgrave.calorietracker.domain.convertAmount
 import com.philipcosgrave.calorietracker.domain.inferMealForTime
+import com.philipcosgrave.calorietracker.domain.normalizeVoiceSearchQuery
+import com.philipcosgrave.calorietracker.domain.normalizeVoiceTranscript
 import com.philipcosgrave.calorietracker.domain.nowIsoString
 import com.philipcosgrave.calorietracker.domain.parseVoiceFoodCommand
 import com.philipcosgrave.calorietracker.domain.toFoodItem
 import com.philipcosgrave.calorietracker.domain.toRecipeDraft
+import com.philipcosgrave.calorietracker.domain.VoiceFoodCommand
 import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItem
@@ -86,9 +89,33 @@ import com.philipcosgrave.calorietracker.ui.screens.RecipeBuilderScreen
 import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
 import com.philipcosgrave.calorietracker.ui.screens.WeightScreen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
+
+private enum class VoiceLogPhase {
+    Idle,
+    Listening,
+    Heard,
+    Parsing,
+    Success,
+    Failed,
+    NeedsChoice,
+}
+
+private data class VoiceLogFeedback(
+    val phase: VoiceLogPhase = VoiceLogPhase.Idle,
+    val transcript: String? = null,
+    val query: String? = null,
+    val message: String? = null,
+    val candidateMatches: List<FoodItem> = emptyList(),
+)
+
+private data class VoiceIngredientScore(
+    val food: FoodItem,
+    val score: Int,
+)
 
 @Composable
 fun CalorieTrackerApp(
@@ -156,6 +183,9 @@ fun CalorieTrackerApp(
     var canadianResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var remoteSearchQuery by remember { mutableStateOf("") }
     var isSearchingRemote by remember { mutableStateOf(false) }
+    var searchFoodInitialQuery by remember { mutableStateOf("") }
+    var voiceFeedback by remember { mutableStateOf(VoiceLogFeedback()) }
+    var pendingVoiceCommand by remember { mutableStateOf<VoiceFoodCommand?>(null) }
 
     fun navigateTo(target: AppScreen) {
         if (screen != target) {
@@ -177,9 +207,25 @@ fun CalorieTrackerApp(
         screenStack.add(target)
     }
 
-    fun speakUnknownIngredient() {
-        Toast.makeText(context, "Unknown ingredient", Toast.LENGTH_SHORT).show()
-        textToSpeech.speak("Unknown ingredient", TextToSpeech.QUEUE_FLUSH, null, "unknown-ingredient")
+    fun clearVoiceFeedback() {
+        voiceFeedback = VoiceLogFeedback()
+        pendingVoiceCommand = null
+    }
+
+    fun openVoiceFallbackSearch(query: String, transcript: String, message: String) {
+        searchFoodInitialQuery = query
+        remoteSearchQuery = ""
+        personalOnlineResults = emptyList()
+        communityResults = emptyList()
+        canadianResults = emptyList()
+        isSearchingRemote = false
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Failed,
+            transcript = transcript,
+            query = query,
+            message = message,
+        )
+        navigateTo(AppScreen.SearchFood)
     }
 
     suspend fun refreshState() {
@@ -241,47 +287,73 @@ fun CalorieTrackerApp(
         return dp[a.length][b.length]
     }
 
-    fun findVoiceIngredient(query: String): FoodItem? {
-        val normalizedQuery = query
-            .lowercase()
-            .trim()
+    fun normalizeVoiceCandidatePhrase(value: String): String =
+        normalizeVoiceSearchQuery(normalizeVoiceTranscript(value))
 
-        val candidates = (customFoods + seedFoods)
-            .filter { it.kind == FoodKind.Ingredient }
+    fun voiceMatchPhrases(food: FoodItem): Set<String> {
+        val phrases = linkedSetOf<String>()
+        phrases += normalizeVoiceCandidatePhrase(food.name)
+        if (food.brand.isNotBlank()) {
+            phrases += normalizeVoiceCandidatePhrase("${food.brand} ${food.name}")
+            phrases += normalizeVoiceCandidatePhrase("${food.name} ${food.brand}")
+            phrases += normalizeVoiceCandidatePhrase(food.brand)
+        }
+        food.components.forEach { component ->
+            phrases += normalizeVoiceCandidatePhrase(component.item.name)
+            if (component.item.brand.isNotBlank()) {
+                phrases += normalizeVoiceCandidatePhrase("${component.item.brand} ${component.item.name}")
+            }
+        }
+        return phrases.filter { it.isNotBlank() }.toSet()
+    }
 
-        // Exact match
-        candidates.firstOrNull {
-            it.name.equals(normalizedQuery, ignoreCase = true)
-        }?.let { return it }
-
-        // Partial match
-        candidates.firstOrNull {
-            it.name.contains(normalizedQuery, ignoreCase = true) ||
-                    normalizedQuery.contains(it.name.lowercase())
-        }?.let { return it }
-
-        // Fuzzy match
-        val threshold = when {
-            normalizedQuery.length <= 4 -> 1
-            normalizedQuery.length <= 7 -> 2
-            else -> 3
+    fun fuzzyVoiceThreshold(query: String): Int =
+        when {
+            query.length <= 4 -> 1
+            query.length <= 7 -> 2
+            query.length <= 12 -> 3
+            else -> 4
         }
 
-        val fuzzyMatch = candidates
-            .map { food ->
-                val distance = levenshteinDistance(
-                    normalizedQuery,
-                    food.name.lowercase()
+    fun scoreVoiceIngredient(food: FoodItem, normalizedQuery: String): Int? {
+        val phrases = voiceMatchPhrases(food)
+        if (phrases.any { it == normalizedQuery }) return 0
+        if (phrases.any { it.contains(normalizedQuery) || normalizedQuery.contains(it) }) {
+            return 20 + phrases.minOf { kotlin.math.abs(it.length - normalizedQuery.length) }
+        }
+
+        val threshold = fuzzyVoiceThreshold(normalizedQuery)
+        val fuzzyDistance = phrases.minOfOrNull { phrase -> levenshteinDistance(normalizedQuery, phrase) } ?: return null
+        return if (fuzzyDistance <= threshold) 100 + fuzzyDistance else null
+    }
+
+    fun findVoiceIngredientMatches(query: String): Pair<FoodItem?, List<FoodItem>> {
+        val normalizedQuery = normalizeVoiceSearchQuery(query)
+        val candidates = (customFoods + seedFoods).filter { it.kind == FoodKind.Ingredient }
+        val scoredMatches = candidates
+            .mapNotNull { food ->
+                scoreVoiceIngredient(food, normalizedQuery)?.let { score ->
+                    VoiceIngredientScore(food = food, score = score)
+                }
+            }
+            .sortedWith(compareBy<VoiceIngredientScore> { it.score }.thenBy { it.food.name })
+
+        if (scoredMatches.isEmpty()) return null to emptyList()
+
+        val best = scoredMatches.first()
+        val runnerUp = scoredMatches.getOrNull(1)
+        val ambiguous =
+            runnerUp != null &&
+                (
+                    runnerUp.score == best.score ||
+                        (best.score < 100 && runnerUp.score - best.score <= 2) ||
+                        (best.score >= 100 && runnerUp.score - best.score <= 1)
                 )
 
-                food to distance
-            }
-            .minByOrNull { it.second }
-
-        return if (fuzzyMatch != null && fuzzyMatch.second <= threshold) {
-            fuzzyMatch.first
+        return if (ambiguous) {
+            null to scoredMatches.take(3).map { it.food }
         } else {
-            null
+            best.food to emptyList()
         }
     }
 
@@ -351,60 +423,128 @@ fun CalorieTrackerApp(
         }
     }
 
-    suspend fun handleVoiceFoodTranscript(transcript: String) {
-        val command = parseVoiceFoodCommand(transcript)
-        if (command == null) {
-            speakUnknownIngredient()
-            return
-        }
-        val ingredient = findVoiceIngredient(command.ingredientQuery)
-        if (ingredient == null) {
-            speakUnknownIngredient()
-            return
-        }
-
-        val convertedAmount =
-            if (command.unit.isBlank()) {
-                ingredient.servingQuantity
-            } else {
-                convertAmount(command.amount, command.unit, ingredient.servingUnit)
-                    ?: if (command.unit == ingredient.servingUnit) {
-                        command.amount
-                    } else {
-                        null
-                    }
+    suspend fun logVoiceMatch(food: FoodItem, command: VoiceFoodCommand, transcript: String) {
+        val servingQuantity = food.servingQuantity.coerceAtLeast(0.1)
+        val normalizedAmount = when {
+            command.amount == null && command.unit == null -> food.servingQuantity
+            command.amount != null && command.unit == null -> command.amount * food.servingQuantity
+            command.amount != null && command.unit != null -> {
+                convertAmount(command.amount, command.unit, food.servingUnit)
+                    ?: if (command.unit == food.servingUnit) command.amount else null
             }
+            else -> null
+        }
 
-        if (convertedAmount == null) {
-            speakUnknownIngredient()
+        if (normalizedAmount == null) {
+            voiceFeedback = VoiceLogFeedback(
+                phase = VoiceLogPhase.Failed,
+                transcript = transcript,
+                query = command.ingredientQuery,
+                message = "I heard the food, but I couldn't convert that unit.",
+            )
             return
         }
 
+        val loggedAmount =
+            when {
+                command.amount == null && command.unit == null -> food.servingQuantity
+                command.amount != null && command.unit == null -> normalizedAmount
+                else -> command.amount ?: food.servingQuantity
+            }
+        val loggedUnit = command.unit ?: food.servingUnit
+        val meal = command.mealOverride ?: inferMealForTime(LocalTime.now())
         val today = LocalDate.now()
-        val meal = inferMealForTime(LocalTime.now())
         val entry = DiaryEntry(
             id = createId("entry"),
-            food = ingredient,
+            food = food,
             date = today,
             meal = meal,
-            servingMultiplier = convertedAmount / ingredient.servingQuantity.coerceAtLeast(0.1),
+            servingMultiplier = normalizedAmount / servingQuantity,
+            loggedAmount = loggedAmount,
+            loggedUnit = loggedUnit,
         )
         diary = listOf(entry) + diary
         selectedDate = today
         saveDiaryEntry(entry)
         refreshState()
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Success,
+            transcript = transcript,
+            query = command.ingredientQuery,
+            message = "Added ${food.name} to ${meal.label.lowercase(Locale.CANADA)}.",
+        )
+        pendingVoiceCommand = null
+    }
+
+    suspend fun handleVoiceFoodTranscript(transcript: String) {
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Heard,
+            transcript = transcript,
+            message = "Heard that. Matching it now.",
+        )
+        val command = parseVoiceFoodCommand(transcript)
+        if (command == null) {
+            openVoiceFallbackSearch(
+                query = normalizeVoiceTranscript(transcript),
+                transcript = transcript,
+                message = "I couldn't fully parse that phrase, so I opened food search with what I heard.",
+            )
+            return
+        }
+
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Parsing,
+            transcript = transcript,
+            query = command.ingredientQuery,
+            message = "Looking for ${command.ingredientQuery}.",
+        )
+
+        val (ingredient, candidateMatches) = findVoiceIngredientMatches(command.ingredientQuery)
+        when {
+            ingredient != null -> {
+                pendingVoiceCommand = command
+                logVoiceMatch(ingredient, command, transcript)
+            }
+            candidateMatches.isNotEmpty() -> {
+                pendingVoiceCommand = command
+                voiceFeedback = VoiceLogFeedback(
+                    phase = VoiceLogPhase.NeedsChoice,
+                    transcript = transcript,
+                    query = command.ingredientQuery,
+                    message = "I found a few close matches.",
+                    candidateMatches = candidateMatches,
+                )
+            }
+            else -> {
+                textToSpeech.speak("Unknown ingredient", TextToSpeech.QUEUE_FLUSH, null, "unknown-ingredient")
+                openVoiceFallbackSearch(
+                    query = command.ingredientQuery,
+                    transcript = transcript,
+                    message = "Unknown ingredient. I opened search with what I heard.",
+                )
+            }
+        }
     }
 
     val speechRecognitionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        if (result.resultCode != Activity.RESULT_OK) {
+            voiceFeedback = VoiceLogFeedback(
+                phase = VoiceLogPhase.Failed,
+                message = "Voice capture was canceled.",
+            )
+            return@rememberLauncherForActivityResult
+        }
         val spokenText = result.data
             ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()
             .orEmpty()
         if (spokenText.isBlank()) {
-            speakUnknownIngredient()
+            voiceFeedback = VoiceLogFeedback(
+                phase = VoiceLogPhase.Failed,
+                message = "I didn't catch that. Try again or cancel.",
+            )
             return@rememberLauncherForActivityResult
         }
         scope.launch {
@@ -415,13 +555,27 @@ fun CalorieTrackerApp(
     val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (!granted) return@rememberLauncherForActivityResult
+        if (!granted) {
+            voiceFeedback = VoiceLogFeedback(
+                phase = VoiceLogPhase.Failed,
+                message = "Microphone permission is required for voice logging.",
+            )
+            return@rememberLauncherForActivityResult
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.CANADA.toLanguageTag())
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like: Add 30 grams onion")
         }
         speechRecognitionLauncher.launch(intent)
+    }
+
+    val launchVoiceRecognition = {
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Listening,
+            message = "Listening. Try saying: add 30 grams onion.",
+        )
+        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     suspend fun ensureSeedRecipes(deviceId: String) {
@@ -673,6 +827,15 @@ fun CalorieTrackerApp(
         }
     }
 
+    LaunchedEffect(voiceFeedback.phase, voiceFeedback.transcript, voiceFeedback.message) {
+        if (voiceFeedback.phase == VoiceLogPhase.Success) {
+            delay(5000)
+            if (voiceFeedback.phase == VoiceLogPhase.Success) {
+                clearVoiceFeedback()
+            }
+        }
+    }
+
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, screen) {
         textToSpeech.language = Locale.CANADA
         val observer = LifecycleEventObserver { _, event ->
@@ -734,10 +897,12 @@ fun CalorieTrackerApp(
                 targetRangeMax = syncSettings.calorieTargetMax,
                 onDateChange = { selectedDate = it },
                 onBack = { popScreen() },
-                onAddFood = { navigateTo(AppScreen.SearchFood) },
-                onVoiceLog = {
-                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                onAddFood = {
+                    searchFoodInitialQuery = ""
+                    clearVoiceFeedback()
+                    navigateTo(AppScreen.SearchFood)
                 },
+                onVoiceLog = launchVoiceRecognition,
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)
                 },
@@ -752,6 +917,29 @@ fun CalorieTrackerApp(
                     editingDiaryEntry = entry
                     selectedFood = entry.food
                     navigateTo(AppScreen.LogFood)
+                },
+                voiceTranscript = voiceFeedback.transcript,
+                voiceStatusLabel = when (voiceFeedback.phase) {
+                    VoiceLogPhase.Listening -> "Listening"
+                    VoiceLogPhase.Heard -> "Heard"
+                    VoiceLogPhase.Parsing -> "Parsing"
+                    VoiceLogPhase.Success -> "Logged"
+                    VoiceLogPhase.Failed -> "Couldn't log that"
+                    VoiceLogPhase.NeedsChoice -> "Need a match"
+                    VoiceLogPhase.Idle -> null
+                },
+                voiceStatusMessage = voiceFeedback.message,
+                voiceRetryVisible = voiceFeedback.phase == VoiceLogPhase.Failed,
+                voiceCandidateMatches = voiceFeedback.candidateMatches,
+                onRetryVoiceLog = launchVoiceRecognition,
+                onDismissVoiceFeedback = ::clearVoiceFeedback,
+                onSelectVoiceCandidate = { food ->
+                    val command = pendingVoiceCommand
+                    if (command != null) {
+                        scope.launch { logVoiceMatch(food, command, voiceFeedback.transcript.orEmpty()) }
+                    } else {
+                        clearVoiceFeedback()
+                    }
                 },
             )
 
@@ -801,7 +989,17 @@ fun CalorieTrackerApp(
                 date = selectedDate,
                 foods = customFoods + recipes + seedFoods.filterNot { hiddenSeedIds.contains(it.id) },
                 isSignedIn = authSession != null,
-                onBack = { popScreen() },
+                initialSearchQuery = searchFoodInitialQuery,
+                voiceSearchNotice =
+                    if (voiceFeedback.phase == VoiceLogPhase.Failed && !voiceFeedback.transcript.isNullOrBlank()) {
+                        "Showing search results for what voice logging heard."
+                    } else {
+                        null
+                    },
+                onBack = {
+                    searchFoodInitialQuery = ""
+                    popScreen()
+                },
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)
                 },
@@ -820,10 +1018,13 @@ fun CalorieTrackerApp(
                     navigateTo(AppScreen.RecipeBuilder)
                 },
                 onSelectFood = {
+                    searchFoodInitialQuery = ""
+                    clearVoiceFeedback()
                     selectedFood = it
                     navigateTo(AppScreen.LogFood)
                 },
                 onQuickLogFood = { food ->
+                    clearVoiceFeedback()
                     val today = LocalDate.now()
                     val entry = DiaryEntry(
                         id = createId("entry"),
@@ -846,6 +1047,7 @@ fun CalorieTrackerApp(
                 isSearchingRemote = isSearchingRemote,
                 onSearchOnlineFoods = { query -> scope.launch { searchOnlineFoods(query) } },
                 onImportRemoteFood = { item ->
+                    clearVoiceFeedback()
                     beginImportRemoteFood(item, openLogAfterSave = true)
                 },
                 onDeleteFood = { item ->
