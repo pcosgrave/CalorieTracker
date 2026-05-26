@@ -9,6 +9,12 @@ export interface FoodProduct {
   brand?: string | undefined;
   serving: Serving;
   nutrients: Nutrients;
+  frequency?: number | undefined;
+  breakfastFrequency?: number | undefined;
+  lunchFrequency?: number | undefined;
+  dinnerFrequency?: number | undefined;
+  snackFrequency?: number | undefined;
+  lastUsedAt?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +34,8 @@ export interface DiaryEntry {
   loggedAt: string;
   meal: MealType;
   servingMultiplier: number;
+  loggedAmount?: number | undefined;
+  loggedUnit?: string | undefined;
   productSnapshot: FoodProduct;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +64,8 @@ export interface CreateDiaryEntryRequest {
   loggedAt: string;
   meal: MealType;
   servingMultiplier: number;
+  loggedAmount?: number | undefined;
+  loggedUnit?: string | undefined;
 }
 
 export interface CreateWeightEntryRequest {

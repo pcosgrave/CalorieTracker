@@ -73,7 +73,7 @@ class CloudFoodCatalogService(
         connection.requestMethod = method
         connection.setRequestProperty("Accept", "application/json")
         connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
+        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
 
         if (body != null) {
             connection.doOutput = true

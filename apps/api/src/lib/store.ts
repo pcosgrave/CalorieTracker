@@ -1,5 +1,6 @@
+import { CognitoIdentityProviderClient, AdminDeleteUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type {
   BarcodeLookupResponse,
   CreateDiaryEntryRequest,
@@ -24,7 +25,9 @@ const barcodeAliasesTableName = requiredEnv("BARCODE_ALIASES_TABLE_NAME");
 const diaryEntriesTableName = requiredEnv("DIARY_ENTRIES_TABLE_NAME");
 const weightEntriesTableName = requiredEnv("WEIGHT_ENTRIES_TABLE_NAME");
 const syncChangesTableName = requiredEnv("SYNC_CHANGES_TABLE_NAME");
+const userPoolId = requiredEnv("USER_POOL_ID");
 const communityOwnerUserId = "__community__";
+const cognito = new CognitoIdentityProviderClient({});
 
 interface FoodSearchResponse {
   products: FoodProduct[];
@@ -233,6 +236,8 @@ export async function createDiaryEntry(
     loggedAt: request.loggedAt,
     meal: request.meal,
     servingMultiplier: request.servingMultiplier,
+    loggedAmount: request.loggedAmount,
+    loggedUnit: request.loggedUnit,
     productSnapshot: product,
     createdAt: now,
     updatedAt: now,
@@ -363,6 +368,21 @@ export async function pullSyncChanges(userId: string, request: SyncPullRequest):
   };
 }
 
+export async function deleteAccount(userId: string): Promise<void> {
+  await deleteOwnedItems(productsTableName, userId, "productId");
+  await deleteOwnedItems(barcodeAliasesTableName, userId, "barcode");
+  await deleteOwnedItems(diaryEntriesTableName, userId, "entryId");
+  await deleteOwnedItems(weightEntriesTableName, userId, "entryId");
+  await deleteOwnedItems(syncChangesTableName, userId, "changeKey");
+
+  await cognito.send(
+    new AdminDeleteUserCommand({
+      UserPoolId: userPoolId,
+      Username: userId,
+    }),
+  );
+}
+
 async function getProduct(userId: string, productId: string): Promise<FoodProduct | undefined> {
   const result = await client.send(
     new GetCommand({
@@ -375,6 +395,46 @@ async function getProduct(userId: string, productId: string): Promise<FoodProduc
   );
 
   return result.Item as FoodProduct | undefined;
+}
+
+async function deleteOwnedItems(
+  tableName: string,
+  ownerUserId: string,
+  rangeKeyName: string,
+): Promise<void> {
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await client.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: "ownerUserId = :ownerUserId",
+        ExpressionAttributeValues: {
+          ":ownerUserId": ownerUserId,
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    for (const item of result.Items ?? []) {
+      const rangeKeyValue = item[rangeKeyName];
+      if (typeof rangeKeyValue !== "string" || rangeKeyValue.length == 0) {
+        continue;
+      }
+
+      await client.send(
+        new DeleteCommand({
+          TableName: tableName,
+          Key: {
+            ownerUserId,
+            [rangeKeyName]: rangeKeyValue,
+          },
+        }),
+      );
+    }
+
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
 }
 
 function requiredEnv(name: string): string {

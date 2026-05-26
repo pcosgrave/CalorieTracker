@@ -130,6 +130,7 @@ fun CalorieTrackerApp(
     val localStore = remember {
         AndroidLocalStore(
             context = context,
+            database = database,
             foodRepository = RoomFoodRepository(database.foodRecordDao()),
             barcodeAliasRepository = RoomBarcodeAliasRepository(database.barcodeAliasDao()),
             diaryRepository = RoomDiaryRepository(database.diaryRecordDao()),
@@ -1178,6 +1179,25 @@ fun CalorieTrackerApp(
                         val uri = authRepository.signOut()
                         refreshState()
                         openExternalUri(uri.toString())
+                    }
+                },
+                onDeleteAccount = {
+                    scope.launch {
+                        runCatching { syncService.deleteAccount() }
+                            .onSuccess {
+                                localStore.clearAllLocalData()
+                                refreshState()
+                                resetTo(AppScreen.Home)
+                                Toast.makeText(context, "Account deleted", Toast.LENGTH_LONG).show()
+                            }
+                            .onFailure { error ->
+                                Log.e("AccountDelete", "Delete account failed", error)
+                                Toast.makeText(
+                                    context,
+                                    error.message ?: "Delete account failed",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
                     }
                 },
                 onConnectHealthConnect = {

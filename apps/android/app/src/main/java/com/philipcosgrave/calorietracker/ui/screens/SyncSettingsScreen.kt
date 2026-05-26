@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,11 +63,13 @@ fun SyncSettingsScreen(
     onSignIn: () -> Unit,
     onSignInWithGoogle: () -> Unit,
     onSignOut: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onConnectHealthConnect: () -> Unit,
     onSetHealthConnectExportEnabled: (Boolean) -> Unit,
     onImportWeightHistory: () -> Unit,
     onImportNutritionHistory: () -> Unit,
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
     var apiBaseUrl by remember(settings) { mutableStateOf(settings.apiBaseUrl.orEmpty()) }
     var backupMode by remember(settings) { mutableStateOf(settings.backupMode) }
@@ -260,6 +263,27 @@ fun SyncSettingsScreen(
                     onClick = onSignOut,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                TextButton(
+                    onClick = { showDeleteConfirm = !showDeleteConfirm },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Delete account", color = Color(0xFFE55A5A))
+                }
+                if (showDeleteConfirm) {
+                    Text(
+                        "This permanently deletes your BiteWise account and synced data.",
+                        color = Color(0xFFE55A5A),
+                    )
+                    AppPrimaryButton(
+                        text = "Delete account permanently",
+                        onClick = onDeleteAccount,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE55A5A),
+                            contentColor = Color.White,
+                        ),
+                    )
+                }
                 Text(
                     "Cloud sync is connected to your signed-in account.",
                     color = AppMuted,
@@ -374,6 +398,7 @@ private fun SyncSettingsScreenPreview() {
             onSignIn = {},
             onSignInWithGoogle = {},
             onSignOut = {},
+            onDeleteAccount = {},
             onConnectHealthConnect = {},
             onSetHealthConnectExportEnabled = {},
             onImportWeightHistory = {},

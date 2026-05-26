@@ -335,6 +335,7 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
 
 class AndroidLocalStore(
     private val context: Context,
+    private val database: CalorieTrackerDatabase,
     val foodRepository: FoodRepository,
     val barcodeAliasRepository: BarcodeAliasRepository,
     val diaryRepository: DiaryRepository,
@@ -377,6 +378,14 @@ class AndroidLocalStore(
     suspend fun saveHiddenSeedIds(ids: Set<String>) {
         context.syncPreferencesDataStore.edit { prefs ->
             prefs[SyncPreferencesKeys.HiddenSeedIds] = ids
+        }
+    }
+
+    suspend fun clearAllLocalData() {
+        database.clearAllTables()
+        context.syncPreferencesDataStore.edit { prefs ->
+            prefs.clear()
+            prefs[SyncPreferencesKeys.CurrentUserId] = "guest"
         }
     }
 

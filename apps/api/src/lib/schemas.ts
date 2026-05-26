@@ -39,6 +39,8 @@ export const createDiaryEntrySchema = z.object({
   loggedAt: z.string().datetime(),
   meal: z.enum(["breakfast", "lunch", "dinner", "snack"]),
   servingMultiplier: z.number().positive(),
+  loggedAmount: z.number().positive().optional(),
+  loggedUnit: z.string().min(1).optional(),
 });
 
 export const createWeightEntrySchema = z.object({
@@ -69,6 +71,12 @@ const foodProductRecordSchema = z.object({
     brand: z.string().optional(),
     serving: servingSchema,
     nutrients: nutrientsSchema,
+    frequency: z.number().int().nonnegative().optional(),
+    breakfastFrequency: z.number().int().nonnegative().optional(),
+    lunchFrequency: z.number().int().nonnegative().optional(),
+    dinnerFrequency: z.number().int().nonnegative().optional(),
+    snackFrequency: z.number().int().nonnegative().optional(),
+    lastUsedAt: z.string().datetime().optional(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   }).passthrough(),
@@ -94,6 +102,8 @@ const diaryEntryRecordSchema = z.object({
     loggedAt: z.string().datetime(),
     meal: z.enum(["breakfast", "lunch", "dinner", "snack"]),
     servingMultiplier: z.number().positive(),
+    loggedAmount: z.number().positive().optional(),
+    loggedUnit: z.string().min(1).optional(),
     productSnapshot: foodProductRecordSchema.shape.product,
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),

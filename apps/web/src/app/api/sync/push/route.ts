@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${session.accessToken}`,
+        authorization: `Bearer ${session.idToken}`,
       },
       body,
       cache: "no-store",

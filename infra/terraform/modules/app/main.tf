@@ -13,6 +13,7 @@ locals {
     DIARY_ENTRIES_TABLE_NAME   = aws_dynamodb_table.diary_entries.name
     WEIGHT_ENTRIES_TABLE_NAME  = aws_dynamodb_table.weight_entries.name
     SYNC_CHANGES_TABLE_NAME    = aws_dynamodb_table.sync_changes.name
+    USER_POOL_ID               = aws_cognito_user_pool.main.id
   }
 
   cognito_domain_prefix = coalesce(var.cognito_domain_prefix, replace(local.name_prefix, "/[^a-zA-Z0-9-]/", "-"))
@@ -312,6 +313,7 @@ resource "aws_iam_role_policy" "api_lambda" {
         Effect = "Allow"
         Action = [
           "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
           "dynamodb:PutItem",
           "dynamodb:Query",
           "dynamodb:UpdateItem",
@@ -323,6 +325,13 @@ resource "aws_iam_role_policy" "api_lambda" {
           aws_dynamodb_table.weight_entries.arn,
           aws_dynamodb_table.sync_changes.arn,
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminDeleteUser",
+        ]
+        Resource = aws_cognito_user_pool.main.arn
       }
     ]
   })
@@ -556,6 +565,25 @@ resource "aws_lambda_function" "sync_pull" {
   tags = local.tags
 }
 
+resource "aws_lambda_function" "account_delete" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-account-delete"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "dist/handlers/account.remove"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
 resource "aws_api_gateway_rest_api" "main" {
   count = var.create_api ? 1 : 0
 
@@ -663,6 +691,14 @@ resource "aws_api_gateway_resource" "weights" {
   rest_api_id = aws_api_gateway_rest_api.main[0].id
   parent_id   = aws_api_gateway_rest_api.main[0].root_resource_id
   path_part   = "weights"
+}
+
+resource "aws_api_gateway_resource" "account" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_rest_api.main[0].root_resource_id
+  path_part   = "account"
 }
 
 resource "aws_api_gateway_resource" "sync_push" {
@@ -801,6 +837,16 @@ resource "aws_api_gateway_method" "sync_pull_post" {
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
 }
 
+resource "aws_api_gateway_method" "account_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.account[0].id
+  http_method   = "DELETE"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
 resource "aws_api_gateway_integration" "foods_get" {
   count = var.create_api ? 1 : 0
 
@@ -933,6 +979,17 @@ resource "aws_api_gateway_integration" "sync_pull_post" {
   uri                     = aws_lambda_function.sync_pull[0].invoke_arn
 }
 
+resource "aws_api_gateway_integration" "account_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.account[0].id
+  http_method             = aws_api_gateway_method.account_delete[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.account_delete[0].invoke_arn
+}
+
 resource "aws_lambda_permission" "apigw_foods_create" {
   count = var.create_api ? 1 : 0
 
@@ -1053,6 +1110,16 @@ resource "aws_lambda_permission" "apigw_sync_pull" {
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "apigw_account_delete" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeAccountDelete"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.account_delete[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
 resource "aws_api_gateway_deployment" "main" {
   count = var.create_api ? 1 : 0
 
@@ -1072,6 +1139,7 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.weights_post[0].id,
       aws_api_gateway_integration.sync_push_post[0].id,
       aws_api_gateway_integration.sync_pull_post[0].id,
+      aws_api_gateway_integration.account_delete[0].id,
     ]))
   }
 

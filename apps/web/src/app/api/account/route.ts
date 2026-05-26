@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyAuthSession, requireBearerAccessToken } from "@/lib/auth/session";
+import { applyAuthSession, clearAuthSession, requireBearerAccessToken } from "@/lib/auth/session";
 import { getCognitoConfig } from "@/lib/auth/config";
 
-export async function POST(request: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
     const apiBaseUrl = request.headers.get("x-sync-api-base-url") || getCognitoConfig().apiBaseUrl;
-    const body = await request.text();
     const { session, refreshed } = await requireBearerAccessToken();
-    const upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/sync/pull`, {
-      method: "POST",
+    const upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/account`, {
+      method: "DELETE",
       headers: {
-        "content-type": "application/json",
         authorization: `Bearer ${session.idToken}`,
       },
-      body,
       cache: "no-store",
     });
 
@@ -23,9 +20,13 @@ export async function POST(request: NextRequest) {
         "content-type": upstream.headers.get("content-type") || "application/json",
       },
     });
-    if (refreshed) {
+
+    if (upstream.ok) {
+      clearAuthSession(response);
+    } else if (refreshed) {
       applyAuthSession(response, session);
     }
+
     return response;
   } catch (error) {
     return NextResponse.json(

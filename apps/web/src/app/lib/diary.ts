@@ -321,6 +321,7 @@ export function writeDiaryEntries(entries: DiaryEntry[]): void {
 
 export function writeDiaryEntry(product: FoodProduct, date: string, meal: MealType, servingMultiplier: number): void {
   const now = new Date().toISOString();
+  const loggedAmount = product.serving.quantity * servingMultiplier;
   const entry: DiaryEntry = {
     entryId: createId("entry"),
     ownerUserId: currentOwnerUserId(),
@@ -328,6 +329,8 @@ export function writeDiaryEntry(product: FoodProduct, date: string, meal: MealTy
     loggedAt: `${date}T12:00:00.000Z`,
     meal,
     servingMultiplier,
+    loggedAmount,
+    loggedUnit: product.serving.unit,
     productSnapshot: product,
     createdAt: now,
     updatedAt: now,

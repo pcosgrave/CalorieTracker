@@ -421,13 +421,22 @@ fun AppFormField(
 }
 
 @Composable
-fun AppPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun AppPrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: androidx.compose.material3.ButtonColors = ButtonDefaults.buttonColors(
+        containerColor = AppBlue,
+        disabledContainerColor = Color(0xFFCAD1DB),
+    ),
+) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AppBlue, disabledContainerColor = Color(0xFFCAD1DB)),
+        colors = colors,
     ) {
         Text(text, color = Color.White, fontWeight = FontWeight.Bold)
     }

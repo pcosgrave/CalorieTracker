@@ -8,6 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1053.0",
     "@aws-sdk/client-dynamodb": "^3.800.0",
     "@aws-sdk/lib-dynamodb": "^3.800.0",
     "@calorie-tracker/shared": "0.1.0",

@@ -51,6 +51,18 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         SyncSummary(pushResponse.acceptedChangeIds.size, pullResponse.changes.size)
     }
 
+    suspend fun deleteAccount() = withContext(Dispatchers.IO) {
+        val settings = localStore.syncStateRepository.getSettings()
+        require(!settings.apiBaseUrl.isNullOrBlank()) {
+            "API base URL is missing"
+        }
+        require(localStore.currentAuthSession() != null) {
+            "You must sign in before deleting your account."
+        }
+
+        deleteRequest("${settings.apiBaseUrl!!.trimEnd('/')}/account")
+    }
+
     private suspend fun applyIncomingChanges(response: SyncPullResponse) {
         for (change in response.changes) {
             when (change.entityType) {
@@ -235,7 +247,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
+        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
         connection.doOutput = true
         connection.outputStream.use { output ->
             output.write(body.toString().toByteArray())
@@ -246,6 +258,21 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
             error("Sync request failed with status ${connection.responseCode}: $responseText")
         }
         return JSONObject(responseText)
+    }
+
+    private suspend fun deleteRequest(url: String) {
+        val session = localStore.authRepository.refreshSessionIfNeeded()
+            ?: error("You must sign in before deleting your account.")
+
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.requestMethod = "DELETE"
+        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
+        val inputStream =
+            if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+        val responseText = inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (connection.responseCode !in 200..299) {
+            error("Delete account failed with status ${connection.responseCode}: $responseText")
+        }
     }
 }
 
@@ -272,6 +299,12 @@ private fun foodItemToWireJson(food: FoodItem, updatedAt: String, ownerUserId: S
                 .put("carbohydrateGrams", food.nutrients.carbohydrateGrams)
                 .put("fatGrams", food.nutrients.fatGrams),
         )
+        .put("frequency", food.frequency)
+        .put("breakfastFrequency", food.breakfastFrequency)
+        .put("lunchFrequency", food.lunchFrequency)
+        .put("dinnerFrequency", food.dinnerFrequency)
+        .put("snackFrequency", food.snackFrequency)
+        .put("lastUsedAt", food.lastUsedAt)
         .put("recipeComponents", JSONArray().apply {
             food.components.forEach { component ->
                 put(
@@ -315,6 +348,12 @@ private fun foodItemFromWireJson(json: JSONObject): FoodItem {
         servingQuantity = json.optJSONObject("serving")?.optDouble("quantity") ?: json.optDouble("servingQuantity", 1.0),
         servingUnit = json.optJSONObject("serving")?.optString("unit") ?: json.optString("servingUnit", "serving"),
         nutrients = nutrientsFromWireJson(json.getJSONObject("nutrients")),
+        frequency = json.optInt("frequency", 0),
+        breakfastFrequency = json.optInt("breakfastFrequency", 0),
+        lunchFrequency = json.optInt("lunchFrequency", 0),
+        dinnerFrequency = json.optInt("dinnerFrequency", 0),
+        snackFrequency = json.optInt("snackFrequency", 0),
+        lastUsedAt = json.optString("lastUsedAt").takeIf { it.isNotBlank() },
         components = List(componentsJson.length()) { index ->
             val component = componentsJson.getJSONObject(index)
             RecipeComponent(

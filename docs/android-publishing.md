@@ -160,6 +160,15 @@ Expected output bundle:
 apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab
 ```
 
+The release script also copies the finished bundle into a repo folder you can commit for tagging/releases:
+
+```text
+releases/android/BiteWise-v<versionName>+<versionCode>.aab
+releases/android/BiteWise-v<versionName>+<versionCode>.json
+```
+
+The JSON file includes the version, application ID, build time, and SHA-256 hash for that exact bundle.
+
 ## Play Console Publishing Steps
 
 ### 1. Create the app in Play Console
@@ -207,7 +216,7 @@ Steps:
 4. Upload:
 
 ```text
-apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab
+releases/android/BiteWise-v<versionName>+<versionCode>.aab
 ```
 
 5. Save
@@ -290,5 +299,6 @@ npm.cmd run typecheck --workspace @calorie-tracker/api
 
 - `apps/android/release.properties` is local-only and must not be committed.
 - `apps/android/secure.properties` is local-only and must not be committed.
+- `releases/android/*.aab` can be committed if you want a tag/release artifact in git, but Git LFS is worth considering once you start keeping multiple large bundles.
 - Changing the Android `applicationId` creates a different installed app identity on Android devices.
 - The `dev` and `prod` flavors can point at different Cognito app clients, domains, and API stages whenever you are ready.

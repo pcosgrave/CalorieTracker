@@ -6,7 +6,7 @@ import type { SyncSettings } from "@calorie-tracker/shared";
 import styles from "../page.module.css";
 import { currentClientAuthUser } from "@/lib/auth/client";
 import { getCognitoConfig } from "@/lib/auth/config";
-import { getPendingSyncCount, getSyncSettings, saveSyncSettings, syncNow } from "@/lib/sync/service";
+import { clearLocalAppData, getPendingSyncCount, getSyncSettings, saveSyncSettings, syncNow } from "@/lib/sync/service";
 
 const defaultSettings: SyncSettings = {
   syncEnabled: false,
@@ -44,6 +44,33 @@ export default function SettingsPage() {
       setStatus(`Synced ${result.pushed} pushed, ${result.pulled} pulled.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Sync failed.");
+    }
+  }
+
+  async function deleteAccount(): Promise<void> {
+    if (!authUser || !window.confirm("Delete your BiteWise account and synced data permanently?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: {
+          "x-sync-api-base-url": settings.apiBaseUrl || getCognitoConfig().apiBaseUrl,
+        },
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.message || "Delete account failed.");
+      }
+
+      clearLocalAppData();
+      setAuthUser(null);
+      setPendingCount(0);
+      setStatus("Account deleted.");
+      window.location.href = "/";
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Delete account failed.");
     }
   }
 
@@ -151,6 +178,11 @@ export default function SettingsPage() {
               <button type="button" onClick={runSync} disabled={!authUser || !settings.syncEnabled || !settings.apiBaseUrl}>
                 Sync now
               </button>
+              {authUser ? (
+                <button type="button" onClick={deleteAccount}>
+                  Delete account
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
