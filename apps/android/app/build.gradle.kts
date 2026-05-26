@@ -83,6 +83,13 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 
     flavorDimensions += "environment"
@@ -198,4 +205,15 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
     ksp("androidx.room:room-compiler:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
+debugImplementation("androidx.arch.core:core-testing:2.2.0")
+debugImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+// Test dependencies
+testImplementation("junit:junit:4.13.2")
+testImplementation("org.mockito:mockito-core:5.15.2")
+testImplementation("org.mockito:mockito-inline:5.2.0")
+testImplementation("org.mockito:mockito-android:5.15.2")
+testImplementation("androidx.arch.core:core-testing:2.2.0")
+testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+testImplementation("androidx.room:room-testing:2.7.0")
 }

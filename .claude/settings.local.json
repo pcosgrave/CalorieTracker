@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew test *)",
+      "Bash(./gradlew cleanTest test)",
+      "Bash(mv src/test/java/com/philipcosgrave/calorietracker domain)",
+      "Bash(mv src/test/java/com/philipcosgrave/calorietracker/repository repository)",
+      "Bash(./gradlew cleanTest test --info)",
+      "Bash(./gradlew :app:compileDevDebugUnitTestKotlin --info)",
+      "Bash(./gradlew :app:compileDevDebugUnitTestKotlin)",
+      "Bash(./gradlew :app:testDevDebugUnitTest)"
+    ]
+  }
+}
