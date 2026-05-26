@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +40,7 @@ import com.philipcosgrave.calorietracker.ui.components.DiaryEntryRow
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.appBorderColor
+import com.philipcosgrave.calorietracker.ui.components.appBorderStrongColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
@@ -228,42 +231,49 @@ private fun VoiceStatusCard(
     onDismiss: () -> Unit,
     onSelectCandidate: (FoodItem) -> Unit,
 ) {
-    AppCardContainer(
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF111827), RoundedCornerShape(24.dp)),
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
+        border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
     ) {
-        if (!label.isNullOrBlank()) {
-            Text(label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.White)
-        }
-        if (!transcript.isNullOrBlank()) {
-            Text("\"$transcript\"", color = Color.White, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-        }
-        if (!message.isNullOrBlank()) {
-            Text(message, color = Color(0xFFD1D5DB), style = MaterialTheme.typography.bodySmall)
-        }
-        if (candidateMatches.isNotEmpty()) {
-            Text("Pick the closest match", fontWeight = FontWeight.Bold)
-            candidateMatches.forEach { item ->
-                DiaryVoiceCandidateRow(
-                    name = item.name,
-                    brand = item.brand,
-                    onSelect = { onSelectCandidate(item) },
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (retryVisible) {
-                TextButton(onClick = onRetry) {
-                    Text("Retry", color = AppBlue)
+            if (!label.isNullOrBlank()) {
+                Text(label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            }
+            if (!transcript.isNullOrBlank()) {
+                Text("\"$transcript\"", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            }
+            if (!message.isNullOrBlank()) {
+                Text(message, color = AppMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            if (candidateMatches.isNotEmpty()) {
+                Text("Pick the closest match", fontWeight = FontWeight.Bold)
+                candidateMatches.forEach { item ->
+                    DiaryVoiceCandidateRow(
+                        name = item.name,
+                        brand = item.brand,
+                        onSelect = { onSelectCandidate(item) },
+                    )
                 }
             }
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = AppMuted)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (retryVisible) {
+                    TextButton(onClick = onRetry) {
+                        Text("Retry", color = AppBlue)
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = AppMuted)
+                }
             }
         }
     }
