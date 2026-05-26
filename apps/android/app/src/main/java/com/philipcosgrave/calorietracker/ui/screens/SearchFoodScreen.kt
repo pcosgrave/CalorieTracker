@@ -83,6 +83,10 @@ fun SearchFoodScreen(
     var sortMode by remember { mutableStateOf(SortMode.Recent) }
     var addMenuExpanded by remember { mutableStateOf(false) }
     val currentMeal = remember { inferMealForTime(LocalTime.now()) }
+    val sortModeLabel = when (sortMode) {
+        SortMode.MealTime -> "Frequent ${currentMeal.label}"
+        else -> sortMode.label
+    }
     val results = foods
         .filter { it.kind == activeKind }
         .filter { item ->
@@ -198,8 +202,14 @@ fun SearchFoodScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(sortMode.label, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                SortMenu(value = sortMode, onChange = { sortMode = it })
+                Text(sortModeLabel, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                SortMenu(
+                    value = sortMode,
+                    onChange = { sortMode = it },
+                    labelForMode = { mode ->
+                        if (mode == SortMode.MealTime) "Frequent ${currentMeal.label}" else mode.label
+                    },
+                )
             }
 
             AppSegmentedControl(

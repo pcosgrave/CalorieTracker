@@ -486,7 +486,12 @@ fun SectionDivider() {
 }
 
 @Composable
-fun SortMenu(value: SortMode, onChange: (SortMode) -> Unit, modifier: Modifier = Modifier) {
+fun SortMenu(
+    value: SortMode,
+    onChange: (SortMode) -> Unit,
+    modifier: Modifier = Modifier,
+    labelForMode: (SortMode) -> String = { it.label },
+) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         TextButton(onClick = { expanded = true }) {
@@ -496,7 +501,7 @@ fun SortMenu(value: SortMode, onChange: (SortMode) -> Unit, modifier: Modifier =
             DropdownMenuItem(text = { Text("Sort by") }, onClick = { })
             SortMode.entries.forEach { mode ->
                 DropdownMenuItem(
-                    text = { Text(if (mode == value) "* ${mode.label}" else mode.label) },
+                    text = { Text(if (mode == value) "* ${labelForMode(mode)}" else labelForMode(mode)) },
                     onClick = {
                         expanded = false
                         onChange(mode)
