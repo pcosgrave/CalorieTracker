@@ -7,15 +7,26 @@ export async function POST(request: NextRequest) {
     const apiBaseUrl = request.headers.get("x-sync-api-base-url") || getCognitoConfig().apiBaseUrl;
     const body = await request.text();
     const { session, refreshed } = await requireBearerAccessToken();
-    const upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/sync/push`, {
+    let upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/sync/push`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${session.idToken}`,
+        authorization: session.idToken,
       },
       body,
       cache: "no-store",
     });
+    if ((upstream.status === 401 || upstream.status === 403) && session.accessToken !== session.idToken) {
+      upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/sync/push`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: session.accessToken,
+        },
+        body,
+        cache: "no-store",
+      });
+    }
 
     const response = new NextResponse(await upstream.text(), {
       status: upstream.status,

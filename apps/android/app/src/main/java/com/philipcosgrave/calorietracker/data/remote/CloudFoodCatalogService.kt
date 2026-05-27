@@ -69,28 +69,39 @@ class CloudFoodCatalogService(
         val session = localStore.authRepository.refreshSessionIfNeeded()
             ?: error("You must sign in to search saved and community foods.")
 
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = method
-        connection.setRequestProperty("Accept", "application/json")
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
+        val bodyBytes = body?.toString()?.toByteArray()
+        val attempts = listOf(session.idToken, session.accessToken).distinct()
+        var lastFailure: String? = null
 
-        if (body != null) {
-            connection.doOutput = true
-            connection.outputStream.use { output ->
-                output.write(body.toString().toByteArray())
+        for (token in attempts) {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = method
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", token)
+
+            if (bodyBytes != null) {
+                connection.doOutput = true
+                connection.outputStream.use { output ->
+                    output.write(bodyBytes)
+                }
+            }
+
+            val inputStream =
+                if (connection.responseCode in 200..299) connection.inputStream
+                else connection.errorStream
+            val responseText = inputStream.bufferedReader().use { it.readText() }
+            if (connection.responseCode in 200..299) {
+                return JSONObject(responseText)
+            }
+
+            lastFailure = "status ${connection.responseCode}: $responseText"
+            if (connection.responseCode != 401 && connection.responseCode != 403) {
+                break
             }
         }
 
-        val inputStream =
-            if (connection.responseCode in 200..299) connection.inputStream
-            else connection.errorStream
-        val responseText = inputStream.bufferedReader().use { it.readText() }
-        if (connection.responseCode !in 200..299) {
-            error("Cloud catalog request failed with status ${connection.responseCode}: $responseText")
-        }
-
-        return JSONObject(responseText)
+        error("Cloud catalog request failed with ${lastFailure ?: "an unknown authorization error"}")
     }
 
     private fun foodItemFromJson(json: JSONObject): FoodItem {

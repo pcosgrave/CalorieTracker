@@ -209,27 +209,29 @@ class HealthConnectNutritionExporter(private val context: Context) {
     }
 
     suspend fun exportWeightEntry(entry: WeightEntry) {
-        if (!hasWriteWeightPermission()) return
+        check(hasWriteWeightPermission()) { "Health Connect WRITE_WEIGHT permission not granted" }
 
         val zoneId = ZoneId.systemDefault()
         val loggedAt = ZonedDateTime.of(entry.date, LocalTime.NOON, zoneId)
         val record = WeightRecord(
             time = loggedAt.toInstant(),
             zoneOffset = loggedAt.offset ?: ZoneOffset.UTC,
-            metadata = Metadata.manualEntry(entry.id, entry.date.toEpochDay()),
+            metadata = Metadata.manualEntry(entry.id, System.currentTimeMillis()),
             weight = Mass.kilograms(entry.weightKg),
         )
 
         client.insertRecords(listOf(record))
+        Log.d("HealthConnectWeight", "Exported weight entry ${entry.id} at ${entry.date} (${entry.weightKg} kg)")
     }
 
     suspend fun deleteWeightEntry(entryId: String) {
-        if (!hasWriteWeightPermission()) return
+        check(hasWriteWeightPermission()) { "Health Connect WRITE_WEIGHT permission not granted" }
         client.deleteRecords(
             WeightRecord::class,
             emptyList(),
             listOf(entryId),
         )
+        Log.d("HealthConnectWeight", "Deleted weight entry $entryId from Health Connect")
     }
 
     suspend fun importWeightEntries(): List<WeightEntry> {

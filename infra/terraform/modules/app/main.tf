@@ -343,7 +343,7 @@ resource "aws_lambda_function" "foods_create" {
   function_name    = "${local.name_prefix}-foods-create"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.create"
+  handler          = "handlers/foods.create"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -362,7 +362,7 @@ resource "aws_lambda_function" "foods_list" {
   function_name    = "${local.name_prefix}-foods-list"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.list"
+  handler          = "handlers/foods.list"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -381,7 +381,7 @@ resource "aws_lambda_function" "foods_lookup" {
   function_name    = "${local.name_prefix}-foods-lookup"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.lookup"
+  handler          = "handlers/foods.lookup"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -400,7 +400,7 @@ resource "aws_lambda_function" "foods_search" {
   function_name    = "${local.name_prefix}-foods-search"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.search"
+  handler          = "handlers/foods.search"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -419,7 +419,7 @@ resource "aws_lambda_function" "foods_community_lookup" {
   function_name    = "${local.name_prefix}-foods-community-lookup"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.lookupCommunity"
+  handler          = "handlers/foods.lookupCommunity"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -438,7 +438,7 @@ resource "aws_lambda_function" "foods_community_search" {
   function_name    = "${local.name_prefix}-foods-community-search"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.searchCommunity"
+  handler          = "handlers/foods.searchCommunity"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -457,7 +457,7 @@ resource "aws_lambda_function" "foods_community_publish" {
   function_name    = "${local.name_prefix}-foods-community-publish"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/foods.publishCommunity"
+  handler          = "handlers/foods.publishCommunity"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -476,7 +476,7 @@ resource "aws_lambda_function" "diary_create" {
   function_name    = "${local.name_prefix}-diary-create"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/diary.create"
+  handler          = "handlers/diary.create"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -495,7 +495,7 @@ resource "aws_lambda_function" "weights_create" {
   function_name    = "${local.name_prefix}-weights-create"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/weights.create"
+  handler          = "handlers/weights.create"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -514,7 +514,7 @@ resource "aws_lambda_function" "weights_list" {
   function_name    = "${local.name_prefix}-weights-list"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/weights.list"
+  handler          = "handlers/weights.list"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -533,7 +533,7 @@ resource "aws_lambda_function" "sync_push" {
   function_name    = "${local.name_prefix}-sync-push"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/sync.push"
+  handler          = "handlers/sync.push"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -552,7 +552,7 @@ resource "aws_lambda_function" "sync_pull" {
   function_name    = "${local.name_prefix}-sync-pull"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/sync.pull"
+  handler          = "handlers/sync.pull"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -571,7 +571,7 @@ resource "aws_lambda_function" "account_delete" {
   function_name    = "${local.name_prefix}-account-delete"
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
-  handler          = "dist/handlers/account.remove"
+  handler          = "handlers/account.remove"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds

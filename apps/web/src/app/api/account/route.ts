@@ -6,13 +6,22 @@ export async function DELETE(request: NextRequest) {
   try {
     const apiBaseUrl = request.headers.get("x-sync-api-base-url") || getCognitoConfig().apiBaseUrl;
     const { session, refreshed } = await requireBearerAccessToken();
-    const upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/account`, {
+    let upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/account`, {
       method: "DELETE",
       headers: {
-        authorization: `Bearer ${session.idToken}`,
+        authorization: session.idToken,
       },
       cache: "no-store",
     });
+    if ((upstream.status === 401 || upstream.status === 403) && session.accessToken !== session.idToken) {
+      upstream = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/account`, {
+        method: "DELETE",
+        headers: {
+          authorization: session.accessToken,
+        },
+        cache: "no-store",
+      });
+    }
 
     const response = new NextResponse(await upstream.text(), {
       status: upstream.status,

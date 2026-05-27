@@ -709,18 +709,28 @@ fun CalorieTrackerApp(
         }
     }
 
-    suspend fun saveWeightEntry(entry: WeightEntry) {
+    suspend fun saveWeightEntry(entry: WeightEntry): String? {
         val weightEntry = entry.copy(id = entry.id.ifBlank { createId("weight") })
         localStore.weightRepository.save(
             localStore.currentOwnerUserId(),
             weightEntry,
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
-            runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
-                .onFailure { error ->
-                    Log.e("HealthConnectWeight", "Failed to export weight entry ${weightEntry.id}", error)
-                }
+        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+            healthConnectPermissionGranted &&
+            healthConnectExportEnabled
+        ) {
+            val exportResult = runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
+            exportResult.exceptionOrNull()?.let { error ->
+                Log.e("HealthConnectWeight", "Failed to export weight entry ${weightEntry.id}", error)
+                return "Weight saved locally. Health Connect sync failed."
+            }
+            return null
         }
+        if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
+            Log.w("HealthConnectWeight", "Skipped weight export for ${weightEntry.id} because Health Connect write permission is not granted")
+            return "Weight saved locally. Reconnect Health Connect to sync it."
+        }
+        return null
     }
 
     suspend fun deleteWeightEntry(entry: WeightEntry) {
@@ -978,8 +988,11 @@ fun CalorieTrackerApp(
                 onSave = { entry ->
                     selectedDate = entry.date
                     scope.launch {
-                        saveWeightEntry(entry)
+                        val warning = saveWeightEntry(entry)
                         refreshState()
+                        warning?.let {
+                            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        }
                     }
                     editingWeight = null
                     popScreen()

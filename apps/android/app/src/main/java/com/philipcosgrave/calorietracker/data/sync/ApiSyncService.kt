@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
@@ -244,35 +245,81 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val session = localStore.authRepository.refreshSessionIfNeeded()
             ?: error("You must sign in before syncing.")
 
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
-        connection.doOutput = true
-        connection.outputStream.use { output ->
-            output.write(body.toString().toByteArray())
+        val bodyBytes = body.toString().toByteArray()
+        val attempts = listOf(
+            "id" to session.idToken,
+            "access" to session.accessToken,
+        ).distinctBy { it.second }
+        var lastFailure: String? = null
+
+        for ((label, token) in attempts) {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", token)
+            connection.doOutput = true
+            connection.outputStream.use { output ->
+                output.write(bodyBytes)
+            }
+            val responseText = readResponseText(connection)
+            if (connection.responseCode in 200..299) {
+                return JSONObject(responseText)
+            }
+
+            lastFailure = "status ${connection.responseCode}: $responseText"
+            if (connection.responseCode != 401 && connection.responseCode != 403) {
+                break
+            }
         }
-        val inputStream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
-        val responseText = inputStream.bufferedReader().use { it.readText() }
-        if (connection.responseCode !in 200..299) {
-            error("Sync request failed with status ${connection.responseCode}: $responseText")
-        }
-        return JSONObject(responseText)
+
+        error("Sync request failed with ${lastFailure ?: "an unknown authorization error"}")
     }
 
     private suspend fun deleteRequest(url: String) {
         val session = localStore.authRepository.refreshSessionIfNeeded()
             ?: error("You must sign in before deleting your account.")
 
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = "DELETE"
-        connection.setRequestProperty("Authorization", "Bearer ${session.idToken}")
-        val inputStream =
-            if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
-        val responseText = inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (connection.responseCode !in 200..299) {
-            error("Delete account failed with status ${connection.responseCode}: $responseText")
+        val attempts = listOf(
+            "id" to session.idToken,
+            "access" to session.accessToken,
+        ).distinctBy { it.second }
+        var lastFailure: String? = null
+
+        for ((label, token) in attempts) {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "DELETE"
+            connection.setRequestProperty("Authorization", token)
+            val responseText = readResponseText(connection)
+            if (connection.responseCode in 200..299) {
+                return
+            }
+
+            lastFailure = "status ${connection.responseCode}: $responseText"
+            if (connection.responseCode != 401 && connection.responseCode != 403) {
+                break
+            }
         }
+
+        error("Delete account failed with ${lastFailure ?: "an unknown authorization error"}")
+    }
+}
+
+private fun readResponseText(connection: HttpURLConnection): String {
+    val stream =
+        if (connection.responseCode in 200..299) {
+            connection.inputStream
+        } else {
+            connection.errorStream ?: connection.inputStream
+        }
+
+    if (stream == null) {
+        return ""
+    }
+
+    return stream.use { input ->
+        val buffer = ByteArrayOutputStream()
+        input.copyTo(buffer)
+        buffer.toString(Charsets.UTF_8.name())
     }
 }
 

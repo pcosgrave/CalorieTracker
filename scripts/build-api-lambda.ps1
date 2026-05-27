@@ -13,11 +13,11 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 
 $apiRoot = Join-Path $repoRoot "apps\api"
 $sharedRoot = Join-Path $repoRoot "shared"
-$workspaceNodeModules = Join-Path $repoRoot "node_modules"
 $apiDistRoot = Join-Path $apiRoot "dist"
-$stagingRoot = Join-Path $apiRoot ".lambda-build\package"
+$buildRoot = Join-Path $apiRoot ".lambda-build"
+$stagingRoot = Join-Path $buildRoot "package"
 $sharedPackageRoot = Join-Path $stagingRoot "node_modules\@calorie-tracker\shared"
-$zodPackageRoot = Join-Path $stagingRoot "node_modules\zod"
+$apiPackageJsonPath = Join-Path $apiRoot "package.json"
 
 Write-Host "Building shared and API workspaces..."
 Push-Location $repoRoot
@@ -29,8 +29,8 @@ finally {
     Pop-Location
 }
 
-if (Test-Path $stagingRoot) {
-    Remove-Item -Recurse -Force $stagingRoot
+if (Test-Path $buildRoot) {
+    Remove-Item -Recurse -Force $buildRoot
 }
 
 New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
@@ -40,9 +40,37 @@ Write-Host "Copying API dist files..."
 Copy-Item -Recurse -Force (Join-Path $apiDistRoot "handlers") $stagingRoot
 Copy-Item -Recurse -Force (Join-Path $apiDistRoot "lib") $stagingRoot
 
-Write-Host "Vendoring zod..."
-New-Item -ItemType Directory -Force -Path $zodPackageRoot | Out-Null
-Copy-Item -Recurse -Force (Join-Path $workspaceNodeModules "zod\*") $zodPackageRoot
+$apiPackage = Get-Content -Raw -Path $apiPackageJsonPath | ConvertFrom-Json
+$runtimeDependencies = [ordered]@{}
+foreach ($property in $apiPackage.dependencies.PSObject.Properties) {
+    if ($property.Name -ne "@calorie-tracker/shared") {
+        $runtimeDependencies[$property.Name] = $property.Value
+    }
+}
+
+$runtimePackageJson = [ordered]@{
+    name = "@calorie-tracker/api-lambda-runtime"
+    private = $true
+    type = "module"
+    dependencies = $runtimeDependencies
+}
+
+$runtimePackageJsonPath = Join-Path $stagingRoot "package.json"
+$runtimePackageJsonJson = $runtimePackageJson | ConvertTo-Json -Depth 10
+[System.IO.File]::WriteAllText(
+    $runtimePackageJsonPath,
+    $runtimePackageJsonJson,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+Write-Host "Installing runtime npm dependencies..."
+Push-Location $stagingRoot
+try {
+    npm.cmd install --omit=dev --ignore-scripts
+}
+finally {
+    Pop-Location
+}
 
 Write-Host "Vendoring shared package..."
 New-Item -ItemType Directory -Force -Path $sharedPackageRoot | Out-Null
