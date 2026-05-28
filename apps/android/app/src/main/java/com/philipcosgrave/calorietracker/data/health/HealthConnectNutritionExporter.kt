@@ -2,7 +2,6 @@ package com.philipcosgrave.calorietracker.data.health
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.PermissionController
@@ -197,32 +196,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
             .sumOf { it.energy.inKilocalories }
             .takeIf { it > 0.0 }
         val latestRecentTotalCalories = caloriesBurnedResponse?.firstOrNull()?.energy?.inKilocalories
-        val latestCaloriesRecord = caloriesBurnedResponse?.firstOrNull()
-        val latestCaloriesRecordDate = latestCaloriesRecord?.endTime?.atZone(zoneId)
-        val latestCaloriesRecordOrigin = latestCaloriesRecord?.metadata?.dataOrigin?.packageName
-        val latestCaloriesInCalories = latestCaloriesRecord?.energy?.inCalories
-        val latestCaloriesInKilocalories = latestCaloriesRecord?.energy?.inKilocalories
-
-        caloriesBurnedResponse?.forEach { record ->
-            val recordStartTime = record.startTime.atZone(zoneId)
-            val recordEndTime = record.endTime.atZone(zoneId)
-            val recordKilocalories = record.energy.inKilocalories
-            val recordCalories = record.energy.inCalories
-            val recordSource = record.metadata.dataOrigin.packageName
-            Log.d(
-                "HealthCalories",
-                "$recordStartTime - $recordEndTime: $recordKilocalories kcal / $recordCalories cal from $recordSource",
-            )
-        }
-
-        Log.d(
-            "HealthConnectCalories",
-            "TodayTotal=$totalCaloriesBurnedToday LatestRecentTotal=$latestRecentTotalCalories RecordCount=${caloriesBurnedResponse?.size ?: 0} TodayRecordCount=${todayCaloriesBurnedRecords.size} LatestRecordAt=$latestCaloriesRecordDate LatestRecordOrigin=$latestCaloriesRecordOrigin LatestRecordCalories=$latestCaloriesInCalories LatestRecordKilocalories=$latestCaloriesInKilocalories",
-        )
-        Log.d(
-            "HealthConnectHeartRate",
-            "Latest=$latestHeartRate AvgToday=$averageHeartRateToday MinToday=$minHeartRateToday MaxToday=$maxHeartRateToday SampleCount48h=${allHeartRateSamples.size} Oldest=$oldestHeartRateSampleTime Newest=$newestHeartRateSampleTime Origins=$heartRateOrigins",
-        )
 
         return HealthDashboardMetrics(
             steps = aggregateResponse?.get(StepsRecord.COUNT_TOTAL),
@@ -291,7 +264,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
         )
 
         client.insertRecords(listOf(record))
-        Log.d("HealthConnectWeight", "Exported weight entry ${entry.id} at ${entry.date} (${entry.weightKg} kg)")
     }
 
     suspend fun deleteWeightEntry(entryId: String) {
@@ -301,7 +273,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
             emptyList(),
             listOf(entryId),
         )
-        Log.d("HealthConnectWeight", "Deleted weight entry $entryId from Health Connect")
     }
 
     suspend fun importWeightEntries(): List<WeightEntry> {
@@ -313,13 +284,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
                 LocalDate.of(2000, 1, 1).atStartOfDay(ZoneId.systemDefault()).toInstant(),
                 java.time.Instant.now(),
             ),
-        )
-        val oldestDate = records.minByOrNull { it.time }?.time?.atZone(ZoneId.systemDefault())?.toLocalDate()
-        val newestDate = records.maxByOrNull { it.time }?.time?.atZone(ZoneId.systemDefault())?.toLocalDate()
-        val originPackages = records.map { it.metadata.dataOrigin.packageName }.distinct().sorted()
-        Log.d(
-            "HealthConnectWeight",
-            "Read ${records.size} WeightRecord(s) from Health Connect. Oldest=$oldestDate Newest=$newestDate Origins=$originPackages",
         )
         return records.map { record ->
             WeightEntry(
