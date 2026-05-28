@@ -37,6 +37,7 @@ module "app" {
   lambda_memory_mb            = var.lambda_memory_mb
   lambda_timeout_seconds      = var.lambda_timeout_seconds
   api_stage_name              = var.api_stage_name
+  manage_lambda_log_groups    = var.manage_lambda_log_groups
   google_client_id            = var.google_client_id
   google_client_secret        = var.google_client_secret
   google_authorize_scopes     = var.google_authorize_scopes

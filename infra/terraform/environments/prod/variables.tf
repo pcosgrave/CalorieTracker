@@ -70,6 +70,12 @@ variable "api_stage_name" {
   default     = "prod"
 }
 
+variable "manage_lambda_log_groups" {
+  description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
+  type        = bool
+  default     = false
+}
+
 variable "log_retention_days" {
   description = "Retention period for API Lambda CloudWatch log groups."
   type        = number

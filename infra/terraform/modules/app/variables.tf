@@ -100,3 +100,9 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "manage_lambda_log_groups" {
+  description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
+  type        = bool
+  default     = false
+}

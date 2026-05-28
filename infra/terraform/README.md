@@ -169,6 +169,7 @@ After apply, useful outputs include:
 
 - Stored application data now uses a customer-managed KMS key instead of only service-default encryption.
 - Lambda log groups are pre-created with retention and KMS encryption so production logs follow the same storage policy.
+- Pre-created encrypted Lambda log groups are optional and should be enabled only on clean environments or after importing existing log groups into Terraform state.
 - Google federation is still intentionally out of scope for this first pass.
 - The Android and web apps still need Cognito client integration and token handling.
 - The Lambda package currently vendors `zod` and the shared package, while relying on the AWS Lambda Node.js runtime's included AWS SDK v3. See AWS Lambda Node.js runtime docs for the runtime-included SDK behavior: [Building Lambda functions with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html).

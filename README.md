@@ -21,6 +21,28 @@ Local-first calorie and weight tracking app by Cosgrave Labs.
 - `infra/terraform`: AWS infrastructure
 - `docs`: Product and architecture notes
 
+## Security
+
+`BiteWise` currently uses a server-readable cloud sync model with stronger infrastructure protections:
+
+- HTTPS in transit
+- customer-managed KMS encryption for DynamoDB, S3, and Lambda log groups
+- per-user storage partitioning in the backend
+- offline-first sync reconciliation on the server
+
+This is not an end-to-end encrypted design. Operators with sufficient AWS permissions can still read stored user data. For the current detailed posture, see:
+
+- [Security And Privacy](./docs/security-and-privacy.md)
+
+## Privacy
+
+Current privacy model:
+
+- user-owned records are stored per authenticated user
+- account deletion removes only that user’s owned rows
+- community food records are stored separately and are not deleted with a user account
+- cloud-stored data is encrypted at rest, but remains server-readable
+
 ## Development Setup
 
 ### Required Tools

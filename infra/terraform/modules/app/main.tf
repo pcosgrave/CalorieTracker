@@ -38,6 +38,8 @@ locals {
     "${local.name_prefix}-account-delete",
   ] : []
 
+  managed_api_lambda_log_group_names = var.manage_lambda_log_groups ? toset(local.api_lambda_function_names) : toset([])
+
   cognito_domain_prefix = coalesce(var.cognito_domain_prefix, replace(local.name_prefix, "/[^a-zA-Z0-9-]/", "-"))
   google_provider_enabled = (
     var.google_client_id != null &&
@@ -56,6 +58,7 @@ resource "aws_kms_key" "app_storage" {
   description             = "Customer managed KMS key for ${local.name_prefix} application storage"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.app_storage_kms.json
 
   tags = local.tags
 }
@@ -63,6 +66,46 @@ resource "aws_kms_key" "app_storage" {
 resource "aws_kms_alias" "app_storage" {
   name          = "alias/${local.name_prefix}-storage"
   target_key_id = aws_kms_key.app_storage.key_id
+}
+
+data "aws_iam_policy_document" "app_storage_kms" {
+  statement {
+    sid    = "EnableRootPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowCloudWatchLogsUseOfKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = ["arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.name_prefix}-*"]
+    }
+  }
 }
 
 resource "aws_cognito_user_pool" "main" {
@@ -334,7 +377,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "events" {
 }
 
 resource "aws_cloudwatch_log_group" "api_lambdas" {
-  for_each = toset(local.api_lambda_function_names)
+  for_each = local.managed_api_lambda_log_group_names
 
   name              = "/aws/lambda/${each.value}"
   retention_in_days = var.log_retention_days
@@ -379,12 +422,12 @@ resource "aws_iam_role_policy" "api_lambda" {
           "logs:CreateLogStream",
           "logs:PutLogEvents",
         ]
-        Resource = flatten([
+        Resource = var.manage_lambda_log_groups ? flatten([
           for log_group in values(aws_cloudwatch_log_group.api_lambdas) : [
             log_group.arn,
             "${log_group.arn}:*"
           ]
-        ])
+        ]) : ["arn:aws:logs:*:*:*"]
       },
       {
         Effect = "Allow"

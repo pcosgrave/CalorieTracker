@@ -70,6 +70,12 @@ variable "api_stage_name" {
   default     = "dev"
 }
 
+variable "manage_lambda_log_groups" {
+  description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
+  type        = bool
+  default     = false
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
