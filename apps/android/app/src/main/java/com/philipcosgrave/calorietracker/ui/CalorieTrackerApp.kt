@@ -740,19 +740,20 @@ fun CalorieTrackerApp(
                 baseVersion = if (existing != null) 1 else null,
             ),
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
-            healthConnectPermissionGranted &&
-            healthConnectExportEnabled
-        ) {
-            val exportResult = runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
-            exportResult.exceptionOrNull()?.let { error ->
-                Log.e("HealthConnectWeight", "Failed to export weight entry ${weightEntry.id}", error)
-                return "Weight saved locally. Health Connect sync failed."
-            }
-            return null
-        }
         if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
-            Log.w("HealthConnectWeight", "Skipped weight export for ${weightEntry.id} because Health Connect write permission is not granted")
+            val hasWriteWeightPermission = healthConnectExporter.hasWriteWeightPermission()
+            if (hasWriteWeightPermission) {
+                val exportResult = runCatching { healthConnectExporter.exportWeightEntry(weightEntry) }
+                exportResult.exceptionOrNull()?.let { error ->
+                    Log.e("HealthConnectWeight", "Failed to export weight entry ${weightEntry.id}", error)
+                    return "Weight saved locally. Health Connect sync failed."
+                }
+                return null
+            }
+            Log.w(
+                "HealthConnectWeight",
+                "Skipped weight export for ${weightEntry.id} because WRITE_WEIGHT permission is not granted",
+            )
             return "Weight saved locally. Reconnect Health Connect to sync it."
         }
         return null
@@ -785,10 +786,17 @@ fun CalorieTrackerApp(
             ),
         )
         if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
-            runCatching { healthConnectExporter.deleteWeightEntry(entry.id) }
-                .onFailure { error ->
-                    Log.e("HealthConnectWeight", "Failed to delete weight entry ${entry.id}", error)
-                }
+            if (healthConnectExporter.hasWriteWeightPermission()) {
+                runCatching { healthConnectExporter.deleteWeightEntry(entry.id) }
+                    .onFailure { error ->
+                        Log.e("HealthConnectWeight", "Failed to delete weight entry ${entry.id}", error)
+                    }
+            } else {
+                Log.w(
+                    "HealthConnectWeight",
+                    "Skipped deleting weight entry ${entry.id} from Health Connect because WRITE_WEIGHT permission is not granted",
+                )
+            }
         }
     }
 

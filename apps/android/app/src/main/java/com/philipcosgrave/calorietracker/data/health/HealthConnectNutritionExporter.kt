@@ -142,34 +142,30 @@ class HealthConnectNutritionExporter(private val context: Context) {
             }
         val caloriesBurnedResponse =
             if (readCaloriesBurnedPermission in granted) {
-                client.readRecords(
-                    ReadRecordsRequest(
-                        recordType = TotalCaloriesBurnedRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(
-                            start.minusSeconds(3 * 24 * 60 * 60),
-                            end,
-                        ),
-                        ascendingOrder = false,
-                        pageSize = 10,
+                readAllRecords(
+                    recordType = TotalCaloriesBurnedRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(
+                        start.minusSeconds(3 * 24 * 60 * 60),
+                        end,
                     ),
+                    ascendingOrder = false,
+                    pageSize = 100,
                 )
             } else {
                 null
             }
         val heartRateResponse =
             if (readHeartRatePermission in granted) {
-                client.readRecords(
-                    ReadRecordsRequest(
-                        recordType = HeartRateRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(heartRateLookbackStart, end),
-                        ascendingOrder = false,
-                        pageSize = 50,
-                    ),
+                readAllRecords(
+                    recordType = HeartRateRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(heartRateLookbackStart, end),
+                    ascendingOrder = false,
+                    pageSize = 100,
                 )
             } else {
                 null
             }
-        val allHeartRateSamples = heartRateResponse?.records
+        val allHeartRateSamples = heartRateResponse
             ?.flatMap { it.samples }
             .orEmpty()
         val latestHeartRate = allHeartRateSamples
@@ -187,22 +183,41 @@ class HealthConnectNutritionExporter(private val context: Context) {
         val maxHeartRateToday = todayHeartRateSamples.maxOfOrNull { it.beatsPerMinute }?.toLong()
         val newestHeartRateSampleTime = allHeartRateSamples.maxByOrNull { it.time }?.time?.atZone(zoneId)
         val oldestHeartRateSampleTime = allHeartRateSamples.minByOrNull { it.time }?.time?.atZone(zoneId)
-        val heartRateOrigins = heartRateResponse?.records
+        val heartRateOrigins = heartRateResponse
             ?.map { it.metadata.dataOrigin.packageName }
             ?.distinct()
             ?.sorted()
             .orEmpty()
-        val latestTotalCaloriesToday = caloriesBurnedResponse?.records
-            ?.firstOrNull { record ->
+        val todayCaloriesBurnedRecords = caloriesBurnedResponse
+            ?.filter { record ->
                 record.endTime.atZone(zoneId).toLocalDate() == LocalDate.now(zoneId)
             }
-            ?.energy
-            ?.inKilocalories
-        val latestRecentTotalCalories = caloriesBurnedResponse?.records?.firstOrNull()?.energy?.inKilocalories
+            .orEmpty()
+        val totalCaloriesBurnedToday = todayCaloriesBurnedRecords
+            .sumOf { it.energy.inKilocalories }
+            .takeIf { it > 0.0 }
+        val latestRecentTotalCalories = caloriesBurnedResponse?.firstOrNull()?.energy?.inKilocalories
+        val latestCaloriesRecord = caloriesBurnedResponse?.firstOrNull()
+        val latestCaloriesRecordDate = latestCaloriesRecord?.endTime?.atZone(zoneId)
+        val latestCaloriesRecordOrigin = latestCaloriesRecord?.metadata?.dataOrigin?.packageName
+        val latestCaloriesInCalories = latestCaloriesRecord?.energy?.inCalories
+        val latestCaloriesInKilocalories = latestCaloriesRecord?.energy?.inKilocalories
+
+        caloriesBurnedResponse?.forEach { record ->
+            val recordStartTime = record.startTime.atZone(zoneId)
+            val recordEndTime = record.endTime.atZone(zoneId)
+            val recordKilocalories = record.energy.inKilocalories
+            val recordCalories = record.energy.inCalories
+            val recordSource = record.metadata.dataOrigin.packageName
+            Log.d(
+                "HealthCalories",
+                "$recordStartTime - $recordEndTime: $recordKilocalories kcal / $recordCalories cal from $recordSource",
+            )
+        }
 
         Log.d(
             "HealthConnectCalories",
-            "LatestTodayTotal=$latestTotalCaloriesToday LatestRecentTotal=$latestRecentTotalCalories RecordCount=${caloriesBurnedResponse?.records?.size ?: 0}",
+            "TodayTotal=$totalCaloriesBurnedToday LatestRecentTotal=$latestRecentTotalCalories RecordCount=${caloriesBurnedResponse?.size ?: 0} TodayRecordCount=${todayCaloriesBurnedRecords.size} LatestRecordAt=$latestCaloriesRecordDate LatestRecordOrigin=$latestCaloriesRecordOrigin LatestRecordCalories=$latestCaloriesInCalories LatestRecordKilocalories=$latestCaloriesInKilocalories",
         )
         Log.d(
             "HealthConnectHeartRate",
@@ -212,7 +227,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
         return HealthDashboardMetrics(
             steps = aggregateResponse?.get(StepsRecord.COUNT_TOTAL),
             heartRateBpm = latestHeartRate ?: averageHeartRateToday,
-            caloriesBurned = latestTotalCaloriesToday ?: latestRecentTotalCalories,
+            caloriesBurned = totalCaloriesBurnedToday ?: latestRecentTotalCalories,
         )
     }
 
@@ -261,7 +276,13 @@ class HealthConnectNutritionExporter(private val context: Context) {
         check(hasWriteWeightPermission()) { "Health Connect WRITE_WEIGHT permission not granted" }
 
         val zoneId = ZoneId.systemDefault()
-        val loggedAt = ZonedDateTime.of(entry.date, LocalTime.NOON, zoneId)
+        val now = ZonedDateTime.now(zoneId)
+        val loggedAt =
+            if (entry.date == now.toLocalDate()) {
+                now.minusMinutes(1)
+            } else {
+                ZonedDateTime.of(entry.date, LocalTime.NOON, zoneId)
+            }
         val record = WeightRecord(
             time = loggedAt.toInstant(),
             zoneOffset = loggedAt.offset ?: ZoneOffset.UTC,

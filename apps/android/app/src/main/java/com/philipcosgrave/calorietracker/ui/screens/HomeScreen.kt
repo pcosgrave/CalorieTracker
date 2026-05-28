@@ -97,7 +97,6 @@ fun HomeScreen(
                 MetricStripCard(
                     label = "Steps",
                     value = healthMetrics.steps?.toString() ?: "--",
-                    detail = "From Google Health today",
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -106,13 +105,11 @@ fun HomeScreen(
                 MetricStripCard(
                     label = "Heart Rate",
                     value = healthMetrics.heartRateBpm?.let { "$it bpm" } ?: "--",
-                    detail = "Latest from Google Health",
                     modifier = Modifier.weight(1f),
                 )
                 MetricStripCard(
                     label = "Calories Burned",
                     value = healthMetrics.caloriesBurned?.let { "${formatNumber(it)} cal" } ?: "--",
-                    detail = "Imported daily total",
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -274,7 +271,6 @@ private fun InsightCard(
 private fun MetricStripCard(
     label: String,
     value: String,
-    detail: String,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -297,11 +293,6 @@ private fun MetricStripCard(
                 value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
-            )
-            Text(
-                detail,
-                color = AppMuted,
-                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
