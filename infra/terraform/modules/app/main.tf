@@ -16,6 +16,28 @@ locals {
     USER_POOL_ID               = aws_cognito_user_pool.main.id
   }
 
+  api_lambda_function_names = var.create_api ? [
+    "${local.name_prefix}-foods-create",
+    "${local.name_prefix}-foods-list",
+    "${local.name_prefix}-foods-update",
+    "${local.name_prefix}-foods-delete",
+    "${local.name_prefix}-foods-lookup",
+    "${local.name_prefix}-foods-search",
+    "${local.name_prefix}-foods-community-lookup",
+    "${local.name_prefix}-foods-community-search",
+    "${local.name_prefix}-foods-community-publish",
+    "${local.name_prefix}-diary-create",
+    "${local.name_prefix}-diary-update",
+    "${local.name_prefix}-diary-delete",
+    "${local.name_prefix}-weights-create",
+    "${local.name_prefix}-weights-list",
+    "${local.name_prefix}-weights-update",
+    "${local.name_prefix}-weights-delete",
+    "${local.name_prefix}-sync-push",
+    "${local.name_prefix}-sync-pull",
+    "${local.name_prefix}-account-delete",
+  ] : []
+
   cognito_domain_prefix = coalesce(var.cognito_domain_prefix, replace(local.name_prefix, "/[^a-zA-Z0-9-]/", "-"))
   google_provider_enabled = (
     var.google_client_id != null &&
@@ -27,6 +49,21 @@ locals {
 }
 
 data "aws_region" "current" {}
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "app_storage" {
+  description             = "Customer managed KMS key for ${local.name_prefix} application storage"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  tags = local.tags
+}
+
+resource "aws_kms_alias" "app_storage" {
+  name          = "alias/${local.name_prefix}-storage"
+  target_key_id = aws_kms_key.app_storage.key_id
+}
 
 resource "aws_cognito_user_pool" "main" {
   name = "${local.name_prefix}-users"
@@ -151,6 +188,11 @@ resource "aws_dynamodb_table" "products" {
     enabled = true
   }
 
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.app_storage.arn
+  }
+
   tags = local.tags
 }
 
@@ -172,6 +214,11 @@ resource "aws_dynamodb_table" "barcode_aliases" {
 
   point_in_time_recovery {
     enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.app_storage.arn
   }
 
   tags = local.tags
@@ -197,6 +244,11 @@ resource "aws_dynamodb_table" "diary_entries" {
     enabled = true
   }
 
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.app_storage.arn
+  }
+
   tags = local.tags
 }
 
@@ -218,6 +270,11 @@ resource "aws_dynamodb_table" "weight_entries" {
 
   point_in_time_recovery {
     enabled = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.app_storage.arn
   }
 
   tags = local.tags
@@ -243,6 +300,11 @@ resource "aws_dynamodb_table" "sync_changes" {
     enabled = true
   }
 
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.app_storage.arn
+  }
+
   tags = local.tags
 }
 
@@ -265,9 +327,20 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "events" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.app_storage.arn
     }
   }
+}
+
+resource "aws_cloudwatch_log_group" "api_lambdas" {
+  for_each = toset(local.api_lambda_function_names)
+
+  name              = "/aws/lambda/${each.value}"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.app_storage.arn
+
+  tags = local.tags
 }
 
 resource "aws_iam_role" "api_lambda" {
@@ -303,11 +376,15 @@ resource "aws_iam_role_policy" "api_lambda" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = flatten([
+          for log_group in values(aws_cloudwatch_log_group.api_lambdas) : [
+            log_group.arn,
+            "${log_group.arn}:*"
+          ]
+        ])
       },
       {
         Effect = "Allow"
@@ -325,6 +402,16 @@ resource "aws_iam_role_policy" "api_lambda" {
           aws_dynamodb_table.weight_entries.arn,
           aws_dynamodb_table.sync_changes.arn,
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+        ]
+        Resource = aws_kms_key.app_storage.arn
       },
       {
         Effect = "Allow"
@@ -363,6 +450,44 @@ resource "aws_lambda_function" "foods_list" {
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
   handler          = "handlers/foods.list"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "foods_update" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-update"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/foods.update"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "foods_delete" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-foods-delete"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/foods.remove"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -489,6 +614,44 @@ resource "aws_lambda_function" "diary_create" {
   tags = local.tags
 }
 
+resource "aws_lambda_function" "diary_update" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-diary-update"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/diary.update"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "diary_delete" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-diary-delete"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/diary.remove"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
 resource "aws_lambda_function" "weights_create" {
   count = var.create_api ? 1 : 0
 
@@ -496,6 +659,44 @@ resource "aws_lambda_function" "weights_create" {
   role             = aws_iam_role.api_lambda[0].arn
   runtime          = var.lambda_runtime
   handler          = "handlers/weights.create"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "weights_update" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-weights-update"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/weights.update"
+  filename         = var.api_lambda_package_path
+  source_code_hash = var.api_lambda_source_code_hash
+  timeout          = var.lambda_timeout_seconds
+  memory_size      = var.lambda_memory_mb
+
+  environment {
+    variables = local.lambda_environment
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lambda_function" "weights_delete" {
+  count = var.create_api ? 1 : 0
+
+  function_name    = "${local.name_prefix}-weights-delete"
+  role             = aws_iam_role.api_lambda[0].arn
+  runtime          = var.lambda_runtime
+  handler          = "handlers/weights.remove"
   filename         = var.api_lambda_package_path
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
@@ -637,6 +838,14 @@ resource "aws_api_gateway_resource" "foods_search" {
   path_part   = "search"
 }
 
+resource "aws_api_gateway_resource" "foods_value" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.foods[0].id
+  path_part   = "{productId}"
+}
+
 resource "aws_api_gateway_resource" "foods_community" {
   count = var.create_api ? 1 : 0
 
@@ -677,6 +886,14 @@ resource "aws_api_gateway_resource" "diary" {
   path_part   = "diary"
 }
 
+resource "aws_api_gateway_resource" "diary_value" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.diary[0].id
+  path_part   = "{entryId}"
+}
+
 resource "aws_api_gateway_resource" "sync" {
   count = var.create_api ? 1 : 0
 
@@ -691,6 +908,14 @@ resource "aws_api_gateway_resource" "weights" {
   rest_api_id = aws_api_gateway_rest_api.main[0].id
   parent_id   = aws_api_gateway_rest_api.main[0].root_resource_id
   path_part   = "weights"
+}
+
+resource "aws_api_gateway_resource" "weights_value" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id = aws_api_gateway_rest_api.main[0].id
+  parent_id   = aws_api_gateway_resource.weights[0].id
+  path_part   = "{entryId}"
 }
 
 resource "aws_api_gateway_resource" "account" {
@@ -737,6 +962,26 @@ resource "aws_api_gateway_method" "foods_post" {
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
 }
 
+resource "aws_api_gateway_method" "foods_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_value[0].id
+  http_method   = "PUT"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "foods_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.foods_value[0].id
+  http_method   = "DELETE"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
 resource "aws_api_gateway_method" "foods_barcode_get" {
   count = var.create_api ? 1 : 0
 
@@ -763,8 +1008,7 @@ resource "aws_api_gateway_method" "foods_community_get" {
   rest_api_id   = aws_api_gateway_rest_api.main[0].id
   resource_id   = aws_api_gateway_resource.foods_community[0].id
   http_method   = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+  authorization = "NONE"
 }
 
 resource "aws_api_gateway_method" "foods_community_search_get" {
@@ -797,6 +1041,26 @@ resource "aws_api_gateway_method" "diary_post" {
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
 }
 
+resource "aws_api_gateway_method" "diary_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.diary_value[0].id
+  http_method   = "PUT"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "diary_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.diary_value[0].id
+  http_method   = "DELETE"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
 resource "aws_api_gateway_method" "sync_push_post" {
   count = var.create_api ? 1 : 0
 
@@ -823,6 +1087,26 @@ resource "aws_api_gateway_method" "weights_post" {
   rest_api_id   = aws_api_gateway_rest_api.main[0].id
   resource_id   = aws_api_gateway_resource.weights[0].id
   http_method   = "POST"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "weights_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.weights_value[0].id
+  http_method   = "PUT"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito[0].id
+}
+
+resource "aws_api_gateway_method" "weights_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id   = aws_api_gateway_rest_api.main[0].id
+  resource_id   = aws_api_gateway_resource.weights_value[0].id
+  http_method   = "DELETE"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito[0].id
 }
@@ -867,6 +1151,28 @@ resource "aws_api_gateway_integration" "foods_post" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.foods_create[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "foods_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_value[0].id
+  http_method             = aws_api_gateway_method.foods_put[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_update[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "foods_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.foods_value[0].id
+  http_method             = aws_api_gateway_method.foods_delete[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.foods_delete[0].invoke_arn
 }
 
 resource "aws_api_gateway_integration" "foods_barcode_get" {
@@ -935,6 +1241,28 @@ resource "aws_api_gateway_integration" "diary_post" {
   uri                     = aws_lambda_function.diary_create[0].invoke_arn
 }
 
+resource "aws_api_gateway_integration" "diary_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.diary_value[0].id
+  http_method             = aws_api_gateway_method.diary_put[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.diary_update[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "diary_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.diary_value[0].id
+  http_method             = aws_api_gateway_method.diary_delete[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.diary_delete[0].invoke_arn
+}
+
 resource "aws_api_gateway_integration" "sync_push_post" {
   count = var.create_api ? 1 : 0
 
@@ -966,6 +1294,28 @@ resource "aws_api_gateway_integration" "weights_post" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.weights_create[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "weights_put" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.weights_value[0].id
+  http_method             = aws_api_gateway_method.weights_put[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.weights_update[0].invoke_arn
+}
+
+resource "aws_api_gateway_integration" "weights_delete" {
+  count = var.create_api ? 1 : 0
+
+  rest_api_id             = aws_api_gateway_rest_api.main[0].id
+  resource_id             = aws_api_gateway_resource.weights_value[0].id
+  http_method             = aws_api_gateway_method.weights_delete[0].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.weights_delete[0].invoke_arn
 }
 
 resource "aws_api_gateway_integration" "sync_pull_post" {
@@ -1006,6 +1356,26 @@ resource "aws_lambda_permission" "apigw_foods_list" {
   statement_id  = "AllowApiGatewayInvokeFoodsList"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.foods_list[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_foods_update" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsUpdate"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_update[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_foods_delete" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeFoodsDelete"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.foods_delete[0].function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
@@ -1070,6 +1440,26 @@ resource "aws_lambda_permission" "apigw_diary_create" {
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "apigw_diary_update" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeDiaryUpdate"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.diary_update[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_diary_delete" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeDiaryDelete"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.diary_delete[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
 resource "aws_lambda_permission" "apigw_sync_push" {
   count = var.create_api ? 1 : 0
 
@@ -1096,6 +1486,26 @@ resource "aws_lambda_permission" "apigw_weights_list" {
   statement_id  = "AllowApiGatewayInvokeWeightsList"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.weights_list[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_weights_update" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeWeightsUpdate"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.weights_update[0].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_weights_delete" {
+  count = var.create_api ? 1 : 0
+
+  statement_id  = "AllowApiGatewayInvokeWeightsDelete"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.weights_delete[0].function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main[0].execution_arn}/*/*"
 }
@@ -1129,14 +1539,20 @@ resource "aws_api_gateway_deployment" "main" {
     redeploy = sha1(jsonencode([
       aws_api_gateway_integration.foods_get[0].id,
       aws_api_gateway_integration.foods_post[0].id,
+      aws_api_gateway_integration.foods_put[0].id,
+      aws_api_gateway_integration.foods_delete[0].id,
       aws_api_gateway_integration.foods_barcode_get[0].id,
       aws_api_gateway_integration.foods_search_get[0].id,
       aws_api_gateway_integration.foods_community_post[0].id,
       aws_api_gateway_integration.foods_community_search_get[0].id,
       aws_api_gateway_integration.foods_community_lookup_get[0].id,
       aws_api_gateway_integration.diary_post[0].id,
+      aws_api_gateway_integration.diary_put[0].id,
+      aws_api_gateway_integration.diary_delete[0].id,
       aws_api_gateway_integration.weights_get[0].id,
       aws_api_gateway_integration.weights_post[0].id,
+      aws_api_gateway_integration.weights_put[0].id,
+      aws_api_gateway_integration.weights_delete[0].id,
       aws_api_gateway_integration.sync_push_post[0].id,
       aws_api_gateway_integration.sync_pull_post[0].id,
       aws_api_gateway_integration.account_delete[0].id,

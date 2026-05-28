@@ -68,11 +68,17 @@ export interface CreateDiaryEntryRequest {
   loggedUnit?: string | undefined;
 }
 
+export interface UpdateDiaryEntryRequest extends CreateDiaryEntryRequest {}
+
 export interface CreateWeightEntryRequest {
   loggedAt: string;
   weightKg: number;
   source?: "manual" | "health_connect" | "import";
 }
+
+export interface UpdateWeightEntryRequest extends CreateWeightEntryRequest {}
+
+export interface UpdateFoodProductRequest extends CreateFoodProductRequest {}
 
 export interface BarcodeLookupResponse {
   found: boolean;

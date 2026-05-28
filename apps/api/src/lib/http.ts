@@ -15,8 +15,17 @@ export interface AuthedRequest<TBody = unknown> {
   body: TBody;
 }
 
+export interface PublicRequest<TBody = unknown> {
+  event: SupportedGatewayEvent;
+  body: TBody;
+}
+
 export type Handler<TBody = unknown> = (
   request: AuthedRequest<TBody>,
+) => Promise<SupportedGatewayResult>;
+
+export type PublicHandler<TBody = unknown> = (
+  request: PublicRequest<TBody>,
 ) => Promise<SupportedGatewayResult>;
 
 export function json(statusCode: number, body: unknown): SupportedGatewayResult {
@@ -64,6 +73,29 @@ export function route<TBody>(
       if (error instanceof UnauthorizedError) {
         return json(401, { message: error.message });
       }
+      if (error instanceof SyntaxError) {
+        return json(400, { message: "Request body must be valid JSON" });
+      }
+      if (error instanceof ZodError) {
+        return json(400, { message: "Request validation failed", issues: error.issues });
+      }
+      console.error(error);
+      return json(500, { message: "Internal server error" });
+    }
+  };
+}
+
+export function publicRoute<TBody>(
+  schema: ZodSchema<TBody>,
+  handler: PublicHandler<TBody>,
+) {
+  return async (event: SupportedGatewayEvent): Promise<SupportedGatewayResult> => {
+    try {
+      return await handler({
+        event,
+        body: parseJson(event, schema),
+      });
+    } catch (error) {
       if (error instanceof SyntaxError) {
         return json(400, { message: "Request body must be valid JSON" });
       }

@@ -9,6 +9,7 @@ Local-first calorie and weight tracking app by Cosgrave Labs.
 - Web app and Android app
 - Google sign-in through Cognito
 - DynamoDB-backed cloud sync path for development/paid-mode iteration
+- Customer-managed KMS encryption for AWS-stored app data and Lambda log groups
 - Terraform-managed AWS infrastructure in `us-east-1`
 
 ## Repository Layout

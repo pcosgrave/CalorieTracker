@@ -14,12 +14,15 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.SyncChangeEnvelope
+import com.philipcosgrave.calorietracker.model.SyncChangeRejection
 import com.philipcosgrave.calorietracker.model.SyncCursor
 import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncPullResponse
 import com.philipcosgrave.calorietracker.model.SyncPushResponse
 import com.philipcosgrave.calorietracker.model.SyncStatus
+import com.philipcosgrave.calorietracker.model.WeightEntry
+import com.philipcosgrave.calorietracker.model.WeightEntryRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -43,6 +46,9 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val pending = localStore.syncOutboxRepository.listPendingChanges()
         val pushResponse = postPush(settings.apiBaseUrl!!, cursor, pending)
         localStore.syncOutboxRepository.acknowledge(pushResponse.acceptedChangeIds, nowIsoString())
+        pushResponse.rejectedChanges.forEach { rejection ->
+            localStore.syncOutboxRepository.markRejected(rejection.changeId)
+        }
 
         val pullResponse = postPull(settings.apiBaseUrl, pushResponse.cursor)
         applyIncomingChanges(pullResponse)
@@ -68,16 +74,37 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         for (change in response.changes) {
             when (change.entityType) {
                 SyncEntityType.FoodProduct -> {
-                    val payload = change.payload as? FoodItemRecord ?: continue
-                    localStore.foodRepository.save(payload)
+                    val payload = change.payload as? FoodItemRecord
+                    when (change.operation) {
+                        SyncOperation.Upsert -> payload?.let { localStore.foodRepository.save(it) }
+                        SyncOperation.Delete -> payload?.let { localStore.foodRepository.save(it) }
+                            ?: localStore.foodRepository.softDelete(change.recordId, change.changedAt)
+                    }
                 }
                 SyncEntityType.BarcodeAlias -> {
-                    val payload = change.payload as? BarcodeAliasRecord ?: continue
-                    localStore.barcodeAliasRepository.save(payload)
+                    val payload = change.payload as? BarcodeAliasRecord
+                    when (change.operation) {
+                        SyncOperation.Upsert -> payload?.let { localStore.barcodeAliasRepository.save(it) }
+                        SyncOperation.Delete -> payload?.let { localStore.barcodeAliasRepository.save(it) }
+                            ?: localStore.barcodeAliasRepository.softDelete(change.recordId, change.changedAt)
+                    }
                 }
                 SyncEntityType.DiaryEntry -> {
-                    val payload = change.payload as? DiaryEntryRecord ?: continue
-                    localStore.diaryRepository.save(payload)
+                    val payload = change.payload as? DiaryEntryRecord
+                    when (change.operation) {
+                        SyncOperation.Upsert -> payload?.let { localStore.diaryRepository.save(it) }
+                        SyncOperation.Delete -> payload?.let { localStore.diaryRepository.save(it) }
+                            ?: localStore.diaryRepository.softDelete(change.recordId, change.changedAt)
+                    }
+                }
+                SyncEntityType.WeightEntry -> {
+                    val payload = change.payload as? WeightEntryRecord
+                    when (change.operation) {
+                        SyncOperation.Upsert -> payload?.let {
+                            localStore.weightRepository.save(localStore.currentOwnerUserId(), it.entry)
+                        }
+                        SyncOperation.Delete -> localStore.weightRepository.delete(localStore.currentOwnerUserId(), change.recordId)
+                    }
                 }
             }
         }
@@ -93,6 +120,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val response = postJson("${baseUrl.trimEnd('/')}/sync/push", requestBody)
         val cursorJson = response.getJSONObject("cursor")
         val accepted = response.getJSONArray("acceptedChangeIds")
+        val rejected = response.optJSONArray("rejectedChanges") ?: JSONArray()
         return SyncPushResponse(
             cursor = SyncCursor(
                 deviceId = cursorJson.getString("deviceId"),
@@ -100,7 +128,19 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
                 lastAcknowledgedChangeId = cursorJson.optString("lastAcknowledgedChangeId").takeIf { it.isNotBlank() },
             ),
             acceptedChangeIds = List(accepted.length()) { accepted.getString(it) },
-            rejectedChanges = emptyList(),
+            rejectedChanges = List(rejected.length()) { index ->
+                val item = rejected.getJSONObject(index)
+                SyncChangeRejection(
+                    changeId = item.getString("changeId"),
+                    code = when (item.getString("code")) {
+                        "conflict" -> SyncChangeRejection.Code.Conflict
+                        "validation_error" -> SyncChangeRejection.Code.ValidationError
+                        "not_found" -> SyncChangeRejection.Code.NotFound
+                        else -> SyncChangeRejection.Code.Unknown
+                    },
+                    message = item.getString("message"),
+                )
+            },
         )
     }
 
@@ -137,6 +177,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
                 SyncEntityType.FoodProduct -> "food_product"
                 SyncEntityType.BarcodeAlias -> "barcode_alias"
                 SyncEntityType.DiaryEntry -> "diary_entry"
+                SyncEntityType.WeightEntry -> "weight_entry"
             })
             .put("recordId", change.recordId)
             .put("operation", if (change.operation == SyncOperation.Upsert) "upsert" else "delete")
@@ -156,6 +197,9 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
             is DiaryEntryRecord -> JSONObject()
                 .put("entry", diaryEntryToWireJson(payload, ownerUserId))
                 .put("sync", syncMetadataToJson(payload.sync))
+            is WeightEntryRecord -> JSONObject()
+                .put("entry", weightEntryToWireJson(payload.entry, ownerUserId))
+                .put("sync", syncMetadataToJson(payload.sync))
             else -> null
         }
 
@@ -163,6 +207,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         val entityType = when (json.getString("entityType")) {
             "food_product" -> SyncEntityType.FoodProduct
             "barcode_alias" -> SyncEntityType.BarcodeAlias
+            "weight_entry" -> SyncEntityType.WeightEntry
             else -> SyncEntityType.DiaryEntry
         }
         val payloadJson = json.optJSONObject("payload")
@@ -186,6 +231,16 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
                 entryJson?.let { entry ->
                     DiaryEntryRecord(
                         entry = diaryEntryFromWireJson(entry),
+                        sync = sync,
+                    )
+                }
+            }
+            SyncEntityType.WeightEntry -> payloadJson?.let {
+                val sync = syncMetadataFromJson(it.getJSONObject("sync"))
+                val entryJson = it.optJSONObject("entry")
+                entryJson?.let { entry ->
+                    WeightEntryRecord(
+                        entry = weightEntryFromWireJson(entry),
                         sync = sync,
                     )
                 }
@@ -252,7 +307,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         ).distinctBy { it.second }
         var lastFailure: String? = null
 
-        for ((label, token) in attempts) {
+        for ((_, token) in attempts) {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
@@ -285,7 +340,7 @@ class ApiSyncService(private val localStore: AndroidLocalStore) {
         ).distinctBy { it.second }
         var lastFailure: String? = null
 
-        for ((label, token) in attempts) {
+        for ((_, token) in attempts) {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "DELETE"
             connection.setRequestProperty("Authorization", token)
@@ -430,6 +485,23 @@ private fun diaryEntryFromWireJson(json: JSONObject): DiaryEntry {
         loggedUnit = json.optString("loggedUnit").ifBlank { food.servingUnit },
     )
 }
+
+private fun weightEntryToWireJson(entry: WeightEntry, ownerUserId: String): JSONObject =
+    JSONObject()
+        .put("entryId", entry.id)
+        .put("ownerUserId", ownerUserId)
+        .put("loggedAt", "${entry.date}T12:00:00.000Z")
+        .put("weightKg", entry.weightKg)
+        .put("source", "manual")
+        .put("createdAt", nowIsoString())
+        .put("updatedAt", nowIsoString())
+
+private fun weightEntryFromWireJson(json: JSONObject): WeightEntry =
+    WeightEntry(
+        id = json.optString("entryId", json.optString("id")),
+        date = LocalDate.parse(json.optString("loggedAt").take(10)),
+        weightKg = json.getDouble("weightKg"),
+    )
 
 private fun nutrientsFromWireJson(json: JSONObject): Nutrients =
     Nutrients(

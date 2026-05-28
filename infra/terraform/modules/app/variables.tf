@@ -94,3 +94,9 @@ variable "google_authorize_scopes" {
   type        = string
   default     = "openid email profile"
 }
+
+variable "log_retention_days" {
+  description = "Retention period for Lambda CloudWatch log groups."
+  type        = number
+  default     = 30
+}

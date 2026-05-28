@@ -14,6 +14,8 @@ import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncMetadata
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncStatus
+import com.philipcosgrave.calorietracker.model.WeightEntry
+import com.philipcosgrave.calorietracker.model.WeightEntryRecord
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -94,6 +96,7 @@ fun SyncChangeEnvelope<*>.payloadToJsonString(): String? {
         SyncEntityType.FoodProduct -> JSONObject().put("food", JSONObject((payloadValue as FoodItemRecord).food.toJsonString())).put("sync", syncToJson(payloadValue.sync)).toString()
         SyncEntityType.BarcodeAlias -> JSONObject().put("alias", JSONObject(barcodeAliasRecordPayloadToJson(payloadValue as BarcodeAliasRecord))).put("sync", syncToJson(payloadValue.sync)).toString()
         SyncEntityType.DiaryEntry -> JSONObject().put("entry", JSONObject((payloadValue as DiaryEntryRecord).entry.toJsonString())).put("sync", syncToJson(payloadValue.sync)).toString()
+        SyncEntityType.WeightEntry -> JSONObject().put("entry", weightEntryToJson(payloadValue as WeightEntryRecord)).put("sync", syncToJson(payloadValue.sync)).toString()
     }
 }
 
@@ -112,6 +115,10 @@ fun syncChangePayloadFromJson(
         SyncEntityType.BarcodeAlias -> barcodeAliasRecordPayloadFromJson(json.getJSONObject("alias").toString(), sync)
         SyncEntityType.DiaryEntry -> DiaryEntryRecord(
             entry = diaryEntryFromJsonString(json.getJSONObject("entry").toString()),
+            sync = sync,
+        )
+        SyncEntityType.WeightEntry -> WeightEntryRecord(
+            entry = weightEntryFromJson(json.getJSONObject("entry")),
             sync = sync,
         )
     }
@@ -210,4 +217,17 @@ private fun nutrientsFromJson(json: JSONObject): Nutrients =
         proteinGrams = json.optDouble("proteinGrams"),
         carbohydrateGrams = json.optDouble("carbohydrateGrams"),
         fatGrams = json.optDouble("fatGrams"),
+    )
+
+private fun weightEntryToJson(record: WeightEntryRecord): JSONObject =
+    JSONObject()
+        .put("id", record.entry.id)
+        .put("date", record.entry.date.toString())
+        .put("weightKg", record.entry.weightKg)
+
+private fun weightEntryFromJson(json: JSONObject): WeightEntry =
+    WeightEntry(
+        id = json.getString("id"),
+        date = LocalDate.parse(json.getString("date")),
+        weightKg = json.getDouble("weightKg"),
     )

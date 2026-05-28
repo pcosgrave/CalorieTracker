@@ -8,7 +8,9 @@
       "Bash(./gradlew cleanTest test --info)",
       "Bash(./gradlew :app:compileDevDebugUnitTestKotlin --info)",
       "Bash(./gradlew :app:compileDevDebugUnitTestKotlin)",
-      "Bash(./gradlew :app:testDevDebugUnitTest)"
+      "Bash(./gradlew :app:testDevDebugUnitTest)",
+      "Bash(Get-ChildItem -Path D:\\\\Projects\\\\CalorieTracker\\\\apps\\\\api\\\\dist\\\\handlers -Recurse)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

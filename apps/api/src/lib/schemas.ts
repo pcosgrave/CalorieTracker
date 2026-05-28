@@ -25,6 +25,8 @@ export const createFoodProductSchema = z.object({
   nutrients: nutrientsSchema,
 });
 
+export const updateFoodProductSchema = createFoodProductSchema;
+
 export const publishCommunityFoodSchema = z.object({
   productId: z.string().min(1).optional(),
   barcode: z.string().min(4).max(32).optional(),
@@ -43,11 +45,15 @@ export const createDiaryEntrySchema = z.object({
   loggedUnit: z.string().min(1).optional(),
 });
 
+export const updateDiaryEntrySchema = createDiaryEntrySchema;
+
 export const createWeightEntrySchema = z.object({
   loggedAt: z.string().datetime(),
   weightKg: z.number().positive(),
   source: z.enum(["manual", "health_connect", "import"]).optional(),
 });
+
+export const updateWeightEntrySchema = createWeightEntrySchema;
 
 export const emptySchema = z.object({});
 

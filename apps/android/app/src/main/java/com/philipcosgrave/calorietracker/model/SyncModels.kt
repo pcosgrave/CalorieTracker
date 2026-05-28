@@ -11,6 +11,7 @@ enum class SyncEntityType {
     FoodProduct,
     BarcodeAlias,
     DiaryEntry,
+    WeightEntry,
 }
 
 enum class SyncOperation {
@@ -44,6 +45,11 @@ data class BarcodeAliasRecord(
 
 data class DiaryEntryRecord(
     val entry: DiaryEntry,
+    val sync: SyncMetadata,
+)
+
+data class WeightEntryRecord(
+    val entry: WeightEntry,
     val sync: SyncMetadata,
 )
 

@@ -42,6 +42,14 @@ output "events_bucket_name" {
   value = aws_s3_bucket.events.bucket
 }
 
+output "app_storage_kms_key_arn" {
+  value = aws_kms_key.app_storage.arn
+}
+
+output "app_storage_kms_alias" {
+  value = aws_kms_alias.app_storage.name
+}
+
 output "api_gateway_rest_api_id" {
   value = var.create_api ? aws_api_gateway_rest_api.main[0].id : null
 }

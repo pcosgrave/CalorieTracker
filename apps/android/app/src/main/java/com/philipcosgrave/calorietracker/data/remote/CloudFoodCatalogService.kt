@@ -47,7 +47,7 @@ class CloudFoodCatalogService(
                     .put("fatGrams", item.nutrients.fatGrams),
             )
 
-        val response = authorizedRequest("${baseUrl()}/foods/community", "POST", body)
+        val response = publicRequest("${baseUrl()}/foods/community", "POST", body)
         return response.optBoolean("existed", false)
     }
 
@@ -102,6 +102,30 @@ class CloudFoodCatalogService(
         }
 
         error("Cloud catalog request failed with ${lastFailure ?: "an unknown authorization error"}")
+    }
+
+    private fun publicRequest(url: String, method: String, body: JSONObject? = null): JSONObject {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.requestMethod = method
+        connection.setRequestProperty("Accept", "application/json")
+        connection.setRequestProperty("Content-Type", "application/json")
+
+        body?.toString()?.toByteArray()?.let { bodyBytes ->
+            connection.doOutput = true
+            connection.outputStream.use { output ->
+                output.write(bodyBytes)
+            }
+        }
+
+        val inputStream =
+            if (connection.responseCode in 200..299) connection.inputStream
+            else connection.errorStream
+        val responseText = inputStream.bufferedReader().use { it.readText() }
+        if (connection.responseCode in 200..299) {
+            return JSONObject(responseText)
+        }
+
+        error("Cloud catalog request failed with status ${connection.responseCode}: $responseText")
     }
 
     private fun foodItemFromJson(json: JSONObject): FoodItem {

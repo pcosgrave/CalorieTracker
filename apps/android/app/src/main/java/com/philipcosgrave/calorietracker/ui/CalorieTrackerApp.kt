@@ -77,6 +77,7 @@ import com.philipcosgrave.calorietracker.model.SyncEntityType
 import com.philipcosgrave.calorietracker.model.SyncOperation
 import com.philipcosgrave.calorietracker.model.SyncSettings
 import com.philipcosgrave.calorietracker.model.WeightEntry
+import com.philipcosgrave.calorietracker.model.WeightEntryRecord
 import com.philipcosgrave.calorietracker.ui.screens.SearchFoodScreen
 import com.philipcosgrave.calorietracker.ui.screens.BarcodeScannerScreen
 import com.philipcosgrave.calorietracker.ui.screens.DiaryScreen
@@ -614,7 +615,7 @@ fun CalorieTrackerApp(
             )
         }
 
-        if (existing == null && item.isUserCreated && authSession != null) {
+        if (existing == null && item.isUserCreated) {
             runCatching { cloudFoodCatalogService.publishCommunityFood(item) }
         }
     }
@@ -710,10 +711,32 @@ fun CalorieTrackerApp(
     }
 
     suspend fun saveWeightEntry(entry: WeightEntry): String? {
+        val deviceId = localStore.deviceId()
         val weightEntry = entry.copy(id = entry.id.ifBlank { createId("weight") })
+        val existing = localStore.weightRepository.getById(localStore.currentOwnerUserId(), weightEntry.id)
         localStore.weightRepository.save(
             localStore.currentOwnerUserId(),
             weightEntry,
+        )
+        val updatedAt = nowIsoString()
+        val weightRecord = WeightEntryRecord(
+            entry = weightEntry,
+            sync = createSyncMetadata(
+                recordId = weightEntry.id,
+                deviceId = deviceId,
+                updatedAt = updatedAt,
+                version = existing?.let { 2 } ?: 1,
+            ).copy(syncStatus = com.philipcosgrave.calorietracker.model.SyncStatus.PendingPush),
+        )
+        localStore.syncOutboxRepository.enqueue(
+            createChangeEnvelope(
+                entityType = SyncEntityType.WeightEntry,
+                operation = SyncOperation.Upsert,
+                deviceId = deviceId,
+                recordId = weightRecord.sync.recordId,
+                payload = weightRecord,
+                baseVersion = if (existing != null) 1 else null,
+            ),
         )
         if (healthConnectAvailability == HealthConnectAvailability.Available &&
             healthConnectPermissionGranted &&
@@ -734,9 +757,30 @@ fun CalorieTrackerApp(
     }
 
     suspend fun deleteWeightEntry(entry: WeightEntry) {
+        val existing = localStore.weightRepository.getById(localStore.currentOwnerUserId(), entry.id) ?: return
+        val deletedAt = nowIsoString()
         localStore.weightRepository.delete(
             localStore.currentOwnerUserId(),
             entry.id,
+        )
+        localStore.syncOutboxRepository.enqueue(
+            createChangeEnvelope(
+                entityType = SyncEntityType.WeightEntry,
+                operation = SyncOperation.Delete,
+                deviceId = localStore.deviceId(),
+                recordId = entry.id,
+                payload = WeightEntryRecord(
+                    entry = existing,
+                    sync = createSyncMetadata(
+                        recordId = entry.id,
+                        deviceId = localStore.deviceId(),
+                        updatedAt = deletedAt,
+                        version = 2,
+                        deletedAt = deletedAt,
+                    ).copy(syncStatus = com.philipcosgrave.calorietracker.model.SyncStatus.PendingPush),
+                ),
+                baseVersion = 1,
+            ),
         )
         if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectExportEnabled) {
             runCatching { healthConnectExporter.deleteWeightEntry(entry.id) }

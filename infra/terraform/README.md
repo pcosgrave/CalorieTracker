@@ -6,6 +6,7 @@ This directory now scaffolds AWS environments for:
 - Web and Android Cognito app clients
 - DynamoDB tables for products, barcode aliases, diary entries, and sync changes
 - A private encrypted S3 bucket for future event/export ingestion
+- A customer-managed KMS key used by DynamoDB, S3, and Lambda CloudWatch log groups
 - Lambda definitions for the API handlers
 - API Gateway with Cognito-protected routes for foods, diary, and sync
 
@@ -166,6 +167,8 @@ After apply, useful outputs include:
 
 ## Notes
 
+- Stored application data now uses a customer-managed KMS key instead of only service-default encryption.
+- Lambda log groups are pre-created with retention and KMS encryption so production logs follow the same storage policy.
 - Google federation is still intentionally out of scope for this first pass.
 - The Android and web apps still need Cognito client integration and token handling.
 - The Lambda package currently vendors `zod` and the shared package, while relying on the AWS Lambda Node.js runtime's included AWS SDK v3. See AWS Lambda Node.js runtime docs for the runtime-included SDK behavior: [Building Lambda functions with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html).

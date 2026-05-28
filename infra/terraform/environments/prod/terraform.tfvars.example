@@ -27,3 +27,4 @@ lambda_runtime         = "nodejs22.x"
 lambda_memory_mb       = 512
 lambda_timeout_seconds = 15
 api_stage_name         = "prod"
+log_retention_days     = 30

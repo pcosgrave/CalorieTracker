@@ -215,6 +215,9 @@ export async function syncNow(): Promise<SyncResult> {
   });
 
   await outboxRepository.acknowledge(pushResponse.acceptedChangeIds);
+  for (const rejection of pushResponse.rejectedChanges) {
+    await outboxRepository.markRejected(rejection.changeId);
+  }
 
   const nextCursor: SyncCursor = pushResponse.cursor;
   const pullResponse = await pullRequest(settings.apiBaseUrl, {

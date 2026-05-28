@@ -70,6 +70,12 @@ variable "api_stage_name" {
   default     = "prod"
 }
 
+variable "log_retention_days" {
+  description = "Retention period for API Lambda CloudWatch log groups."
+  type        = number
+  default     = 30
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
