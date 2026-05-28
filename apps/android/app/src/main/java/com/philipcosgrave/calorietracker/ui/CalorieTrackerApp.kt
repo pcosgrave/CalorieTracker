@@ -95,6 +95,8 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
 
+private const val AUTO_SYNC_INTERVAL_MILLIS = 5 * 60 * 1000L
+
 private enum class VoiceLogPhase {
     Idle,
     Listening,
@@ -839,6 +841,22 @@ fun CalorieTrackerApp(
         return seedFoods.firstOrNull { it.barcode == barcode }
     }
 
+    suspend fun autoSyncIfNeeded() {
+        val latestSettings = localStore.syncStateRepository.getSettings()
+        val hasSession = localStore.currentAuthSession() != null
+        val hasPendingChanges = localStore.syncOutboxRepository.listPendingChanges().isNotEmpty()
+        if (
+            latestSettings.syncEnabled &&
+            latestSettings.backupMode == SyncSettings.BackupMode.AutomaticBackup &&
+            !latestSettings.apiBaseUrl.isNullOrBlank() &&
+            hasSession &&
+            hasPendingChanges
+        ) {
+            runCatching { syncService.syncNow() }
+            refreshState()
+        }
+    }
+
     LaunchedEffect(Unit) {
         localStore.migrateLegacyIfNeeded(
             readLegacyFoods = ::readFoodItems,
@@ -847,9 +865,13 @@ fun CalorieTrackerApp(
         )
         ensureSeedRecipes(localStore.deviceId())
         refreshState()
-        if (syncSettings.syncEnabled && syncSettings.backupMode == SyncSettings.BackupMode.AutomaticBackup && !syncSettings.apiBaseUrl.isNullOrBlank()) {
-            runCatching { syncService.syncNow() }
-            refreshState()
+        autoSyncIfNeeded()
+    }
+
+    LaunchedEffect(syncSettings.syncEnabled, syncSettings.backupMode, syncSettings.apiBaseUrl, authSession?.userSub) {
+        while (true) {
+            delay(AUTO_SYNC_INTERVAL_MILLIS)
+            autoSyncIfNeeded()
         }
     }
 
@@ -896,6 +918,8 @@ fun CalorieTrackerApp(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && screen == AppScreen.Home) {
                 scope.launch { refreshState() }
+            } else if (event == Lifecycle.Event.ON_STOP) {
+                scope.launch { autoSyncIfNeeded() }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
