@@ -954,15 +954,19 @@ fun CalorieTrackerApp(
             .safeDrawingPadding(),
         color = MaterialTheme.colorScheme.background,
     ) {
+        val today = LocalDate.now()
         when (screen) {
             AppScreen.Home -> HomeScreen(
-                caloriesLogged = diary.filter { it.date == selectedDate }.sumOf {
+                caloriesLogged = diary.filter { it.date == today }.sumOf {
                     it.food.nutrients.calories * it.servingMultiplier
                 },
                 healthMetrics = healthMetrics,
                 latestWeightKg = weights.maxByOrNull { it.date }?.weightKg,
                 weightUnit = syncSettings.weightUnit,
-                onOpenFoodLog = { navigateTo(AppScreen.Diary) },
+                onOpenFoodLog = {
+                    selectedDate = today
+                    navigateTo(AppScreen.Diary)
+                },
                 onOpenWeight = { navigateTo(AppScreen.Weight) },
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)

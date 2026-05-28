@@ -35,6 +35,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.Duration
 import kotlin.reflect.KClass
 
 enum class HealthConnectAvailability {
@@ -124,6 +125,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
         val zoneId = ZoneId.systemDefault()
         val start = ZonedDateTime.now(zoneId).toLocalDate().atStartOfDay(zoneId).toInstant()
         val end = java.time.Instant.now()
+        val heartRateLookbackStart = end.minus(Duration.ofHours(48))
         val aggregateMetrics = buildSet {
             if (readStepsPermission in granted) add(StepsRecord.COUNT_TOTAL)
         }
@@ -159,35 +161,57 @@ class HealthConnectNutritionExporter(private val context: Context) {
                 client.readRecords(
                     ReadRecordsRequest(
                         recordType = HeartRateRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(start, end),
+                        timeRangeFilter = TimeRangeFilter.between(heartRateLookbackStart, end),
                         ascendingOrder = false,
-                        pageSize = 10,
+                        pageSize = 50,
                     ),
                 )
             } else {
                 null
             }
-        val latestHeartRate = heartRateResponse?.records
+        val allHeartRateSamples = heartRateResponse?.records
             ?.flatMap { it.samples }
+            .orEmpty()
+        val latestHeartRate = allHeartRateSamples
             ?.maxByOrNull { it.time }
             ?.beatsPerMinute
             ?.toLong()
+        val todayHeartRateSamples = allHeartRateSamples.filter { sample ->
+            sample.time.atZone(zoneId).toLocalDate() == LocalDate.now(zoneId)
+        }
+        val averageHeartRateToday = todayHeartRateSamples.takeIf { it.isNotEmpty() }
+            ?.map { it.beatsPerMinute }
+            ?.average()
+            ?.toLong()
+        val minHeartRateToday = todayHeartRateSamples.minOfOrNull { it.beatsPerMinute }?.toLong()
+        val maxHeartRateToday = todayHeartRateSamples.maxOfOrNull { it.beatsPerMinute }?.toLong()
+        val newestHeartRateSampleTime = allHeartRateSamples.maxByOrNull { it.time }?.time?.atZone(zoneId)
+        val oldestHeartRateSampleTime = allHeartRateSamples.minByOrNull { it.time }?.time?.atZone(zoneId)
+        val heartRateOrigins = heartRateResponse?.records
+            ?.map { it.metadata.dataOrigin.packageName }
+            ?.distinct()
+            ?.sorted()
+            .orEmpty()
         val latestTotalCaloriesToday = caloriesBurnedResponse?.records
             ?.firstOrNull { record ->
                 record.endTime.atZone(zoneId).toLocalDate() == LocalDate.now(zoneId)
             }
             ?.energy
-            ?.inCalories
-        val latestRecentTotalCalories = caloriesBurnedResponse?.records?.firstOrNull()?.energy?.inCalories
+            ?.inKilocalories
+        val latestRecentTotalCalories = caloriesBurnedResponse?.records?.firstOrNull()?.energy?.inKilocalories
 
         Log.d(
             "HealthConnectCalories",
             "LatestTodayTotal=$latestTotalCaloriesToday LatestRecentTotal=$latestRecentTotalCalories RecordCount=${caloriesBurnedResponse?.records?.size ?: 0}",
         )
+        Log.d(
+            "HealthConnectHeartRate",
+            "Latest=$latestHeartRate AvgToday=$averageHeartRateToday MinToday=$minHeartRateToday MaxToday=$maxHeartRateToday SampleCount48h=${allHeartRateSamples.size} Oldest=$oldestHeartRateSampleTime Newest=$newestHeartRateSampleTime Origins=$heartRateOrigins",
+        )
 
         return HealthDashboardMetrics(
             steps = aggregateResponse?.get(StepsRecord.COUNT_TOTAL),
-            heartRateBpm = latestHeartRate,
+            heartRateBpm = latestHeartRate ?: averageHeartRateToday,
             caloriesBurned = latestTotalCaloriesToday ?: latestRecentTotalCalories,
         )
     }
@@ -215,7 +239,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
             metadata = Metadata.manualEntry(entry.id, record.sync.version.toLong()),
             mealType = mealType,
             name = entry.food.name,
-            energy = Energy.calories(nutrients.calories),
+            energy = Energy.kilocalories(nutrients.calories),
             protein = Mass.grams(nutrients.proteinGrams),
             totalCarbohydrate = Mass.grams(nutrients.carbohydrateGrams),
             totalFat = Mass.grams(nutrients.fatGrams),
@@ -305,7 +329,7 @@ class HealthConnectNutritionExporter(private val context: Context) {
                     servingQuantity = 1.0,
                     servingUnit = "entry",
                     nutrients = Nutrients(
-                        calories = record.energy?.inCalories ?: 0.0,
+                        calories = record.energy?.inKilocalories ?: 0.0,
                         proteinGrams = record.protein?.inGrams ?: 0.0,
                         carbohydrateGrams = record.totalCarbohydrate?.inGrams ?: 0.0,
                         fatGrams = record.totalFat?.inGrams ?: 0.0,
