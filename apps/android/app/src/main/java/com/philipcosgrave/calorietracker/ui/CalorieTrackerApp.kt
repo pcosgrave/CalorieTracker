@@ -60,6 +60,7 @@ import com.philipcosgrave.calorietracker.domain.normalizeVoiceSearchQuery
 import com.philipcosgrave.calorietracker.domain.normalizeVoiceTranscript
 import com.philipcosgrave.calorietracker.domain.nowIsoString
 import com.philipcosgrave.calorietracker.domain.parseVoiceFoodCommand
+import com.philipcosgrave.calorietracker.domain.parseVoiceMealCopyCommand
 import com.philipcosgrave.calorietracker.domain.toFoodItem
 import com.philipcosgrave.calorietracker.domain.toRecipeDraft
 import com.philipcosgrave.calorietracker.domain.VoiceFoodCommand
@@ -69,6 +70,7 @@ import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.HealthDashboardMetrics
 import com.philipcosgrave.calorietracker.model.Meal
+import com.philipcosgrave.calorietracker.model.MealCopyOptions
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
@@ -361,6 +363,26 @@ fun CalorieTrackerApp(
         }
     }
 
+    fun mealCopyOptionsForDate(
+        entries: List<DiaryEntry>,
+        targetDate: LocalDate,
+        meal: Meal,
+    ): MealCopyOptions {
+        val sourceDates = entries
+            .asSequence()
+            .filter { it.meal == meal && it.date.isBefore(targetDate) }
+            .map { it.date }
+            .distinct()
+            .sortedDescending()
+            .toList()
+
+        return MealCopyOptions(
+            previousDate = sourceDates.firstOrNull(),
+            yesterdayDate = targetDate.minusDays(1).takeIf { it in sourceDates },
+            selectableDates = sourceDates.take(10),
+        )
+    }
+
     suspend fun touchFoodUsage(foodId: String, meal: Meal) {
         val deviceId = localStore.deviceId()
         val existing = localStore.foodRepository.getById(foodId) ?: return
@@ -427,6 +449,28 @@ fun CalorieTrackerApp(
         }
     }
 
+    suspend fun copyMealEntries(
+        meal: Meal,
+        sourceDate: LocalDate,
+        targetDate: LocalDate,
+    ): Int {
+        val sourceEntries = diary
+            .filter { it.meal == meal && it.date == sourceDate }
+            .sortedBy { it.food.name }
+
+        sourceEntries.forEach { sourceEntry ->
+            saveDiaryEntry(
+                sourceEntry.copy(
+                    id = createId("entry"),
+                    date = targetDate,
+                    meal = meal,
+                ),
+            )
+        }
+        refreshState()
+        return sourceEntries.size
+    }
+
     suspend fun logVoiceMatch(food: FoodItem, command: VoiceFoodCommand, transcript: String) {
         val servingQuantity = food.servingQuantity.coerceAtLeast(0.1)
         val normalizedAmount = when {
@@ -480,12 +524,40 @@ fun CalorieTrackerApp(
         pendingVoiceCommand = null
     }
 
+    suspend fun handleVoiceMealCopyTranscript(transcript: String): Boolean {
+        val command = parseVoiceMealCopyCommand(transcript, selectedDate) ?: return false
+        val sourceDate = command.sourceDate ?: mealCopyOptionsForDate(diary, selectedDate, command.meal).previousDate
+        if (sourceDate == null) {
+            voiceFeedback = VoiceLogFeedback(
+                phase = VoiceLogPhase.Failed,
+                transcript = transcript,
+                message = "I couldn't find a previous ${command.meal.label.lowercase(Locale.CANADA)} to copy.",
+            )
+            return true
+        }
+        val copiedCount = copyMealEntries(command.meal, sourceDate, selectedDate)
+        voiceFeedback = VoiceLogFeedback(
+            phase = VoiceLogPhase.Success,
+            transcript = transcript,
+            message = if (copiedCount > 0) {
+                "Copied $copiedCount item${if (copiedCount == 1) "" else "s"} from ${command.meal.label.lowercase(Locale.CANADA)} on ${sourceDate.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${sourceDate.dayOfMonth}."
+            } else {
+                "I couldn't find any items in ${command.meal.label.lowercase(Locale.CANADA)} on ${sourceDate.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${sourceDate.dayOfMonth}."
+            },
+        )
+        pendingVoiceCommand = null
+        return true
+    }
+
     suspend fun handleVoiceFoodTranscript(transcript: String) {
         voiceFeedback = VoiceLogFeedback(
             phase = VoiceLogPhase.Heard,
             transcript = transcript,
             message = "Heard that. Matching it now.",
         )
+        if (handleVoiceMealCopyTranscript(transcript)) {
+            return
+        }
         val command = parseVoiceFoodCommand(transcript)
         if (command == null) {
             openVoiceFallbackSearch(
@@ -569,7 +641,7 @@ fun CalorieTrackerApp(
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.CANADA.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like: Add 30 grams onion")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like: add 30 grams onion or repeat breakfast")
         }
         speechRecognitionLauncher.launch(intent)
     }
@@ -577,7 +649,7 @@ fun CalorieTrackerApp(
     val launchVoiceRecognition = {
         voiceFeedback = VoiceLogFeedback(
             phase = VoiceLogPhase.Listening,
-            message = "Listening. Try saying: add 30 grams onion.",
+            message = "Listening. Try saying: add 30 grams onion or repeat breakfast.",
         )
         recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
@@ -956,6 +1028,12 @@ fun CalorieTrackerApp(
         popScreen()
     }
 
+    val mealCopyOptionsByMeal = remember(diary, selectedDate) {
+        Meal.entries.associateWith { meal ->
+            mealCopyOptionsForDate(diary, selectedDate, meal)
+        }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -1008,6 +1086,35 @@ fun CalorieTrackerApp(
                     editingDiaryEntry = entry
                     selectedFood = entry.food
                     navigateTo(AppScreen.LogFood)
+                },
+                mealCopyOptions = mealCopyOptionsByMeal,
+                onCopyMealFromDate = { meal, sourceDate ->
+                    scope.launch {
+                        val copiedCount = copyMealEntries(meal, sourceDate, selectedDate)
+                        Toast.makeText(
+                            context,
+                            if (copiedCount > 0) {
+                                "Copied $copiedCount item${if (copiedCount == 1) "" else "s"} from ${meal.label.lowercase(Locale.CANADA)}."
+                            } else {
+                                "No items found to copy from that ${meal.label.lowercase(Locale.CANADA)}."
+                            },
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                },
+                onCopyMealToToday = { meal ->
+                    scope.launch {
+                        val copiedCount = copyMealEntries(meal, selectedDate, LocalDate.now())
+                        Toast.makeText(
+                            context,
+                            if (copiedCount > 0) {
+                                "Copied $copiedCount item${if (copiedCount == 1) "" else "s"} to today’s ${meal.label.lowercase(Locale.CANADA)}."
+                            } else {
+                                "No items found to copy from that ${meal.label.lowercase(Locale.CANADA)}."
+                            },
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 },
                 voiceTranscript = voiceFeedback.transcript,
                 voiceStatusLabel = when (voiceFeedback.phase) {

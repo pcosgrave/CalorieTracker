@@ -19,11 +19,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,6 +40,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
@@ -96,7 +105,7 @@ fun appBorderColor(): Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2
 fun appBorderStrongColor(): Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.48f)
 
 @Composable
-fun appSoftColor(): Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+fun appSoftColor(): Color = MaterialTheme.colorScheme.surfaceVariant.copy()
 
 fun isDigitsOnlyInput(value: String): Boolean = value.isEmpty() || value.all { it.isDigit() }
 fun isDecimalNumberInput(value: String): Boolean =
@@ -104,12 +113,15 @@ fun isDecimalNumberInput(value: String): Boolean =
 fun normalizeDecimalNumberInput(value: String): String = if (value.startsWith(".")) "0$value" else value
 
 @Composable
-fun Page(content: @Composable ColumnScope.() -> Unit) {
+fun Page(
+    scrollState: ScrollState = rememberScrollState(),
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(appBackgroundColor())
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         content = content,
@@ -170,33 +182,30 @@ fun Metric(value: String, label: String, modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun DiaryEntryRow(
+    entry: DiaryEntry,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val nutrients = entry.food.nutrients.scale(entry.servingMultiplier)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
-        border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(start = 18.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(entry.food.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${entry.food.brand.ifBlank { entry.food.servingLabel }} • ${formatNumber(entry.loggedAmount)} ${entry.loggedUnit}",
-                    color = AppMuted,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Text("${formatNumber(nutrients.calories)} cal", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-            OverflowMenu(onEdit = onEdit, onDelete = onDelete)
-        }
-    }
+    InteractiveFoodRow(
+        title = entry.food.name,
+        trailing = "${formatNumber(nutrients.calories)} cal",
+        onClick = {},
+        onLongClick = onToggleExpanded,
+        onEdit = onEdit,
+        onDelete = onDelete,
+        compact = false,
+        supporting = if (expanded) {
+            "${entry.food.brand.ifBlank { entry.food.servingLabel }} - ${formatNumber(entry.loggedAmount)} ${entry.loggedUnit}"
+        } else {
+            null
+        },
+    )
 }
 
 @Composable
@@ -205,8 +214,122 @@ fun FoodSearchRow(
     showCalories: Boolean,
     onClick: () -> Unit,
     onDoubleClick: (() -> Unit)? = null,
+    expanded: Boolean = false,
+    onToggleExpanded: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+) {
+    val manageable = onEdit != null && onToggleExpanded != null
+    InteractiveFoodRow(
+        title = item.name,
+        trailing = if (showCalories) "${formatNumber(item.nutrients.calories)} cal" else null,
+        onClick = onClick,
+        onDoubleClick = onDoubleClick,
+        onLongClick = if (manageable) onToggleExpanded else onEdit,
+        onEdit = onEdit,
+        onDelete = onDelete,
+        compact = true,
+        supporting = if (!manageable || expanded) {
+            buildList {
+                if (item.kind == FoodKind.Recipe) add("Recipe")
+                if (item.brand.isNotBlank()) add(item.brand)
+                add(item.servingLabel)
+                if (!manageable && showCalories) add("${formatNumber(item.nutrients.calories)} cal")
+            }.joinToString(" - ")
+        } else {
+            null
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InteractiveFoodRow(
+    title: String,
+    trailing: String?,
+    onClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    compact: Boolean,
+    supporting: String?,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { it * 0.35f },
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onEdit?.invoke()
+                    false
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDelete?.invoke()
+                    false
+                }
+                else -> false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = onEdit != null,
+        enableDismissFromEndToStart = onDelete != null,
+        backgroundContent = {
+            when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    if (onEdit != null) {
+                        SwipeActionBackground(
+                            alignment = Alignment.CenterStart,
+                            color = Color(0xFF4CAF50),
+                        ) {
+                            Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit", tint = Color.White)
+                        }
+                    }
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    if (onDelete != null) {
+                        SwipeActionBackground(
+                            alignment = Alignment.CenterEnd,
+                            color = Color(0xFFFF5449),
+                        ) {
+                            Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        },
+    ) {
+        FoodRowCardContent(
+            title = title,
+            trailing = trailing,
+            compact = compact,
+            onClick = onClick,
+            onDoubleClick = onDoubleClick,
+            onLongClick = onLongClick,
+        ) {
+            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            if (!supporting.isNullOrBlank()) {
+                Text(
+                    supporting,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = appMutedColor(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoodRowCardContent(
+    title: String,
+    trailing: String?,
+    compact: Boolean,
+    onClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    supporting: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -219,28 +342,47 @@ fun FoodSearchRow(
                 .combinedClickable(
                     onClick = onClick,
                     onDoubleClick = onDoubleClick,
+                    onLongClick = onLongClick,
                 )
-                .padding(start = 18.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+                .padding(
+                    start = 18.dp,
+                    top = if (compact) 6.dp else 16.dp,
+                    end = 18.dp,
+                    bottom = if (compact) 6.dp else 16.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
+                content = supporting,
+            )
+            if (trailing != null) {
                 Text(
-                    buildList {
-                        if (item.kind == FoodKind.Recipe) add("Recipe")
-                        if (item.brand.isNotBlank()) add(item.brand)
-                        add(item.servingLabel)
-                        if (showCalories) add("${formatNumber(item.nutrients.calories)} cal")
-                    }.joinToString(" • "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = appMutedColor(),
+                    trailing,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
                 )
-            }
-            if (onEdit != null && onDelete != null) {
-                OverflowMenu(onEdit = onEdit, onDelete = onDelete)
             }
         }
+    }
+}
+
+@Composable
+private fun SwipeActionBackground(
+    alignment: Alignment,
+    color: Color,
+    icon: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color, RoundedCornerShape(22.dp))
+            .padding(horizontal = 20.dp),
+        contentAlignment = alignment,
+    ) {
+        icon()
     }
 }
 
@@ -285,7 +427,10 @@ fun RecipeComponentRow(
                     shape = RoundedCornerShape(14.dp),
                 )
                 UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)
-                TextButton(onClick = onRemove) { Text("\uD83D\uDDD1", color = Color(0xFFFF5449), style = MaterialTheme.typography.titleMedium) }
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Delete",
+                )
             }
         }
     }
@@ -536,7 +681,13 @@ private fun TotalsPreview() {
 private fun RowsPreview() {
     PreviewData.Theme {
         Page {
-            DiaryEntryRow(entry = PreviewData.diaryEntries.first(), onEdit = {}, onDelete = {})
+            DiaryEntryRow(
+                entry = PreviewData.diaryEntries.first(),
+                expanded = true,
+                onToggleExpanded = {},
+                onEdit = {},
+                onDelete = {},
+            )
             FoodSearchRow(item = PreviewData.foods.last(), showCalories = true, onClick = {}, onEdit = {}, onDelete = {})
             RecipeComponentRow(component = PreviewData.recipeComponent, onChange = {}, onRemove = {})
         }

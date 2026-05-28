@@ -1,6 +1,9 @@
 package com.philipcosgrave.calorietracker.domain
 
 import com.philipcosgrave.calorietracker.model.Meal
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.Month
 import java.time.LocalTime
 import java.util.Locale
 
@@ -9,6 +12,11 @@ data class VoiceFoodCommand(
     val unit: String?,
     val ingredientQuery: String,
     val mealOverride: Meal? = null,
+)
+
+data class VoiceMealCopyCommand(
+    val meal: Meal,
+    val sourceDate: LocalDate? = null,
 )
 
 private data class NumberParseResult(
@@ -99,6 +107,42 @@ private val ignorableVoiceLeadIns = setOf(
     "bitewise",
 )
 
+private val weekdayTokens = mapOf(
+    "monday" to DayOfWeek.MONDAY,
+    "tuesday" to DayOfWeek.TUESDAY,
+    "wednesday" to DayOfWeek.WEDNESDAY,
+    "thursday" to DayOfWeek.THURSDAY,
+    "friday" to DayOfWeek.FRIDAY,
+    "saturday" to DayOfWeek.SATURDAY,
+    "sunday" to DayOfWeek.SUNDAY,
+)
+
+private val monthTokens = mapOf(
+    "january" to Month.JANUARY,
+    "jan" to Month.JANUARY,
+    "february" to Month.FEBRUARY,
+    "feb" to Month.FEBRUARY,
+    "march" to Month.MARCH,
+    "mar" to Month.MARCH,
+    "april" to Month.APRIL,
+    "apr" to Month.APRIL,
+    "may" to Month.MAY,
+    "june" to Month.JUNE,
+    "jun" to Month.JUNE,
+    "july" to Month.JULY,
+    "jul" to Month.JULY,
+    "august" to Month.AUGUST,
+    "aug" to Month.AUGUST,
+    "september" to Month.SEPTEMBER,
+    "sep" to Month.SEPTEMBER,
+    "october" to Month.OCTOBER,
+    "oct" to Month.OCTOBER,
+    "november" to Month.NOVEMBER,
+    "nov" to Month.NOVEMBER,
+    "december" to Month.DECEMBER,
+    "dec" to Month.DECEMBER,
+)
+
 fun parseVoiceFoodCommand(spokenText: String): VoiceFoodCommand? {
     val normalized = normalizeVoiceTranscript(spokenText)
     if (normalized.isBlank()) return null
@@ -115,6 +159,24 @@ fun parseVoiceFoodCommand(spokenText: String): VoiceFoodCommand? {
         unit = null,
         ingredientQuery = core.trim(),
         mealOverride = mealOverride,
+    )
+}
+
+fun parseVoiceMealCopyCommand(
+    spokenText: String,
+    targetDate: LocalDate,
+): VoiceMealCopyCommand? {
+    val normalized = normalizeVoiceTranscript(spokenText)
+    if (normalized.isBlank()) return null
+
+    val tokens = normalized.split(" ").filter { it.isNotBlank() }
+    if (tokens.none { it in setOf("copy", "repeat") }) return null
+
+    val meal = extractMealReference(normalized) ?: return null
+    val sourceDate = extractCopySourceDate(normalized, targetDate)
+    return VoiceMealCopyCommand(
+        meal = meal,
+        sourceDate = sourceDate,
     )
 }
 
@@ -285,6 +347,47 @@ private fun extractMealHint(text: String): Pair<String, Meal?> {
 
     val match = hints.firstOrNull { text.contains(it.first) } ?: return text to null
     return text.replace(match.first, "").replace(Regex("\\s+"), " ").trim() to match.second
+}
+
+private fun extractMealReference(text: String): Meal? =
+    when {
+        text.contains("breakfast") -> Meal.Breakfast
+        text.contains("lunch") -> Meal.Lunch
+        text.contains("dinner") -> Meal.Dinner
+        text.contains("snack") -> Meal.Snack
+        else -> null
+    }
+
+private fun extractCopySourceDate(
+    text: String,
+    targetDate: LocalDate,
+): LocalDate? {
+    if (text.contains("yesterday")) {
+        return targetDate.minusDays(1)
+    }
+
+    weekdayTokens.entries.firstOrNull { text.contains(it.key) }?.value?.let { weekday ->
+        var candidate = targetDate.minusDays(1)
+        while (candidate.dayOfWeek != weekday) {
+            candidate = candidate.minusDays(1)
+        }
+        return candidate
+    }
+
+    val tokens = text.split(" ").filter { it.isNotBlank() }
+    for (index in 0 until tokens.lastIndex) {
+        val month = monthTokens[tokens[index]] ?: continue
+        val day = tokens[index + 1].trimEnd(',', '.').toIntOrNull() ?: continue
+        var candidateYear = targetDate.year
+        var candidate = runCatching { LocalDate.of(candidateYear, month, day) }.getOrNull() ?: continue
+        if (!candidate.isBefore(targetDate)) {
+            candidateYear -= 1
+            candidate = runCatching { LocalDate.of(candidateYear, month, day) }.getOrNull() ?: continue
+        }
+        return candidate
+    }
+
+    return null
 }
 
 private fun stripIngredientLeadInTokens(tokens: List<String>): List<String> =

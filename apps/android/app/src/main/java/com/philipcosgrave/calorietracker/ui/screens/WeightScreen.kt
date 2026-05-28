@@ -11,13 +11,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,11 +51,12 @@ import com.philipcosgrave.calorietracker.ui.components.AppBlue
 import com.philipcosgrave.calorietracker.ui.components.AppCardContainer
 import com.philipcosgrave.calorietracker.ui.components.AppMuted
 import com.philipcosgrave.calorietracker.ui.components.AppSegmentedControl
-import com.philipcosgrave.calorietracker.ui.components.OverflowMenu
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.ScrollablePillSelector
 import com.philipcosgrave.calorietracker.ui.components.SectionDivider
+import com.philipcosgrave.calorietracker.ui.components.appBorderStrongColor
+import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -66,6 +79,7 @@ fun WeightScreen(
     var selectedDailyDate by remember { mutableStateOf(today) }
     var selectedWeekStart by remember { mutableStateOf(startOfWeek(today)) }
     var selectedMonthStart by remember { mutableStateOf(today.withDayOfMonth(1)) }
+    var pendingDeleteWeight by remember { mutableStateOf<WeightEntry?>(null) }
 
     val selectedEntries = remember(weights, range, selectedDailyDate, selectedWeekStart, selectedMonthStart) {
         when (range) {
@@ -186,11 +200,34 @@ fun WeightScreen(
                         entry = entry,
                         weightUnit = weightUnit,
                         onEdit = onEditWeight,
-                        onDelete = onDeleteWeight,
+                        onDelete = { pendingDeleteWeight = it },
                     )
                 }
             }
         }
+    }
+
+    pendingDeleteWeight?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteWeight = null },
+            title = { Text("Delete weight?") },
+            text = { Text("Delete the weight recorded on ${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteWeight = null
+                        onDeleteWeight(entry)
+                    },
+                ) {
+                    Text("Delete", color = androidx.compose.ui.graphics.Color(0xFFFF5449), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteWeight = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
@@ -419,6 +456,7 @@ private fun WeightTrendChart(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeightHistoryRow(
     entry: WeightEntry,
@@ -426,27 +464,87 @@ private fun WeightHistoryRow(
     onEdit: (WeightEntry) -> Unit,
     onDelete: (WeightEntry) -> Unit,
 ) {
-        Row(
+    val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { it * 0.35f },
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onEdit(entry)
+                    false
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDelete(entry)
+                    false
+                }
+                else -> false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .background(androidx.compose.ui.graphics.Color(0xFF4CAF50), RoundedCornerShape(22.dp)),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Box(modifier = Modifier.width(56.dp), contentAlignment = Alignment.Center) {
+                            Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit", tint = androidx.compose.ui.graphics.Color.White)
+                        }
+                    }
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .background(androidx.compose.ui.graphics.Color(0xFFFF5449), RoundedCornerShape(22.dp)),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        Box(modifier = Modifier.width(56.dp), contentAlignment = Alignment.Center) {
+                            Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = androidx.compose.ui.graphics.Color.White)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        },
+    ) {
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = appSoftColor()),
+            border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     "${entry.date.month.name.take(3)} ${entry.date.dayOfMonth}, ${entry.date.year}",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f).padding(start = 18.dp),
                 )
                 Text(
                     "${formatNumber(convertWeightFromKg(entry.weightKg, weightUnit))} ${weightUnitLabel(weightUnit)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 18.dp),
                 )
-            OverflowMenu(
-                onEdit = { onEdit(entry) },
-                onDelete = { onDelete(entry) },
-            )
+            }
         }
-        SectionDivider()
+    }
+    SectionDivider()
 }
 
 private fun buildChartPoints(

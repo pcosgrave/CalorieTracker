@@ -64,6 +64,12 @@ data class DiaryEntry(
     val loggedUnit: String = food.servingUnit,
 )
 
+data class MealCopyOptions(
+    val previousDate: LocalDate? = null,
+    val yesterdayDate: LocalDate? = null,
+    val selectableDates: List<LocalDate> = emptyList(),
+)
+
 data class RecipeDraft(
     val name: String = "",
     val brand: String = "",

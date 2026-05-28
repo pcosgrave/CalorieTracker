@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,6 +83,8 @@ fun SearchFoodScreen(
     var activeKind by remember { mutableStateOf(FoodKind.Ingredient) }
     var sortMode by remember { mutableStateOf(SortMode.Recent) }
     var addMenuExpanded by remember { mutableStateOf(false) }
+    var expandedFoodId by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteFood by remember { mutableStateOf<FoodItem?>(null) }
     val currentMeal = remember { inferMealForTime(LocalTime.now()) }
     val sortModeLabel = when (sortMode) {
         SortMode.MealTime -> "Frequent ${currentMeal.label}"
@@ -121,6 +124,10 @@ fun SearchFoodScreen(
         if (initialSearchQuery.isNotBlank() && initialSearchQuery != search) {
             search = initialSearchQuery
         }
+    }
+
+    LaunchedEffect(search, activeKind, sortMode) {
+        expandedFoodId = null
     }
 
     Page {
@@ -227,8 +234,12 @@ fun SearchFoodScreen(
                         showCalories = true,
                         onClick = { onSelectFood(item) },
                         onDoubleClick = { onQuickLogFood(item) },
+                        expanded = expandedFoodId == item.id,
+                        onToggleExpanded = {
+                            expandedFoodId = if (expandedFoodId == item.id) null else item.id
+                        },
                         onEdit = { onEditFood(item) },
-                        onDelete = { onDeleteFood(item) },
+                        onDelete = { pendingDeleteFood = item },
                     )
                 }
             }
@@ -316,6 +327,29 @@ fun SearchFoodScreen(
                 }
             }
         }
+    }
+
+    pendingDeleteFood?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteFood = null },
+            title = { Text("Delete food?") },
+            text = { Text("Delete ${item.name} from your saved foods?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteFood = null
+                        onDeleteFood(item)
+                    },
+                ) {
+                    Text("Delete", color = Color(0xFFFF5449), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteFood = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
