@@ -592,19 +592,31 @@ fun <T> ScrollablePillSelector(
     labelForOption: (T) -> String,
     modifier: Modifier = Modifier,
 ) {
-    val selectedIndex = options.indexOf(selectedOption).coerceAtLeast(0)
+    val historicalOptions = remember(options, currentOption) {
+        if (currentOption == null) options else options.filter { it != currentOption }
+    }
+    val selectedHistoricalIndex = historicalOptions.indexOf(selectedOption)
     val listState = rememberLazyListState()
     val fadeColor = appCardColor()
 
-    LaunchedEffect(selectedIndex, options.size) {
-        listState.animateScrollToItem(selectedIndex.coerceAtLeast(0))
+    LaunchedEffect(selectedHistoricalIndex, historicalOptions.size, currentOption, selectedOption) {
+        if (historicalOptions.isEmpty()) return@LaunchedEffect
+        val targetIndex =
+            when {
+                currentOption != null && selectedOption == currentOption -> historicalOptions.lastIndex
+                selectedHistoricalIndex >= 0 -> selectedHistoricalIndex
+                else -> historicalOptions.lastIndex
+            }
+        listState.animateScrollToItem(targetIndex.coerceAtLeast(0))
         awaitFrame()
-        val layoutInfo = listState.layoutInfo
-        val selectedItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
-        if (selectedItem != null) {
-            val viewportWidth = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-            val centeredOffset = -((viewportWidth - selectedItem.size) / 2)
-            listState.animateScrollToItem(selectedIndex, centeredOffset)
+        if (currentOption == null && selectedHistoricalIndex >= 0) {
+            val layoutInfo = listState.layoutInfo
+            val selectedItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedHistoricalIndex }
+            if (selectedItem != null) {
+                val viewportWidth = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                val centeredOffset = -((viewportWidth - selectedItem.size) / 2)
+                listState.animateScrollToItem(selectedHistoricalIndex, centeredOffset)
+            }
         }
     }
 
@@ -620,7 +632,7 @@ fun <T> ScrollablePillSelector(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                itemsIndexed(options, key = { _, option -> option.hashCode() }) { _, option ->
+                itemsIndexed(historicalOptions, key = { _, option -> option.hashCode() }) { _, option ->
                     val selected = option == selectedOption
                     Box(
                         modifier = Modifier
@@ -670,17 +682,18 @@ fun <T> ScrollablePillSelector(
             }
         }
 
-        if (currentOption != null && currentLabel != null && selectedOption != currentOption) {
+        if (currentOption != null && currentLabel != null) {
+            val currentSelected = selectedOption == currentOption
             Box(
                 modifier = Modifier
-                    .background(appSoftColor(), RoundedCornerShape(14.dp))
+                    .background(if (currentSelected) AppBlue else appSoftColor(), RoundedCornerShape(14.dp))
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 TextButton(onClick = { onSelect(currentOption) }) {
                     Text(
                         currentLabel,
-                        color = AppBlue,
+                        color = if (currentSelected) Color.White else AppBlue,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelLarge,
                     )
