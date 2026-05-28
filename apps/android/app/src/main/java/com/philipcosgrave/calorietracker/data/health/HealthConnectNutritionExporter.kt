@@ -8,7 +8,6 @@ import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_HISTORY
-import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.MealType
 import androidx.health.connect.client.records.NutritionRecord
@@ -58,8 +57,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
             HealthPermission.getReadPermission(HeartRateRecord::class)
         val readCaloriesBurnedPermission: String =
             HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class)
-        val readActiveCaloriesBurnedPermission: String =
-            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
         val writeWeightPermission: String =
             HealthPermission.getWritePermission(WeightRecord::class)
         val readWeightPermission: String =
@@ -73,7 +70,6 @@ class HealthConnectNutritionExporter(private val context: Context) {
             readStepsPermission,
             readHeartRatePermission,
             readCaloriesBurnedPermission,
-            readActiveCaloriesBurnedPermission,
         )
 
         fun onboardingUri(): Uri =
@@ -122,48 +118,77 @@ class HealthConnectNutritionExporter(private val context: Context) {
         }
 
     suspend fun readTodayMetrics(): HealthDashboardMetrics {
-        if (!hasRequestedPermissions()) return HealthDashboardMetrics()
+        val granted = grantedPermissions()
+        if (granted.isEmpty()) return HealthDashboardMetrics()
 
         val zoneId = ZoneId.systemDefault()
         val start = ZonedDateTime.now(zoneId).toLocalDate().atStartOfDay(zoneId).toInstant()
         val end = java.time.Instant.now()
-        val aggregateResponse = client.aggregate(
-            AggregateRequest(
-                metrics = setOf(
-                    StepsRecord.COUNT_TOTAL,
-                    ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
-                ),
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            ),
-        )
-        val caloriesBurnedResponse = client.readRecords(
-            ReadRecordsRequest(
-                recordType = TotalCaloriesBurnedRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-                ascendingOrder = false,
-                pageSize = 1,
-            ),
-        )
-        val heartRateResponse = client.readRecords(
-            ReadRecordsRequest(
-                recordType = HeartRateRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-                ascendingOrder = false,
-                pageSize = 10,
-            ),
-        )
-        val latestHeartRate = heartRateResponse.records
-            .flatMap { it.samples }
-            .maxByOrNull { it.time }
+        val aggregateMetrics = buildSet {
+            if (readStepsPermission in granted) add(StepsRecord.COUNT_TOTAL)
+        }
+        val aggregateResponse =
+            if (aggregateMetrics.isNotEmpty()) {
+                client.aggregate(
+                    AggregateRequest(
+                        metrics = aggregateMetrics,
+                        timeRangeFilter = TimeRangeFilter.between(start, end),
+                    ),
+                )
+            } else {
+                null
+            }
+        val caloriesBurnedResponse =
+            if (readCaloriesBurnedPermission in granted) {
+                client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = TotalCaloriesBurnedRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(
+                            start.minusSeconds(3 * 24 * 60 * 60),
+                            end,
+                        ),
+                        ascendingOrder = false,
+                        pageSize = 10,
+                    ),
+                )
+            } else {
+                null
+            }
+        val heartRateResponse =
+            if (readHeartRatePermission in granted) {
+                client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = HeartRateRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(start, end),
+                        ascendingOrder = false,
+                        pageSize = 10,
+                    ),
+                )
+            } else {
+                null
+            }
+        val latestHeartRate = heartRateResponse?.records
+            ?.flatMap { it.samples }
+            ?.maxByOrNull { it.time }
             ?.beatsPerMinute
             ?.toLong()
-        val activeCalories = aggregateResponse[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inCalories
-        val latestTotalCalories = caloriesBurnedResponse.records.firstOrNull()?.energy?.inCalories
+        val latestTotalCaloriesToday = caloriesBurnedResponse?.records
+            ?.firstOrNull { record ->
+                record.endTime.atZone(zoneId).toLocalDate() == LocalDate.now(zoneId)
+            }
+            ?.energy
+            ?.inCalories
+        val latestRecentTotalCalories = caloriesBurnedResponse?.records?.firstOrNull()?.energy?.inCalories
+
+        Log.d(
+            "HealthConnectCalories",
+            "LatestTodayTotal=$latestTotalCaloriesToday LatestRecentTotal=$latestRecentTotalCalories RecordCount=${caloriesBurnedResponse?.records?.size ?: 0}",
+        )
 
         return HealthDashboardMetrics(
-            steps = aggregateResponse[StepsRecord.COUNT_TOTAL],
+            steps = aggregateResponse?.get(StepsRecord.COUNT_TOTAL),
             heartRateBpm = latestHeartRate,
-            caloriesBurned = activeCalories ?: latestTotalCalories,
+            caloriesBurned = latestTotalCaloriesToday ?: latestRecentTotalCalories,
         )
     }
 
