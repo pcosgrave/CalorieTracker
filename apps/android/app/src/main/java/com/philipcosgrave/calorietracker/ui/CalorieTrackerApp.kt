@@ -98,6 +98,7 @@ import java.time.LocalTime
 import java.util.Locale
 
 private const val AUTO_SYNC_INTERVAL_MILLIS = 5 * 60 * 1000L
+private const val AUTO_HEALTH_CONNECT_SYNC_INTERVAL_MILLIS = 5 * 60 * 1000L
 
 private enum class VoiceLogPhase {
     Idle,
@@ -937,6 +938,29 @@ fun CalorieTrackerApp(
         }
     }
 
+    suspend fun autoHealthConnectSyncIfNeeded() {
+        val latestAvailability = healthConnectExporter.availability()
+        val latestPermissionsGranted =
+            latestAvailability == HealthConnectAvailability.Available &&
+                healthConnectExporter.hasRequestedPermissions()
+        val latestExportEnabled = localStore.isHealthConnectExportEnabled()
+
+        if (
+            latestAvailability != HealthConnectAvailability.Available ||
+            !latestPermissionsGranted ||
+            !latestExportEnabled
+        ) {
+            return
+        }
+
+        val (importedWeights, _) = importWeightHistoryFromHealthConnect()
+        val (importedNutrition, _) = importNutritionHistoryFromHealthConnect()
+
+        if (importedWeights > 0 || importedNutrition > 0 || screen == AppScreen.Home) {
+            refreshState()
+        }
+    }
+
     LaunchedEffect(Unit) {
         localStore.migrateLegacyIfNeeded(
             readLegacyFoods = ::readFoodItems,
@@ -945,6 +969,7 @@ fun CalorieTrackerApp(
         )
         ensureSeedRecipes(localStore.deviceId())
         refreshState()
+        autoHealthConnectSyncIfNeeded()
         autoSyncIfNeeded()
     }
 
@@ -952,6 +977,13 @@ fun CalorieTrackerApp(
         while (true) {
             delay(AUTO_SYNC_INTERVAL_MILLIS)
             autoSyncIfNeeded()
+        }
+    }
+
+    LaunchedEffect(healthConnectAvailability, healthConnectPermissionGranted, healthConnectExportEnabled) {
+        while (true) {
+            delay(AUTO_HEALTH_CONNECT_SYNC_INTERVAL_MILLIS)
+            autoHealthConnectSyncIfNeeded()
         }
     }
 
@@ -997,9 +1029,15 @@ fun CalorieTrackerApp(
         textToSpeech.language = Locale.CANADA
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && screen == AppScreen.Home) {
-                scope.launch { refreshState() }
+                scope.launch {
+                    refreshState()
+                    autoHealthConnectSyncIfNeeded()
+                }
             } else if (event == Lifecycle.Event.ON_STOP) {
-                scope.launch { autoSyncIfNeeded() }
+                scope.launch {
+                    autoHealthConnectSyncIfNeeded()
+                    autoSyncIfNeeded()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
