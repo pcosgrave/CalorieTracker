@@ -1,0 +1,10 @@
+﻿{
+    "applicationId":  "com.cosgravelabs.bitewise",
+    "versionCode":  2,
+    "versionName":  "0.1.1",
+    "releaseTag":  "v0.1.1+2",
+    "bundleFile":  "BiteWise-v0.1.1+2.aab",
+    "sourceBundle":  "D:\\Projects\\CalorieTracker\\apps\\android\\app\\build\\outputs\\bundle\\prodRelease\\app-prod-release.aab",
+    "sha256":  "3E3C34270D67191A4587D8F247CB2E868FE2308C951828D16352933971BFB066",
+    "builtAtUtc":  "2026-05-29T01:31:07.7393040Z"
+}
