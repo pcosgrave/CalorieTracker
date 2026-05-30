@@ -1,47 +1,48 @@
 # BiteWise
 
-Local-first calorie and weight tracking app by Cosgrave Labs.
+BiteWise is a local-first calorie, meal, and weight tracking app from Cosgrave Labs. The project currently includes an Android app, a web app, and an AWS-backed sync layer for authenticated cloud backup and cross-device sync.
 
-## Phase 1
+## Overview
 
-- Manual food entry
-- Private per-user barcode mappings
-- Web app and Android app
-- Google sign-in through Cognito
-- DynamoDB-backed cloud sync path for development/paid-mode iteration
-- Customer-managed KMS encryption for AWS-stored app data and Lambda log groups
-- Terraform-managed AWS infrastructure in `us-east-1`
+BiteWise is built around a local-first model:
+
+- food, diary, and weight data are created locally first
+- changes can sync to AWS when cloud sync is enabled
+- Health Connect is used on Android for supported nutrition and health data flows
+- community food records can be shared separately from user-owned data
+
+Current areas of focus include:
+
+- food logging and meal management
+- weight tracking and charting
+- voice-assisted logging
+- barcode scanning and food lookup
+- Android and web support with shared backend contracts
 
 ## Repository Layout
 
-- `apps/web`: Next.js web app
-- `apps/api`: TypeScript AWS Lambda API
-- `apps/android`: Android Kotlin/Jetpack Compose app skeleton
-- `shared`: Shared TypeScript domain contracts
-- `infra/terraform`: AWS infrastructure
-- `docs`: Product and architecture notes
+- `apps/android` - Kotlin + Jetpack Compose Android app
+- `apps/web` - Next.js web app
+- `apps/api` - TypeScript AWS Lambda API
+- `shared` - shared TypeScript contracts and domain types
+- `infra/terraform` - AWS infrastructure definitions for `dev` and `prod`
+- `scripts` - local build and release helpers
+- `docs` - product, architecture, release, and security documentation
 
-## Security
+## Security Notice
 
-`BiteWise` currently uses a server-readable cloud sync model with stronger infrastructure protections:
+BiteWise currently uses a server-readable sync model with stronger infrastructure protections.
 
-- HTTPS in transit
-- customer-managed KMS encryption for DynamoDB, S3, and Lambda log groups
-- per-user storage partitioning in the backend
-- offline-first sync reconciliation on the server
+- data is sent over HTTPS in transit
+- AWS-stored data is encrypted at rest using customer-managed KMS-backed infrastructure
+- user-owned data is partitioned per authenticated user in the backend
+- sync changes are reconciled server-side for offline-first workflows
 
-This is not an end-to-end encrypted design. Operators with sufficient AWS permissions can still read stored user data. For the current detailed posture, see:
+This is **not** an end-to-end encrypted system. Anyone with sufficient AWS access to the production environment can still read stored user data.
 
-- [Security And Privacy](./docs/security-and-privacy.md)
+For more detail, see:
 
-## Privacy
-
-Current privacy model:
-
-- user-owned records are stored per authenticated user
-- account deletion removes only that user’s owned rows
-- community food records are stored separately and are not deleted with a user account
-- cloud-stored data is encrypted at rest, but remains server-readable
+- [Security and Privacy](./docs/security-and-privacy.md)
 
 ## Development Setup
 
@@ -49,119 +50,42 @@ Current privacy model:
 
 - Node.js and npm
 - Terraform
+- AWS CLI
 - Android Studio for Android development
-- AWS CLI for deployed infrastructure work
 
-On Windows, the recommended package-manager setup is Scoop because it installs command-line tools into your user profile and does not require an Administrator shell:
+Optional but recommended:
 
-```powershell
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-scoop install nodejs-lts terraform aws
-```
-
-If this is a fresh PowerShell session, confirm Scoop's shims are on `PATH`:
-
-```powershell
-node --version
-npm --version
-terraform version
-aws --version
-```
-
-If you prefer official installers instead, install:
-
-- Node.js LTS from <https://nodejs.org/>
-- Git for Windows from <https://git-scm.com/download/win>
-- Android Studio from <https://developer.android.com/studio>
-- Terraform from <https://developer.hashicorp.com/terraform/install>
-- AWS CLI v2 from <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>
-
-After installing tools, close and reopen PowerShell so `PATH` changes are loaded.
-
-On macOS, install Node.js and npm with Homebrew:
-
-```bash
-brew install node
-```
-
-Confirm Node.js and npm are available:
-
-```bash
-node --version
-npm --version
-```
-
-On Windows, run the setup check from PowerShell:
-
-```powershell
-.\scripts\setup-windows.ps1
-```
-
-If PowerShell blocks script execution for this command, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
-```
-
-The setup check reports missing or broken tools. It can also install workspace npm dependencies once Node.js and npm are working:
-
-```powershell
-.\scripts\setup-windows.ps1 -InstallDependencies
-```
+- Git for Windows on Windows
+- Scoop on Windows for easier tool installation
 
 ### Install Dependencies
 
-Install JavaScript/TypeScript workspace dependencies from the repo root:
+From the repository root:
 
 ```bash
 npm install
 ```
 
-TypeScript is installed locally through the workspace dependencies. Do not install TypeScript globally for this project.
+### Environment Notes
 
-### Verify The Workspace
+Before the Android app can connect to Cognito and the API, create:
 
-Run the TypeScript checks:
+- `apps/android/secure.properties`
 
-```bash
-npm run typecheck
-```
+using:
 
-Check for whitespace or patch formatting issues:
+- `apps/android/secure.properties.example`
 
-```bash
-git diff --check
-```
+That file is intentionally ignored by git.
 
-Format Terraform files:
+## Testing
 
-```bash
-terraform fmt -recursive infra/terraform
-```
+### Web
 
-## Testing Locally
-
-### Preview The Web App
-
-From the repo root, start the Next.js dev server:
+Run the web app locally:
 
 ```bash
 npm run dev --workspace @calorie-tracker/web
-```
-
-Then open:
-
-```text
-http://localhost:3000
-```
-
-The current web app is a static shell for the Phase 1 workflow. It shows daily totals, a sample logged food, and the manual label-entry form. The form is not connected to the API yet.
-
-If port `3000` is busy, choose another port:
-
-```bash
-npm run dev --workspace @calorie-tracker/web -- -p 3001
 ```
 
 Build the web app:
@@ -170,94 +94,50 @@ Build the web app:
 npm run build --workspace @calorie-tracker/web
 ```
 
-### Test The Android App
+### Android
 
-Open `apps/android` in Android Studio, let Gradle sync, then run the `app` configuration on an emulator or device.
+Open `apps/android` in Android Studio and run the `app` configuration on an emulator or device.
 
-Before the Android app can talk to AWS/Cognito, create a local `apps/android/secure.properties` file from `apps/android/secure.properties.example` and fill in the real `CT_*` values. That file is ignored by git on purpose.
-
-For the current BiteWise setup, the Android callback/logout scheme should be:
-
-```text
-bitewise://auth/callback
-bitewise://signout
-```
-
-The current Android app is also a static shell. It includes the temporary package name and declares the ML Kit barcode scanning dependency, but the camera scanner and persistence are not wired yet.
-
-The Android app currently ships with:
-
-```text
-applicationId: com.cosgravelabs.bitewise
-display name: BiteWise
-```
-
-If running Gradle from the command line on macOS, use Android Studio's bundled JDK:
-
-```bash
-cd apps/android
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
-```
-
-If Gradle cannot write to the default home cache in a restricted environment, keep the Gradle cache inside the project:
-
-```bash
-cd apps/android
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-GRADLE_USER_HOME="$PWD/.gradle-user-home" \
-./gradlew :app:assembleDebug
-```
-
-On Windows, open `apps\android` in Android Studio for the easiest path. To build from PowerShell after Android Studio has installed the SDK, run:
+From PowerShell, you can also build the debug app with:
 
 ```powershell
 cd apps\android
 .\gradlew.bat :app:assembleDebug
 ```
 
-If Gradle cannot find the Android SDK, write a local `local.properties` file from the repo root:
+### API
 
-```powershell
-.\scripts\setup-windows.ps1 -WriteAndroidLocalProperties
-```
-
-Or pass the SDK location explicitly:
-
-```powershell
-.\scripts\setup-windows.ps1 -WriteAndroidLocalProperties -AndroidSdkPath "$env:LOCALAPPDATA\Android\Sdk"
-```
-
-### Test The API
-
-Run API typechecks:
+Run the API typechecks:
 
 ```bash
 npm run typecheck --workspace @calorie-tracker/api
 ```
 
-The API currently contains Lambda handlers, validation, and DynamoDB store code. It does not have a local HTTP runner yet.
+### Workspace Checks
 
-### Terraform
+Run the main repository checks from the root:
 
-The first Terraform environment is:
-
-```text
-infra/terraform/environments/dev
+```bash
+npm run typecheck
+git diff --check
+terraform fmt -recursive infra/terraform
 ```
 
-It targets `us-east-1` by default and defines the initial Cognito, DynamoDB, and S3 resources. Google federation is not wired yet because it needs real Google OAuth credentials.
+## Infrastructure
 
-If you rename the Cognito hosted domain prefix, update:
-- `infra/terraform/environments/dev/terraform.tfvars`
-- `apps/android/secure.properties`
-- any Google OAuth redirect URI that points to `https://<domain>.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`
+Terraform environments live in:
 
-## Windows Troubleshooting
+- `infra/terraform/environments/dev`
+- `infra/terraform/environments/prod`
 
-If `node --version` fails with `Access is denied`, PowerShell is probably finding a packaged app shim instead of a normal Node.js install. Install Node.js LTS from the official installer, reopen PowerShell, and confirm that `Get-Command node -All` shows `C:\Program Files\nodejs\node.exe` before any WindowsApps or app-package paths.
+The AWS stack currently covers:
 
-If `npm` is missing after installing Node.js, repair or reinstall Node.js LTS and choose the option that adds Node.js to `PATH`.
+- Cognito authentication
+- DynamoDB-backed app storage
+- Lambda-based API handlers
+- S3-backed supporting storage
 
-If PowerShell blocks `npm.ps1`, either run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` or use `npm.cmd` for the same commands, for example `npm.cmd run typecheck`.
+## Additional Documentation
 
-If `terraform`, `aws`, or Android SDK commands are missing, install the relevant tool and reopen PowerShell. Terraform and AWS CLI are only required when working with deployed infrastructure.
+- [Security and Privacy](./docs/security-and-privacy.md)
+- [GitHub Actions Release Setup](./docs/github-actions-release-setup.md)
