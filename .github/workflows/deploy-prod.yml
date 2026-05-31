@@ -1,0 +1,41 @@
+name: Deploy Prod
+
+on:
+  pull_request:
+    branches:
+      - prod
+    types:
+      - closed
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Ensure this workflow runs for dev merged into prod
+        run: |
+          if [ "${{ github.event.pull_request.base.ref }}" != "prod" ]; then
+            echo "This workflow must run for PRs merged into prod. Base branch: ${{ github.event.pull_request.base.ref }}"
+            exit 1
+          fi
+          if [ "${{ github.event.pull_request.head.ref }}" != "dev" ]; then
+            echo "This workflow only accepts dev -> prod merges. Head branch: ${{ github.event.pull_request.head.ref }}"
+            exit 1
+          fi
+
+  deploy:
+    needs: guard
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/_deploy-mobile-and-infra.yml
+    with:
+      github_environment: prod
+      terraform_environment: prod
+      android_flavor: prod
+      android_package_name: com.cosgravelabs.bitewise
+      play_track: production
+      play_status: completed
+      bump_release_version: true
+      create_release_tag: true
+      release_tag_prefix: android-prod
+    secrets: inherit
+

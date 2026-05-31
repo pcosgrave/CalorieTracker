@@ -1,0 +1,41 @@
+name: Deploy Dev Internal
+
+on:
+  pull_request:
+    branches:
+      - dev
+    types:
+      - closed
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Ensure this workflow runs for main merged into dev
+        run: |
+          if [ "${{ github.event.pull_request.base.ref }}" != "dev" ]; then
+            echo "This workflow must run for PRs merged into dev. Base branch: ${{ github.event.pull_request.base.ref }}"
+            exit 1
+          fi
+          if [ "${{ github.event.pull_request.head.ref }}" != "main" ]; then
+            echo "This workflow only accepts main -> dev merges. Head branch: ${{ github.event.pull_request.head.ref }}"
+            exit 1
+          fi
+
+  deploy:
+    needs: guard
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/_deploy-mobile-and-infra.yml
+    with:
+      github_environment: dev
+      terraform_environment: dev
+      android_flavor: dev
+      android_package_name: com.cosgravelabs.bitewise
+      play_track: internal
+      play_status: completed
+      bump_release_version: true
+      create_release_tag: true
+      release_tag_prefix: android-dev
+    secrets: inherit
+

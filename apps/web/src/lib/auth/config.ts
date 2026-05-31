@@ -11,11 +11,11 @@ export type CognitoConfig = {
 
 const defaultConfig: CognitoConfig = {
   region: "us-east-1",
-  domain: "cosgravelabs-bitewise-dev",
-  userPoolId: "us-east-1_WTewfUGq5",
-  webClientId: "ve4a8a9nc1utk25pn40gv7mj1",
-  androidClientId: "72jisfhflil4r7ih6vn1hjf98b",
-  apiBaseUrl: "https://84jfkxkrd6.execute-api.us-east-1.amazonaws.com/dev",
+  domain: "replace-with-cognito-domain",
+  userPoolId: "replace-with-user-pool-id",
+  webClientId: "replace-with-web-client-id",
+  androidClientId: "replace-with-android-client-id",
+  apiBaseUrl: "https://example.execute-api.us-east-1.amazonaws.com/dev",
   webRedirectUri: "http://localhost:3000/auth/callback",
   webLogoutUri: "http://localhost:3000/",
 };

@@ -86,13 +86,13 @@ Fill in the flavor-specific values:
 Recommended current setup while prod is still pending:
 
 ```text
-CT_DEV_COGNITO_DOMAIN=cosgravelabs-bitewise-dev
+CT_DEV_COGNITO_DOMAIN=replace-with-dev-cognito-domain
 CT_DEV_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/dev
 CT_DEV_COGNITO_ANDROID_REDIRECT_URI=bitewise-dev://auth/callback
 CT_DEV_COGNITO_ANDROID_LOGOUT_URI=bitewise-dev://signout
 
-CT_PROD_COGNITO_DOMAIN=cosgravelabs-bitewise-dev
-CT_PROD_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/dev
+CT_PROD_COGNITO_DOMAIN=replace-with-prod-cognito-domain
+CT_PROD_SYNC_API_BASE_URL=https://example.execute-api.us-east-1.amazonaws.com/prod
 CT_PROD_COGNITO_ANDROID_REDIRECT_URI=bitewise://auth/callback
 CT_PROD_COGNITO_ANDROID_LOGOUT_URI=bitewise://signout
 ```
@@ -263,12 +263,12 @@ Because BiteWise uses Cognito hosted login:
 
 #### Hosted domain
 
-- `cosgravelabs-bitewise-dev.auth.us-east-1.amazoncognito.com`
+- `replace-with-your-cognito-domain.auth.us-east-1.amazoncognito.com`
 
 #### Google authorized redirect URI
 
 ```text
-https://cosgravelabs-bitewise-dev.auth.us-east-1.amazoncognito.com/oauth2/idpresponse
+https://replace-with-your-cognito-domain.auth.us-east-1.amazoncognito.com/oauth2/idpresponse
 ```
 
 ### 7. Retrieve SHA fingerprints after Play enrollment

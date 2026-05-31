@@ -1,0 +1,301 @@
+name: Reusable Mobile And Infra Deploy
+
+on:
+  workflow_call:
+    inputs:
+      github_environment:
+        required: true
+        type: string
+      terraform_environment:
+        required: true
+        type: string
+      android_flavor:
+        required: true
+        type: string
+      android_package_name:
+        required: true
+        type: string
+      play_track:
+        required: true
+        type: string
+      play_status:
+        required: false
+        type: string
+        default: completed
+      bump_release_version:
+        required: false
+        type: boolean
+        default: false
+      create_release_tag:
+        required: false
+        type: boolean
+        default: false
+      release_tag_prefix:
+        required: false
+        type: string
+        default: android
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.github_environment }}
+    runs-on: windows-latest
+    environment: ${{ inputs.github_environment }}
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Restore Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/android/.gradle-user-home
+            ~\.gradle\caches
+            ~\.gradle\wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/android/**/*.gradle*', 'apps/android/gradle.properties', 'apps/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Restore Terraform plugin cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\terraform.d\plugin-cache
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/terraform/environments/**/.terraform.lock.hcl') }}
+          restore-keys: |
+            ${{ runner.os }}-terraform-
+
+      - name: Prepare Terraform backend and variables
+        shell: pwsh
+        env:
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
+          TF_APP_NAME: ${{ vars.TF_APP_NAME }}
+          TF_COGNITO_DOMAIN_PREFIX: ${{ vars.TF_COGNITO_DOMAIN_PREFIX }}
+          TF_WEB_CALLBACK_URL: ${{ vars.TF_WEB_CALLBACK_URL }}
+          TF_WEB_LOGOUT_URL: ${{ vars.TF_WEB_LOGOUT_URL }}
+          TF_GOOGLE_CLIENT_ID: ${{ vars.TF_GOOGLE_CLIENT_ID }}
+          TF_GOOGLE_CLIENT_SECRET: ${{ secrets.TF_GOOGLE_CLIENT_SECRET }}
+          TF_GOOGLE_AUTHORIZE_SCOPES: ${{ vars.TF_GOOGLE_AUTHORIZE_SCOPES }}
+          TF_LOG_RETENTION_DAYS: ${{ vars.TF_LOG_RETENTION_DAYS }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          $tfDir = Join-Path $PWD "infra/terraform/environments/${{ inputs.terraform_environment }}"
+          $backendPath = Join-Path $tfDir "backend.ci.hcl"
+          $tfvarsPath = Join-Path $tfDir "ci.auto.tfvars"
+
+          @"
+          bucket = "$env:TF_STATE_BUCKET"
+          key    = "bitewise/${{ inputs.terraform_environment }}/terraform.tfstate"
+          region = "$env:AWS_REGION"
+          dynamodb_table = "$env:TF_LOCK_TABLE"
+          encrypt = true
+          "@ | Set-Content -Path $backendPath -Encoding utf8NoBOM
+
+          $androidCallbacks = @(
+            "bitewise-dev://auth/callback",
+            "bitewise://auth/callback"
+          )
+          $androidLogouts = @(
+            "bitewise-dev://signout",
+            "bitewise://signout"
+          )
+
+          $lines = @(
+            "aws_region = ""$env:AWS_REGION""",
+            "app_name = ""$env:TF_APP_NAME""",
+            "environment = ""${{ inputs.terraform_environment }}""",
+            "web_callback_urls = [""$env:TF_WEB_CALLBACK_URL""]",
+            "web_logout_urls = [""$env:TF_WEB_LOGOUT_URL""]",
+            "android_callback_urls = [" + (($androidCallbacks | ForEach-Object { """$_""" }) -join ", ") + "]",
+            "android_logout_urls = [" + (($androidLogouts | ForEach-Object { """$_""" }) -join ", ") + "]",
+            "cognito_domain_prefix = ""$env:TF_COGNITO_DOMAIN_PREFIX"""
+          )
+
+          if ($env:TF_GOOGLE_CLIENT_ID) {
+            $lines += "google_client_id = ""$env:TF_GOOGLE_CLIENT_ID"""
+          }
+          if ($env:TF_GOOGLE_CLIENT_SECRET) {
+            $lines += "google_client_secret = ""$env:TF_GOOGLE_CLIENT_SECRET"""
+          }
+          if ($env:TF_GOOGLE_AUTHORIZE_SCOPES) {
+            $lines += "google_authorize_scopes = ""$env:TF_GOOGLE_AUTHORIZE_SCOPES"""
+          }
+          if ($env:TF_LOG_RETENTION_DAYS) {
+            $lines += "log_retention_days = $env:TF_LOG_RETENTION_DAYS"
+          }
+
+          $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
+
+      - name: Build API Lambda package
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-lambda.ps1
+
+      - name: Terraform init
+        shell: pwsh
+        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
+
+      - name: Terraform apply
+        shell: pwsh
+        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} apply -auto-approve -var-file="ci.auto.tfvars"
+
+      - name: Decode Android signing key
+        shell: pwsh
+        env:
+          BW_UPLOAD_STORE_FILE_BASE64: ${{ secrets.BW_UPLOAD_STORE_FILE_BASE64 }}
+        run: |
+          $keystorePath = Join-Path $env:RUNNER_TEMP "bitewise-upload-keystore.jks"
+          [System.IO.File]::WriteAllBytes($keystorePath, [Convert]::FromBase64String($env:BW_UPLOAD_STORE_FILE_BASE64))
+          "BW_UPLOAD_STORE_FILE=$keystorePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Bump Android release version
+        if: ${{ inputs.bump_release_version }}
+        shell: pwsh
+        run: |
+          $gradleFile = "apps/android/app/build.gradle.kts"
+          $content = Get-Content $gradleFile -Raw
+
+          $versionCodeMatch = [regex]::Match($content, 'versionCode\s*=\s*(\d+)')
+          $versionNameMatch = [regex]::Match($content, 'versionName\s*=\s*"([^"]+)"')
+
+          if (-not $versionCodeMatch.Success -or -not $versionNameMatch.Success) {
+            throw "Unable to locate versionCode/versionName in $gradleFile"
+          }
+
+          $currentVersionCode = [int]$versionCodeMatch.Groups[1].Value
+          $currentVersionName = $versionNameMatch.Groups[1].Value
+
+          $versionParts = $currentVersionName.Split(".")
+          if ($versionParts.Length -ne 3) {
+            throw "Expected semantic version x.y.z, found '$currentVersionName'"
+          }
+
+          $nextVersionCode = $currentVersionCode + 1
+          $nextVersionName = "{0}.{1}.{2}" -f $versionParts[0], $versionParts[1], ([int]$versionParts[2] + 1)
+
+          $updated = $content
+          $updated = [regex]::Replace($updated, 'versionCode\s*=\s*\d+', "versionCode = $nextVersionCode", 1)
+          $updated = [regex]::Replace($updated, 'versionName\s*=\s*"[^"]+"', "versionName = ""$nextVersionName""", 1)
+          [System.IO.File]::WriteAllText((Resolve-Path $gradleFile), $updated, (New-Object System.Text.UTF8Encoding($false)))
+
+          "RELEASE_VERSION_CODE=$nextVersionCode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_VERSION_NAME=$nextVersionName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_GIT_TAG=${{ inputs.release_tag_prefix }}-v$nextVersionName+$nextVersionCode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Android bundle
+        shell: pwsh
+        env:
+          BW_UPLOAD_STORE_PASSWORD: ${{ secrets.BW_UPLOAD_STORE_PASSWORD }}
+          BW_UPLOAD_KEY_ALIAS: ${{ secrets.BW_UPLOAD_KEY_ALIAS }}
+          BW_UPLOAD_KEY_PASSWORD: ${{ secrets.BW_UPLOAD_KEY_PASSWORD }}
+          ANDROID_AWS_REGION: ${{ vars.ANDROID_AWS_REGION }}
+          ANDROID_COGNITO_DOMAIN: ${{ vars.ANDROID_COGNITO_DOMAIN }}
+          ANDROID_COGNITO_USER_POOL_ID: ${{ vars.ANDROID_COGNITO_USER_POOL_ID }}
+          ANDROID_COGNITO_ANDROID_CLIENT_ID: ${{ vars.ANDROID_COGNITO_ANDROID_CLIENT_ID }}
+          ANDROID_SYNC_API_BASE_URL: ${{ vars.ANDROID_SYNC_API_BASE_URL }}
+          ANDROID_COGNITO_ANDROID_REDIRECT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
+          ANDROID_COGNITO_ANDROID_LOGOUT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
+        run: |
+          if ("${{ inputs.android_flavor }}" -eq "dev") {
+            $env:CT_DEV_AWS_REGION = $env:ANDROID_AWS_REGION
+            $env:CT_DEV_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
+            $env:CT_DEV_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
+            $env:CT_DEV_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
+            $env:CT_DEV_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
+            $env:CT_DEV_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
+            $env:CT_DEV_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
+            $bundleTask = ":app:bundleDevRelease"
+            $bundlePath = "apps/android/app/build/outputs/bundle/devRelease/app-dev-release.aab"
+            $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/devRelease"
+          } else {
+            $env:CT_PROD_AWS_REGION = $env:ANDROID_AWS_REGION
+            $env:CT_PROD_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
+            $env:CT_PROD_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
+            $env:CT_PROD_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
+            $env:CT_PROD_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
+            $env:CT_PROD_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
+            $env:CT_PROD_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
+            $bundleTask = ":app:bundleProdRelease"
+            $bundlePath = "apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
+            $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/prodRelease"
+          }
+
+          Push-Location .\apps\android
+          try {
+            .\gradlew.bat $bundleTask
+          }
+          finally {
+            Pop-Location
+          }
+
+          "AAB_PATH=$bundlePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SYMBOLS_PATH=$symbolsPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload release bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ inputs.android_flavor }}-${{ github.sha }}
+          path: ${{ env.AAB_PATH }}
+
+      - name: Upload native symbols artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-symbols-${{ inputs.android_flavor }}-${{ github.sha }}
+          path: ${{ env.SYMBOLS_PATH }}
+          if-no-files-found: warn
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ inputs.android_package_name }}
+          releaseFiles: ${{ env.AAB_PATH }}
+          track: ${{ inputs.play_track }}
+          status: ${{ inputs.play_status }}
+
+      - name: Commit bumped Android release version
+        if: ${{ inputs.bump_release_version }}
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/android/app/build.gradle.kts
+          git commit -m "build: bump Android release to $env:RELEASE_VERSION_NAME+$env:RELEASE_VERSION_CODE for ${{ inputs.github_environment }} deploy"
+          git push origin HEAD:${{ github.event.pull_request.base.ref || github.ref_name }}
+
+      - name: Tag release commit
+        if: ${{ inputs.create_release_tag }}
+        shell: pwsh
+        run: |
+          git tag -a "$env:RELEASE_GIT_TAG" -m "Release $env:RELEASE_VERSION_NAME+$env:RELEASE_VERSION_CODE"
+          git push origin "$env:RELEASE_GIT_TAG"
+
