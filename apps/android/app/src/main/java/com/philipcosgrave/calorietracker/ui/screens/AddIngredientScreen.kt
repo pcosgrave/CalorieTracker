@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,14 @@ import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInp
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 
 @Composable
-fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodItem) -> Unit) {
+fun AddIngredientScreen(
+    existing: FoodItem?,
+    barcodeLookupResult: FoodItem? = null,
+    isLookingUpBarcode: Boolean = false,
+    onBack: () -> Unit,
+    onSave: (FoodItem) -> Unit,
+    onLookupBarcode: (String) -> Unit = {},
+) {
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var brand by remember(existing?.id) { mutableStateOf(existing?.brand.orEmpty()) }
     var barcode by remember(existing?.id) { mutableStateOf(existing?.barcode.orEmpty()) }
@@ -49,6 +57,24 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
     var protein by remember(existing?.id) { mutableStateOf(existing?.nutrients?.proteinGrams?.let(::formatNumber).orEmpty()) }
     var carbs by remember(existing?.id) { mutableStateOf(existing?.nutrients?.carbohydrateGrams?.let(::formatNumber).orEmpty()) }
     var fat by remember(existing?.id) { mutableStateOf(existing?.nutrients?.fatGrams?.let(::formatNumber).orEmpty()) }
+    var lastAppliedLookupId by remember(existing?.id) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(barcodeLookupResult?.id) {
+        val lookup = barcodeLookupResult ?: return@LaunchedEffect
+        if (lookup.id == lastAppliedLookupId) return@LaunchedEffect
+        name = lookup.name
+        brand = lookup.brand
+        if (barcode.isBlank()) {
+            barcode = lookup.barcode
+        }
+        servingQuantity = formatNumber(lookup.servingQuantity)
+        servingUnit = lookup.servingUnit
+        calories = formatNumber(lookup.nutrients.calories)
+        protein = formatNumber(lookup.nutrients.proteinGrams)
+        carbs = formatNumber(lookup.nutrients.carbohydrateGrams)
+        fat = formatNumber(lookup.nutrients.fatGrams)
+        lastAppliedLookupId = lookup.id
+    }
 
     Page {
         PageHeader("Add Ingredient", onBack = onBack)
@@ -69,18 +95,22 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                     modifier = Modifier.weight(1f),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 AppFormField(calories, {
                     val normalized = normalizeDecimalNumberInput(it)
                     if (isDecimalNumberInput(normalized)) {
                         calories = normalized
                     }
                 }, "Calories (kcal)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                AppFormField(barcode, {
-                    if (isDigitsOnlyInput(it)) {
-                        barcode = it
+                AppFormField(fat, {
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        fat = normalized
                     }
-                }, "Barcode / UPC", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }, "Fat (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppFormField(protein, {
@@ -96,13 +126,20 @@ fun AddIngredientScreen(existing: FoodItem?, onBack: () -> Unit, onSave: (FoodIt
                     }
                 }, "Carbs (g)", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             }
-            Box(modifier = Modifier.fillMaxWidth()) {
-                AppFormField(fat, {
-                    val normalized = normalizeDecimalNumberInput(it)
-                    if (isDecimalNumberInput(normalized)) {
-                        fat = normalized
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppFormField(barcode, {
+                    if (isDigitsOnlyInput(it)) {
+                        barcode = it
                     }
-                }, "Fat (g)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                }, "Barcode / UPC", Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                AppPrimaryButton(
+                    text = if (isLookingUpBarcode) "..." else "Find",
+                    enabled = barcode.length >= 4 && !isLookingUpBarcode,
+                    onClick = { onLookupBarcode(barcode.trim()) },
+                )
             }
 
             AppPrimaryButton(
