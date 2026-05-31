@@ -282,20 +282,12 @@ jobs:
           track: ${{ inputs.play_track }}
           status: ${{ inputs.play_status }}
 
-      - name: Commit bumped Android release version
-        if: ${{ inputs.bump_release_version }}
-        shell: pwsh
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/android/app/build.gradle.kts
-          git commit -m "build: bump Android release to $env:RELEASE_VERSION_NAME+$env:RELEASE_VERSION_CODE for ${{ inputs.github_environment }} deploy"
-          git push origin HEAD:${{ github.event.pull_request.base.ref || github.ref_name }}
-
       - name: Tag release commit
         if: ${{ inputs.create_release_tag }}
         shell: pwsh
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$env:RELEASE_GIT_TAG" -m "Release $env:RELEASE_VERSION_NAME+$env:RELEASE_VERSION_CODE"
           git push origin "$env:RELEASE_GIT_TAG"
 
