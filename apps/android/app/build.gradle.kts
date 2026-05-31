@@ -100,14 +100,14 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
 
-            val redirectUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_REDIRECT_URI")
-            val logoutUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_LOGOUT_URI")
+            val redirectUri = configForFlavor("CT_DEV", "COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_DEV", "COGNITO_ANDROID_LOGOUT_URI")
 
-            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_DEV", "CT_AWS_REGION")}\"")
-            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_DEV", "CT_COGNITO_DOMAIN")}\"")
-            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_USER_POOL_ID")}\"")
-            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
-            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_DEV", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_DEV", "AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_DEV", "COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_DEV", "COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_DEV", "COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_DEV", "SYNC_API_BASE_URL")}\"")
             buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
             buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
             manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
@@ -118,14 +118,14 @@ android {
         create("prod") {
             dimension = "environment"
 
-            val redirectUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_REDIRECT_URI")
-            val logoutUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_LOGOUT_URI")
+            val redirectUri = configForFlavor("CT_PROD", "COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_PROD", "COGNITO_ANDROID_LOGOUT_URI")
 
-            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_PROD", "CT_AWS_REGION")}\"")
-            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_PROD", "CT_COGNITO_DOMAIN")}\"")
-            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_USER_POOL_ID")}\"")
-            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
-            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_PROD", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_PROD", "AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_PROD", "COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_PROD", "COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_PROD", "COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_PROD", "SYNC_API_BASE_URL")}\"")
             buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
             buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
             manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
