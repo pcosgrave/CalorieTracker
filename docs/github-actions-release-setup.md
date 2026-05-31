@@ -296,29 +296,20 @@ Create these variables on environment `prod`:
 - `ANDROID_COGNITO_ANDROID_REDIRECT_URI`
 - `ANDROID_COGNITO_ANDROID_LOGOUT_URI`
 
-### 6.5 Repo Settings Needed For Prod Version Bumps And Tags
+### 6.5 Repo Settings Needed For Release Tags
 
 The release workflows now:
 
-- bumps `apps/android/app/build.gradle.kts`
-- commits that version bump back to the target branch
-
-Additionally, the prod workflow:
-
-- creates a git tag for the release
+- compute the Android version inside CI for the build
+- do not commit version bumps back to `dev` or `prod`
+- create release tags from the workflow run
 
 To allow that to work, make sure:
 
 1. the workflow has `contents: write` permissions
-2. your repository or branch protection allows GitHub Actions to push to `dev` and `prod`
-3. tag creation is allowed from GitHub Actions for prod releases
+2. tag creation is allowed from GitHub Actions for `dev` and `prod`
 
-If `prod` is protected, the easiest setup is:
-
-- allow GitHub Actions to bypass branch protection for this workflow, or
-- use a dedicated bot/PAT approach later if you want tighter control
-
-No extra GitHub secret is required for tagging if `GITHUB_TOKEN` with `contents: write` is allowed to push.
+No extra GitHub secret is required for tagging if `GITHUB_TOKEN` with `contents: write` is allowed to push tags.
 
 ## 7. Convert The Android Keystore To Base64
 
@@ -366,7 +357,7 @@ Expected result:
 - Deploys happen only when a pull request is merged into `dev` or `prod`, not when a PR is merely opened.
 - `Deploy Dev Internal` only accepts `main -> dev` merges.
 - `Deploy Prod` only accepts `dev -> prod` merges.
-- Dev deploys now auto-bump the Android release version, commit that bump back to `dev`, and create a tag like `android-dev-v0.1.2+3`.
-- Prod deploys now auto-bump the Android release version, commit that bump back to `prod`, and create a tag like `android-prod-v0.1.2+3`.
+- Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
+- Prod deploys now auto-bump the Android release version inside CI only and create a tag like `android-prod-v0.1.2+3`.
 - The workflows generate temporary Terraform backend and tfvars files during the run.
 - The workflows use GitHub environment variables and secrets instead of local `secure.properties`, `release.properties`, `backend.hcl`, or `terraform.tfvars`.
