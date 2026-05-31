@@ -242,25 +242,21 @@ jobs:
           ANDROID_COGNITO_ANDROID_REDIRECT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
           ANDROID_COGNITO_ANDROID_LOGOUT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
         run: |
+          foreach ($prefix in @("CT_DEV", "CT_PROD")) {
+            Set-Item -Path "Env:${prefix}_AWS_REGION" -Value $env:ANDROID_AWS_REGION
+            Set-Item -Path "Env:${prefix}_COGNITO_DOMAIN" -Value $env:ANDROID_COGNITO_DOMAIN
+            Set-Item -Path "Env:${prefix}_COGNITO_USER_POOL_ID" -Value $env:ANDROID_COGNITO_USER_POOL_ID
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_CLIENT_ID" -Value $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
+            Set-Item -Path "Env:${prefix}_SYNC_API_BASE_URL" -Value $env:ANDROID_SYNC_API_BASE_URL
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_REDIRECT_URI" -Value $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_LOGOUT_URI" -Value $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
+          }
+
           if ("${{ inputs.android_flavor }}" -eq "dev") {
-            $env:CT_DEV_AWS_REGION = $env:ANDROID_AWS_REGION
-            $env:CT_DEV_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
-            $env:CT_DEV_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
-            $env:CT_DEV_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
-            $env:CT_DEV_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
-            $env:CT_DEV_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
-            $env:CT_DEV_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
             $bundleTask = ":app:bundleDevRelease"
             $bundlePath = "apps/android/app/build/outputs/bundle/devRelease/app-dev-release.aab"
             $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/devRelease"
           } else {
-            $env:CT_PROD_AWS_REGION = $env:ANDROID_AWS_REGION
-            $env:CT_PROD_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
-            $env:CT_PROD_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
-            $env:CT_PROD_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
-            $env:CT_PROD_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
-            $env:CT_PROD_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
-            $env:CT_PROD_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
             $bundleTask = ":app:bundleProdRelease"
             $bundlePath = "apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
             $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/prodRelease"
