@@ -162,6 +162,13 @@ jobs:
 
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
 
+      - name: Show Terraform backend target
+        shell: pwsh
+        run: |
+          Write-Host "Terraform environment: ${{ inputs.terraform_environment }}"
+          Write-Host "Backend file:"
+          Get-Content "infra/terraform/environments/${{ inputs.terraform_environment }}/backend.ci.hcl"
+
       - name: Build API Lambda package
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-lambda.ps1
@@ -169,6 +176,10 @@ jobs:
       - name: Terraform init
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
+
+      - name: Show Terraform state addresses
+        shell: pwsh
+        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} state list
 
       - name: Terraform apply
         shell: pwsh
