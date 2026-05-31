@@ -94,6 +94,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-terraform-
 
+      - name: Install npm dependencies
+        shell: pwsh
+        run: npm.cmd ci
+
       - name: Prepare Terraform backend and variables
         shell: pwsh
         env:
