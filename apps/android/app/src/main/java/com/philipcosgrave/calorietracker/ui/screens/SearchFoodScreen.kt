@@ -257,7 +257,7 @@ fun SearchFoodScreen(
                             TextButton(onClick = { onSearchOnlineFoods(search) }) {
                                 Text(
                                     if (isSignedIn) "Search online foods"
-                                    else "Sign in to search saved and community foods",
+                                    else "Search community and Canadian foods",
                                     color = AppBlue,
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -266,7 +266,7 @@ fun SearchFoodScreen(
                                 if (isSignedIn) {
                                     "Search order: your cloud foods, then community foods, then the Canadian Nutrient File."
                                 } else {
-                                    "Sign in from Settings to search your saved foods and the community catalog. Scanning a barcode is still better when available."
+                                    "Search order: community foods, then the Canadian Nutrient File. Sign in to include your saved cloud foods."
                                 },
                                 color = AppMuted,
                                 style = MaterialTheme.typography.bodySmall,

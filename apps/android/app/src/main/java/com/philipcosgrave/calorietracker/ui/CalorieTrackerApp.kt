@@ -123,6 +123,26 @@ private data class VoiceIngredientScore(
     val score: Int,
 )
 
+private fun mergeSearchFoods(
+    localFoods: List<FoodItem>,
+    personalCloudFoods: List<FoodItem>,
+): List<FoodItem> {
+    val merged = LinkedHashMap<String, FoodItem>()
+    localFoods.forEach { merged[it.id] = it }
+    personalCloudFoods.forEach { cloudFood ->
+        val duplicateLocal = localFoods.firstOrNull { localFood ->
+            localFood.id == cloudFood.id ||
+                (cloudFood.barcode.isNotBlank() && localFood.barcode == cloudFood.barcode) ||
+                (
+                    localFood.name.equals(cloudFood.name, ignoreCase = true) &&
+                        localFood.brand.equals(cloudFood.brand, ignoreCase = true)
+                )
+        }
+        merged[duplicateLocal?.id ?: cloudFood.id] = duplicateLocal ?: cloudFood
+    }
+    return merged.values.toList()
+}
+
 @Composable
 fun CalorieTrackerApp(
     authCallbackUri: String? = null,
@@ -167,6 +187,8 @@ fun CalorieTrackerApp(
     var parentRecipeDraft by remember { mutableStateOf<RecipeDraft?>(null) }
     var returnToRecipeAfterIngredientSave by remember { mutableStateOf(false) }
     var editingFood by remember { mutableStateOf<FoodItem?>(null) }
+    var addIngredientBarcodeLookupResult by remember { mutableStateOf<FoodItem?>(null) }
+    var isLookingUpAddIngredientBarcode by remember { mutableStateOf(false) }
     var editingDiaryEntry by remember { mutableStateOf<DiaryEntry?>(null) }
     var editingWeight by remember { mutableStateOf<WeightEntry?>(null) }
     var openLogAfterIngredientSave by remember { mutableStateOf(false) }
@@ -188,6 +210,7 @@ fun CalorieTrackerApp(
     var personalOnlineResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var communityResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var canadianResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+    var personalCloudFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var remoteSearchQuery by remember { mutableStateOf("") }
     var isSearchingRemote by remember { mutableStateOf(false) }
     var searchFoodInitialQuery by remember { mutableStateOf("") }
@@ -245,6 +268,12 @@ fun CalorieTrackerApp(
         syncSettings = localStore.syncStateRepository.getSettings()
         pendingChangeCount = localStore.syncOutboxRepository.listPendingChanges().size
         authSession = localStore.currentAuthSession()
+        personalCloudFoods =
+            if (authSession != null) {
+                runCatching { cloudFoodCatalogService.listPersonalFoods() }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
         healthConnectAvailability = healthConnectExporter.availability()
         healthConnectPermissionGranted =
             healthConnectAvailability == HealthConnectAvailability.Available &&
@@ -696,6 +725,8 @@ fun CalorieTrackerApp(
     }
 
     fun beginImportRemoteFood(item: FoodItem, openLogAfterSave: Boolean) {
+        addIngredientBarcodeLookupResult = null
+        isLookingUpAddIngredientBarcode = false
         editingFood = item.copy(id = createId("custom"))
         openLogAfterIngredientSave = openLogAfterSave
         navigateTo(AppScreen.AddIngredient)
@@ -717,9 +748,9 @@ fun CalorieTrackerApp(
             cloudFoodCatalogService.searchPersonalFoods(remoteSearchQuery)
         }.getOrDefault(emptyList()) else emptyList()
 
-        val community = if (signedIn) runCatching {
+        val community = runCatching {
             cloudFoodCatalogService.searchCommunityFoods(remoteSearchQuery)
-        }.getOrDefault(emptyList()) else emptyList()
+        }.getOrDefault(emptyList())
 
         val canadian = if (personal.isEmpty() && community.isEmpty()) {
             canadianNutrientFileLookupService.searchFoodsByName(remoteSearchQuery)
@@ -920,6 +951,19 @@ fun CalorieTrackerApp(
             localStore.foodRepository.getById(alias.productId)?.food?.let { return it }
         }
         return seedFoods.firstOrNull { it.barcode == barcode }
+    }
+
+    suspend fun lookupFoodForBarcode(barcode: String): FoodItem? {
+        val normalizedBarcode = barcode.trim()
+        if (normalizedBarcode.isBlank()) return null
+        return findFoodByBarcode(normalizedBarcode)
+            ?: if (authSession != null) {
+                runCatching { cloudFoodCatalogService.lookupPersonalBarcode(normalizedBarcode) }.getOrNull()
+            } else {
+                null
+            }
+            ?: runCatching { cloudFoodCatalogService.lookupCommunityBarcode(normalizedBarcode) }.getOrNull()
+            ?: runCatching { openFoodFactsLookupService.lookupFoodByBarcode(normalizedBarcode) }.getOrNull()
     }
 
     suspend fun autoSyncIfNeeded() {
@@ -1226,7 +1270,10 @@ fun CalorieTrackerApp(
 
             AppScreen.SearchFood -> SearchFoodScreen(
                 date = selectedDate,
-                foods = customFoods + recipes + seedFoods.filterNot { hiddenSeedIds.contains(it.id) },
+                foods = mergeSearchFoods(
+                    localFoods = customFoods + recipes + seedFoods.filterNot { hiddenSeedIds.contains(it.id) },
+                    personalCloudFoods = personalCloudFoods,
+                ),
                 isSignedIn = authSession != null,
                 initialSearchQuery = searchFoodInitialQuery,
                 voiceSearchNotice =
@@ -1247,6 +1294,8 @@ fun CalorieTrackerApp(
                     navigateTo(AppScreen.BarcodeScanner)
                 },
                 onAddIngredient = {
+                    addIngredientBarcodeLookupResult = null
+                    isLookingUpAddIngredientBarcode = false
                     editingFood = null
                     returnToRecipeAfterIngredientSave = false
                     navigateTo(AppScreen.AddIngredient)
@@ -1308,6 +1357,8 @@ fun CalorieTrackerApp(
                         editingFood = item
                         navigateTo(AppScreen.RecipeBuilder)
                     } else {
+                        addIngredientBarcodeLookupResult = null
+                        isLookingUpAddIngredientBarcode = false
                         editingFood = item
                         navigateTo(AppScreen.AddIngredient)
                     }
@@ -1333,7 +1384,7 @@ fun CalorieTrackerApp(
                             } else {
                                 null
                             }
-                            val communityFood = if (personalCloudFood == null && authSession != null) {
+                            val communityFood = if (personalCloudFood == null) {
                                 runCatching { cloudFoodCatalogService.lookupCommunityBarcode(barcode) }.getOrNull()
                             } else {
                                 null
@@ -1355,6 +1406,8 @@ fun CalorieTrackerApp(
                                     beginImportRemoteFood(openFoodFactsFood, openLogAfterSave = true)
                                 }
                                 else -> {
+                                    addIngredientBarcodeLookupResult = null
+                                    isLookingUpAddIngredientBarcode = false
                                     editingFood = FoodItem(
                                         id = createId("custom"),
                                         kind = FoodKind.Ingredient,
@@ -1511,11 +1564,25 @@ fun CalorieTrackerApp(
 
             AppScreen.AddIngredient -> AddIngredientScreen(
                 existing = editingFood,
+                barcodeLookupResult = addIngredientBarcodeLookupResult,
+                isLookingUpBarcode = isLookingUpAddIngredientBarcode,
                 onBack = {
+                    addIngredientBarcodeLookupResult = null
+                    isLookingUpAddIngredientBarcode = false
                     editingFood = null
                     openLogAfterIngredientSave = false
                     returnToRecipeAfterIngredientSave = false
                     popScreen()
+                },
+                onLookupBarcode = { barcode ->
+                    scope.launch {
+                        isLookingUpAddIngredientBarcode = true
+                        addIngredientBarcodeLookupResult = lookupFoodForBarcode(barcode)
+                        isLookingUpAddIngredientBarcode = false
+                        if (addIngredientBarcodeLookupResult == null) {
+                            Toast.makeText(context, "No barcode match found", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 },
                 onSave = { item ->
                     if (item.kind == FoodKind.Recipe) {
@@ -1523,6 +1590,8 @@ fun CalorieTrackerApp(
                     } else {
                         customFoods = listOf(item) + customFoods.filterNot { it.id == item.id }
                     }
+                    addIngredientBarcodeLookupResult = null
+                    isLookingUpAddIngredientBarcode = false
                     editingFood = null
                     scope.launch {
                         saveFood(item)
