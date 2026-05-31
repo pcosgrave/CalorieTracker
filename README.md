@@ -2,7 +2,7 @@
 
 BiteWise is a local-first calorie, meal, and weight tracking app from Cosgrave Labs. The project currently includes an Android app, a web app, and an AWS-backed sync layer for authenticated cloud backup and cross-device sync.
 
-## Overview
+## Overview 
 
 BiteWise is built around a local-first model:
 
