@@ -103,6 +103,7 @@ jobs:
         env:
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
+          TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
           TF_APP_NAME: ${{ vars.TF_APP_NAME }}
           TF_COGNITO_DOMAIN_PREFIX: ${{ vars.TF_COGNITO_DOMAIN_PREFIX }}
           TF_WEB_CALLBACK_URL: ${{ vars.TF_WEB_CALLBACK_URL }}
@@ -116,10 +117,11 @@ jobs:
           $tfDir = Join-Path $PWD "infra/terraform/environments/${{ inputs.terraform_environment }}"
           $backendPath = Join-Path $tfDir "backend.ci.hcl"
           $tfvarsPath = Join-Path $tfDir "ci.auto.tfvars"
+          $stateKey = if ($env:TF_STATE_KEY) { $env:TF_STATE_KEY } else { "$env:TF_APP_NAME/${{ inputs.terraform_environment }}/terraform.tfstate" }
 
           @"
           bucket = "$env:TF_STATE_BUCKET"
-          key    = "bitewise/${{ inputs.terraform_environment }}/terraform.tfstate"
+          key    = "$stateKey"
           region = "$env:AWS_REGION"
           dynamodb_table = "$env:TF_LOCK_TABLE"
           encrypt = true

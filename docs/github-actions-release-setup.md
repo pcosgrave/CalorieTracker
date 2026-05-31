@@ -250,6 +250,7 @@ Create these secrets on environment `dev`:
 Create these variables on environment `dev`:
 
 - `AWS_REGION`
+- `TF_STATE_KEY`
 - `TF_APP_NAME`
 - `TF_COGNITO_DOMAIN_PREFIX`
 - `TF_WEB_CALLBACK_URL`
@@ -283,6 +284,7 @@ Create these secrets on environment `prod`:
 Create these variables on environment `prod`:
 
 - `AWS_REGION`
+- `TF_STATE_KEY`
 - `TF_APP_NAME`
 - `TF_COGNITO_DOMAIN_PREFIX`
 - `TF_WEB_CALLBACK_URL`
