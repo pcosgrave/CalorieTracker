@@ -15,6 +15,7 @@ The intended branch model is:
 - `dev` branch
   - receives PRs from `main` only
   - when a PR into `dev` is merged, GitHub Actions automatically deploys dev
+  - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/dev`
   - builds Android `devRelease`
   - uploads `com.cosgravelabs.bitewise` to the Google Play `internal` track
@@ -22,6 +23,7 @@ The intended branch model is:
 - `prod` branch
   - receives PRs from `dev` only
   - when a PR into `prod` is merged, GitHub Actions automatically deploys prod
+  - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/prod`
   - builds Android `prodRelease`
   - uploads `com.cosgravelabs.bitewise` to the Google Play `production` track
@@ -326,9 +328,10 @@ Paste that into:
 ## 8. First Dev Release Test
 
 1. Merge these workflow files into `main`.
-2. Open a PR from `main` into `dev`.
-3. Merge that PR.
-4. Open the Actions tab and watch `Deploy Dev Internal` run automatically.
+2. Either:
+   - open a PR from `main` into `dev` and merge it, or
+   - open the `Deploy Dev Internal` workflow in the Actions tab and run it manually from the `dev` branch.
+3. Watch the workflow run.
 
 Expected result:
 
@@ -339,10 +342,10 @@ Expected result:
 
 ## 9. First Prod Release Test
 
-1. Open a PR from `dev` into `prod`.
-2. Review it carefully.
-3. Merge that PR.
-4. Open the Actions tab and watch `Deploy Prod` run automatically.
+1. Either:
+   - open a PR from `dev` into `prod`, review it carefully, and merge it, or
+   - open the `Deploy Prod` workflow in the Actions tab and run it manually from the `prod` branch.
+2. Watch the workflow run.
 
 Expected result:
 
@@ -354,7 +357,7 @@ Expected result:
 
 - The prod workflow currently uploads directly to the `production` track.
 - If you want a safer first rollout, change [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
-- Deploys happen only when a pull request is merged into `dev` or `prod`, not when a PR is merely opened.
+- Deploys can be triggered either by merging the expected PR flow or by manual workflow dispatch.
 - `Deploy Dev Internal` only accepts `main -> dev` merges.
 - `Deploy Prod` only accepts `dev -> prod` merges.
 - Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
