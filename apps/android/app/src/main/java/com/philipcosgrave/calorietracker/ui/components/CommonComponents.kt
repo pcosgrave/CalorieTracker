@@ -49,8 +49,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -193,6 +195,7 @@ fun DiaryEntryRow(
 ) {
     val nutrients = entry.food.nutrients.scale(entry.servingMultiplier)
     InteractiveFoodRow(
+        rowKey = entry.id,
         title = entry.food.name,
         trailing = "${formatNumber(nutrients.calories)} cal",
         onClick = {},
@@ -221,6 +224,7 @@ fun FoodSearchRow(
 ) {
     val manageable = onEdit != null && onToggleExpanded != null
     InteractiveFoodRow(
+        rowKey = item.id,
         title = item.name,
         trailing = if (showCalories) "${formatNumber(item.nutrients.calories)} cal" else null,
         onClick = onClick,
@@ -245,6 +249,7 @@ fun FoodSearchRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InteractiveFoodRow(
+    rowKey: Any,
     title: String,
     trailing: String?,
     onClick: () -> Unit,
@@ -255,67 +260,71 @@ private fun InteractiveFoodRow(
     compact: Boolean,
     supporting: String?,
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { it * 0.35f },
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    onEdit?.invoke()
-                    false
+    key(rowKey) {
+        val currentOnEdit by rememberUpdatedState(onEdit)
+        val currentOnDelete by rememberUpdatedState(onDelete)
+        val dismissState = rememberSwipeToDismissBoxState(
+            positionalThreshold = { it * 0.35f },
+            confirmValueChange = { value ->
+                when (value) {
+                    SwipeToDismissBoxValue.StartToEnd -> {
+                        currentOnEdit?.invoke()
+                        false
+                    }
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        currentOnDelete?.invoke()
+                        false
+                    }
+                    else -> false
                 }
-                SwipeToDismissBoxValue.EndToStart -> {
-                    onDelete?.invoke()
-                    false
-                }
-                else -> false
-            }
-        },
-    )
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = onEdit != null,
-        enableDismissFromEndToStart = onDelete != null,
-        backgroundContent = {
-            when (dismissState.dismissDirection) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    if (onEdit != null) {
-                        SwipeActionBackground(
-                            alignment = Alignment.CenterStart,
-                            color = Color(0xFF4CAF50),
-                        ) {
-                            Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit", tint = Color.White)
+            },
+        )
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = onEdit != null,
+            enableDismissFromEndToStart = onDelete != null,
+            backgroundContent = {
+                when (dismissState.dismissDirection) {
+                    SwipeToDismissBoxValue.StartToEnd -> {
+                        if (onEdit != null) {
+                            SwipeActionBackground(
+                                alignment = Alignment.CenterStart,
+                                color = Color(0xFF4CAF50),
+                            ) {
+                                Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit", tint = Color.White)
+                            }
                         }
                     }
-                }
-                SwipeToDismissBoxValue.EndToStart -> {
-                    if (onDelete != null) {
-                        SwipeActionBackground(
-                            alignment = Alignment.CenterEnd,
-                            color = Color(0xFFFF5449),
-                        ) {
-                            Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        if (onDelete != null) {
+                            SwipeActionBackground(
+                                alignment = Alignment.CenterEnd,
+                                color = Color(0xFFFF5449),
+                            ) {
+                                Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = Color.White)
+                            }
                         }
                     }
+                    else -> Unit
                 }
-                else -> Unit
-            }
-        },
-    ) {
-        FoodRowCardContent(
-            title = title,
-            trailing = trailing,
-            compact = compact,
-            onClick = onClick,
-            onDoubleClick = onDoubleClick,
-            onLongClick = onLongClick,
+            },
         ) {
-            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-            if (!supporting.isNullOrBlank()) {
-                Text(
-                    supporting,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = appMutedColor(),
-                )
+            FoodRowCardContent(
+                title = title,
+                trailing = trailing,
+                compact = compact,
+                onClick = onClick,
+                onDoubleClick = onDoubleClick,
+                onLongClick = onLongClick,
+            ) {
+                Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                if (!supporting.isNullOrBlank()) {
+                    Text(
+                        supporting,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = appMutedColor(),
+                    )
+                }
             }
         }
     }
