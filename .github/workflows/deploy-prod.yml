@@ -7,6 +7,10 @@ on:
     types:
       - closed
 
+permissions:
+  contents: write
+  id-token: write
+
 jobs:
   guard:
     runs-on: ubuntu-latest
