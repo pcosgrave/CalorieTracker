@@ -17,7 +17,7 @@ The intended branch model is:
   - when a PR into `dev` is merged, GitHub Actions automatically deploys dev
   - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/dev`
-  - builds Android `devRelease`
+  - builds Android `prodRelease` against the dev environment config
   - uploads `com.cosgravelabs.bitewise` to the Google Play `internal` track
 
 - `prod` branch
@@ -339,7 +339,7 @@ Expected result:
 
 - Terraform `dev` applies
 - Lambda package is built
-- Android `devRelease` AAB is built
+- Android `prodRelease` AAB is built against the dev environment config
 - `com.cosgravelabs.bitewise` uploads to the Play internal testing track
 
 ## 9. First Prod Release Test
