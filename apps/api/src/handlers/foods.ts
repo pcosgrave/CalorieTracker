@@ -66,7 +66,7 @@ export const search = route(emptySchema, async ({ event, userId }) => {
   return json(200, result);
 });
 
-export const lookupCommunity = route(z.object({}), async ({ event }) => {
+export const lookupCommunity = publicRoute(z.object({}), async ({ event }) => {
   const barcode = event.pathParameters?.barcode;
   if (!barcode) {
     return json(400, { message: "Barcode is required" });
@@ -76,7 +76,7 @@ export const lookupCommunity = route(z.object({}), async ({ event }) => {
   return json(200, result);
 });
 
-export const searchCommunity = route(emptySchema, async ({ event }) => {
+export const searchCommunity = publicRoute(emptySchema, async ({ event }) => {
   const query = event.queryStringParameters?.query ?? "";
   const result = await searchCommunityFoodProducts(query);
   return json(200, result);

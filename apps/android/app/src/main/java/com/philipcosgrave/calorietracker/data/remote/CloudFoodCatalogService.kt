@@ -17,13 +17,16 @@ class CloudFoodCatalogService(
         lookup("${baseUrl()}/foods/lookup/$barcode")
 
     suspend fun lookupCommunityBarcode(barcode: String): FoodItem? =
-        lookup("${baseUrl()}/foods/community/lookup/$barcode")
+        publicLookup("${baseUrl()}/foods/community/lookup/$barcode")
 
     suspend fun searchPersonalFoods(query: String): List<FoodItem> =
         search("${baseUrl()}/foods/search?query=${encode(query)}")
 
+    suspend fun listPersonalFoods(): List<FoodItem> =
+        search("${baseUrl()}/foods")
+
     suspend fun searchCommunityFoods(query: String): List<FoodItem> =
-        search("${baseUrl()}/foods/community/search?query=${encode(query)}")
+        publicSearch("${baseUrl()}/foods/community/search?query=${encode(query)}")
 
     suspend fun publishCommunityFood(item: FoodItem): Boolean {
         val body = JSONObject()
@@ -57,8 +60,23 @@ class CloudFoodCatalogService(
         return if (found) response.optJSONObject("product")?.let(::foodItemFromJson) else null
     }
 
+    private fun publicLookup(url: String): FoodItem? {
+        val response = publicRequest(url, "GET")
+        val found = response.optBoolean("found", false)
+        return if (found) response.optJSONObject("product")?.let(::foodItemFromJson) else null
+    }
+
     private suspend fun search(url: String): List<FoodItem> {
         val response = authorizedRequest(url, "GET")
+        return parseProducts(response)
+    }
+
+    private fun publicSearch(url: String): List<FoodItem> {
+        val response = publicRequest(url, "GET")
+        return parseProducts(response)
+    }
+
+    private fun parseProducts(response: JSONObject): List<FoodItem> {
         val products = response.optJSONArray("products") ?: JSONArray()
         return List(products.length()) { index ->
             products.optJSONObject(index)
