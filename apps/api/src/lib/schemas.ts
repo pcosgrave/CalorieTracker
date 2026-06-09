@@ -57,6 +57,12 @@ export const updateWeightEntrySchema = createWeightEntrySchema;
 
 export const emptySchema = z.object({});
 
+export const aiFoodLogParseSchema = z.object({
+  transcript: z.string().min(1),
+  date: z.string().date(),
+  fallbackMeal: z.enum(["Breakfast", "Lunch", "Dinner", "Snack"]),
+});
+
 const syncMetadataSchema = z.object({
   recordId: z.string().min(1),
   version: z.number().int().positive(),
