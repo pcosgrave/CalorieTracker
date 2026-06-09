@@ -64,6 +64,31 @@ data class DiaryEntry(
     val loggedUnit: String = food.servingUnit,
 )
 
+data class AiFoodLogRequest(
+    val transcript: String,
+    val date: LocalDate,
+    val fallbackMeal: Meal,
+)
+
+data class AiFoodLogResponse(
+    val entries: List<AiDiaryEntryDraft> = emptyList(),
+    val createdFoods: List<AiCreatedFoodSummary> = emptyList(),
+)
+
+data class AiDiaryEntryDraft(
+    val foodName: String,
+    val calories: Double,
+    val meal: Meal,
+    val servingQuantity: Double = 1.0,
+    val servingUnit: String = "entry",
+)
+
+data class AiCreatedFoodSummary(
+    val foodId: String,
+    val foodName: String,
+    val brand: String = "",
+)
+
 data class MealCopyOptions(
     val previousDate: LocalDate? = null,
     val yesterdayDate: LocalDate? = null,

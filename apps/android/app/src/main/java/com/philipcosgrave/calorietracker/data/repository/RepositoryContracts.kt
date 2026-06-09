@@ -3,8 +3,10 @@ package com.philipcosgrave.calorietracker.data.repository
 import android.net.Uri
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
 import com.philipcosgrave.calorietracker.model.AuthSession
+import com.philipcosgrave.calorietracker.model.AiFoodLogResponse
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItemRecord
+import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.SyncChangeEnvelope
 import com.philipcosgrave.calorietracker.model.SyncCursor
 import com.philipcosgrave.calorietracker.model.SyncPullResponse
@@ -34,6 +36,14 @@ interface DiaryRepository {
     suspend fun getById(recordId: String): DiaryEntryRecord?
     suspend fun save(record: DiaryEntryRecord)
     suspend fun softDelete(recordId: String, deletedAt: String)
+}
+
+interface AiFoodLogRepository {
+    suspend fun parseFoodLog(
+        transcript: String,
+        date: LocalDate,
+        fallbackMeal: Meal,
+    ): AiFoodLogResponse
 }
 
 interface WeightRepository {

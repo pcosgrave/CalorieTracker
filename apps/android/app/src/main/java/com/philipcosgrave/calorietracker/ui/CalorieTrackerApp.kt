@@ -39,8 +39,8 @@ import com.philipcosgrave.calorietracker.data.remote.CanadianNutrientFileLookupS
 import com.philipcosgrave.calorietracker.data.remote.CloudFoodCatalogService
 import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
-import com.philipcosgrave.calorietracker.data.repository.FakeAiLogRepository
-import com.philipcosgrave.calorietracker.data.repository.ParsedDiaryEntryDraft
+import com.philipcosgrave.calorietracker.data.repository.FakeAiFoodLogRepository
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
 import com.philipcosgrave.calorietracker.data.repository.RoomBarcodeAliasRepository
@@ -174,7 +174,7 @@ fun CalorieTrackerApp(
     val cloudFoodCatalogService = remember { CloudFoodCatalogService(localStore) }
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
-    val aiLogRepository = remember { FakeAiLogRepository() }
+    val aiLogRepository = remember { FakeAiFoodLogRepository() }
     val textToSpeech = remember(context) { TextToSpeech(context, null) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -219,7 +219,7 @@ fun CalorieTrackerApp(
     var searchFoodInitialQuery by remember { mutableStateOf("") }
     var voiceFeedback by remember { mutableStateOf(VoiceLogFeedback()) }
     var pendingVoiceCommand by remember { mutableStateOf<VoiceFoodCommand?>(null) }
-    var aiLogParsedDrafts by remember { mutableStateOf<List<ParsedDiaryEntryDraft>>(emptyList()) }
+    var aiLogParsedDrafts by remember { mutableStateOf<List<AiDiaryEntryDraft>>(emptyList()) }
 
     fun navigateTo(target: AppScreen) {
         if (screen != target) {
@@ -1160,7 +1160,11 @@ fun CalorieTrackerApp(
                 onVoiceLog = launchVoiceRecognition,
                 onAiLogParse = { transcript ->
                     scope.launch {
-                        aiLogParsedDrafts = aiLogRepository.parseTranscript(transcript)
+                        aiLogParsedDrafts = aiLogRepository.parseFoodLog(
+                            transcript = transcript,
+                            date = selectedDate,
+                            fallbackMeal = Meal.Snack,
+                        ).entries
                     }
                 },
                 aiLogParsedDrafts = aiLogParsedDrafts,

@@ -43,7 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.philipcosgrave.calorietracker.data.repository.ParsedDiaryEntryDraft
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.totalsForEntries
 import com.philipcosgrave.calorietracker.model.DiaryEntry
@@ -77,8 +77,8 @@ fun DiaryScreen(
     onAddFood: () -> Unit,
     onVoiceLog: () -> Unit,
     onAiLogParse: (String) -> Unit,
-    aiLogParsedDrafts: List<ParsedDiaryEntryDraft>,
-    onAiLogConfirm: (List<ParsedDiaryEntryDraft>) -> Unit,
+    aiLogParsedDrafts: List<AiDiaryEntryDraft>,
+    onAiLogConfirm: (List<AiDiaryEntryDraft>) -> Unit,
     onAiLogCancelReview: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
@@ -100,7 +100,7 @@ fun DiaryScreen(
     var pendingDeleteEntry by remember(selectedDate) { mutableStateOf<DiaryEntry?>(null) }
     var aiLogSheetOpen by remember { mutableStateOf(false) }
     var aiLogTranscript by remember { mutableStateOf("") }
-    var reviewDrafts by remember { mutableStateOf<List<ParsedDiaryEntryDraft>>(emptyList()) }
+    var reviewDrafts by remember { mutableStateOf<List<AiDiaryEntryDraft>>(emptyList()) }
     val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
     val totals = totalsForEntries(selectedEntries)

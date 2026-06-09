@@ -1,6 +1,10 @@
 package com.philipcosgrave.calorietracker.data.local
 
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
+import com.philipcosgrave.calorietracker.model.AiCreatedFoodSummary
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
+import com.philipcosgrave.calorietracker.model.AiFoodLogRequest
+import com.philipcosgrave.calorietracker.model.AiFoodLogResponse
 import com.philipcosgrave.calorietracker.model.DiaryEntry
 import com.philipcosgrave.calorietracker.model.DiaryEntryRecord
 import com.philipcosgrave.calorietracker.model.FoodItem
@@ -19,6 +23,45 @@ import com.philipcosgrave.calorietracker.model.WeightEntryRecord
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
+
+fun AiFoodLogRequest.toJsonString(): String =
+    JSONObject()
+        .put("transcript", transcript)
+        .put("date", date.toString())
+        .put("fallbackMeal", fallbackMeal.name)
+        .toString()
+
+fun aiFoodLogRequestFromJsonString(value: String): AiFoodLogRequest {
+    val json = JSONObject(value)
+    return AiFoodLogRequest(
+        transcript = json.getString("transcript"),
+        date = LocalDate.parse(json.getString("date")),
+        fallbackMeal = Meal.valueOf(json.getString("fallbackMeal")),
+    )
+}
+
+fun AiFoodLogResponse.toJsonString(): String {
+    val entriesJson = JSONArray()
+    entries.forEach { entriesJson.put(it.toJson()) }
+    val createdFoodsJson = JSONArray()
+    createdFoods.forEach { createdFoodsJson.put(it.toJson()) }
+    return JSONObject()
+        .put("entries", entriesJson)
+        .put("createdFoods", createdFoodsJson)
+        .toString()
+}
+
+fun aiFoodLogResponseFromJsonString(value: String): AiFoodLogResponse {
+    val json = JSONObject(value)
+    val entriesJson = json.optJSONArray("entries") ?: JSONArray()
+    val createdFoodsJson = json.optJSONArray("createdFoods") ?: JSONArray()
+    return AiFoodLogResponse(
+        entries = List(entriesJson.length()) { index -> aiDiaryEntryDraftFromJson(entriesJson.getJSONObject(index)) },
+        createdFoods = List(createdFoodsJson.length()) { index ->
+            aiCreatedFoodSummaryFromJson(createdFoodsJson.getJSONObject(index))
+        },
+    )
+}
 
 fun FoodItem.toJsonString(): String = toJson().toString()
 
@@ -181,6 +224,20 @@ private fun Nutrients.toJson(): JSONObject =
         .put("carbohydrateGrams", carbohydrateGrams)
         .put("fatGrams", fatGrams)
 
+private fun AiDiaryEntryDraft.toJson(): JSONObject =
+    JSONObject()
+        .put("foodName", foodName)
+        .put("calories", calories)
+        .put("meal", meal.name)
+        .put("servingQuantity", servingQuantity)
+        .put("servingUnit", servingUnit)
+
+private fun AiCreatedFoodSummary.toJson(): JSONObject =
+    JSONObject()
+        .put("foodId", foodId)
+        .put("foodName", foodName)
+        .put("brand", brand)
+
 private fun foodItemFromJson(json: JSONObject): FoodItem {
     val componentsJson = json.optJSONArray("components") ?: JSONArray()
     return FoodItem(
@@ -217,6 +274,22 @@ private fun nutrientsFromJson(json: JSONObject): Nutrients =
         proteinGrams = json.optDouble("proteinGrams"),
         carbohydrateGrams = json.optDouble("carbohydrateGrams"),
         fatGrams = json.optDouble("fatGrams"),
+    )
+
+private fun aiDiaryEntryDraftFromJson(json: JSONObject): AiDiaryEntryDraft =
+    AiDiaryEntryDraft(
+        foodName = json.getString("foodName"),
+        calories = json.getDouble("calories"),
+        meal = Meal.valueOf(json.getString("meal")),
+        servingQuantity = json.optDouble("servingQuantity").takeIf { !it.isNaN() && it > 0 } ?: 1.0,
+        servingUnit = json.optString("servingUnit").ifBlank { "entry" },
+    )
+
+private fun aiCreatedFoodSummaryFromJson(json: JSONObject): AiCreatedFoodSummary =
+    AiCreatedFoodSummary(
+        foodId = json.getString("foodId"),
+        foodName = json.getString("foodName"),
+        brand = json.optString("brand"),
     )
 
 private fun weightEntryToJson(record: WeightEntryRecord): JSONObject =
