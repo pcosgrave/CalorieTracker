@@ -77,9 +77,12 @@ fun DiaryScreen(
     onAddFood: () -> Unit,
     onVoiceLog: () -> Unit,
     onAiLogParse: (String) -> Unit,
+    aiLogIsParsing: Boolean,
+    aiLogErrorMessage: String?,
     aiLogParsedDrafts: List<AiDiaryEntryDraft>,
     onAiLogConfirm: (List<AiDiaryEntryDraft>) -> Unit,
     onAiLogCancelReview: () -> Unit,
+    onRetryAiLogParse: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onEditEntry: (DiaryEntry) -> Unit,
@@ -336,6 +339,30 @@ fun DiaryScreen(
                     label = { Text("Transcript") },
                     minLines = 4,
                 )
+                if (!aiLogErrorMessage.isNullOrBlank()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = appSoftColor()),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("AI Log failed", fontWeight = FontWeight.Bold)
+                            Text(aiLogErrorMessage, color = AppMuted, style = MaterialTheme.typography.bodySmall)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = onRetryAiLogParse, enabled = !aiLogIsParsing) {
+                                    Text("Retry", color = AppBlue)
+                                }
+                            }
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -344,8 +371,11 @@ fun DiaryScreen(
                     TextButton(onClick = { aiLogSheetOpen = false }) {
                         Text("Cancel")
                     }
-                    Button(onClick = { onAiLogParse(aiLogTranscript) }) {
-                        Text("Parse")
+                    Button(
+                        onClick = { onAiLogParse(aiLogTranscript) },
+                        enabled = !aiLogIsParsing,
+                    ) {
+                        Text(if (aiLogIsParsing) "Parsing..." else "Parse")
                     }
                 }
             }
@@ -857,9 +887,12 @@ private fun DiaryScreenPreview() {
             onAddFood = {},
             onVoiceLog = {},
             onAiLogParse = {},
+            aiLogIsParsing = false,
+            aiLogErrorMessage = null,
             aiLogParsedDrafts = emptyList(),
             onAiLogConfirm = {},
             onAiLogCancelReview = {},
+            onRetryAiLogParse = {},
             onOpenSyncSettings = {},
             onDeleteEntry = {},
             onEditEntry = {},

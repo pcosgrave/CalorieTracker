@@ -39,7 +39,7 @@ import com.philipcosgrave.calorietracker.data.remote.CanadianNutrientFileLookupS
 import com.philipcosgrave.calorietracker.data.remote.CloudFoodCatalogService
 import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
-import com.philipcosgrave.calorietracker.data.repository.FakeAiFoodLogRepository
+import com.philipcosgrave.calorietracker.data.repository.ApiAiFoodLogRepository
 import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
@@ -174,7 +174,7 @@ fun CalorieTrackerApp(
     val cloudFoodCatalogService = remember { CloudFoodCatalogService(localStore) }
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
-    val aiLogRepository = remember { FakeAiFoodLogRepository() }
+    val aiLogRepository = remember { ApiAiFoodLogRepository(localStore) }
     val textToSpeech = remember(context) { TextToSpeech(context, null) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -220,6 +220,14 @@ fun CalorieTrackerApp(
     var voiceFeedback by remember { mutableStateOf(VoiceLogFeedback()) }
     var pendingVoiceCommand by remember { mutableStateOf<VoiceFoodCommand?>(null) }
     var aiLogParsedDrafts by remember { mutableStateOf<List<AiDiaryEntryDraft>>(emptyList()) }
+    var aiLogIsParsing by remember { mutableStateOf(false) }
+    var aiLogErrorMessage by remember { mutableStateOf<String?>(null) }
+    var aiLogLastTranscript by remember { mutableStateOf("") }
+
+    fun clearAiLogFeedback() {
+        aiLogIsParsing = false
+        aiLogErrorMessage = null
+    }
 
     fun navigateTo(target: AppScreen) {
         if (screen != target) {
@@ -1160,13 +1168,25 @@ fun CalorieTrackerApp(
                 onVoiceLog = launchVoiceRecognition,
                 onAiLogParse = { transcript ->
                     scope.launch {
-                        aiLogParsedDrafts = aiLogRepository.parseFoodLog(
-                            transcript = transcript,
-                            date = selectedDate,
-                            fallbackMeal = Meal.Snack,
-                        ).entries
+                        aiLogLastTranscript = transcript
+                        aiLogIsParsing = true
+                        aiLogErrorMessage = null
+                        runCatching {
+                            aiLogRepository.parseFoodLog(
+                                transcript = transcript,
+                                date = selectedDate,
+                                fallbackMeal = Meal.Snack,
+                            )
+                        }.onSuccess { response ->
+                            aiLogParsedDrafts = response.entries
+                        }.onFailure { error ->
+                            aiLogErrorMessage = error.message ?: "AI Log failed."
+                        }
+                        aiLogIsParsing = false
                     }
                 },
+                aiLogIsParsing = aiLogIsParsing,
+                aiLogErrorMessage = aiLogErrorMessage,
                 aiLogParsedDrafts = aiLogParsedDrafts,
                 onAiLogConfirm = { drafts ->
                     scope.launch {
@@ -1189,11 +1209,31 @@ fun CalorieTrackerApp(
                             saveDiaryEntry(entry)
                         }
                         aiLogParsedDrafts = emptyList()
+                        clearAiLogFeedback()
                         refreshState()
                     }
                 },
                 onAiLogCancelReview = {
                     aiLogParsedDrafts = emptyList()
+                    clearAiLogFeedback()
+                },
+                onRetryAiLogParse = {
+                    scope.launch {
+                        aiLogIsParsing = true
+                        aiLogErrorMessage = null
+                        runCatching {
+                            aiLogRepository.parseFoodLog(
+                                transcript = aiLogLastTranscript,
+                                date = selectedDate,
+                                fallbackMeal = Meal.Snack,
+                            )
+                        }.onSuccess { response ->
+                            aiLogParsedDrafts = response.entries
+                        }.onFailure { error ->
+                            aiLogErrorMessage = error.message ?: "AI Log failed."
+                        }
+                        aiLogIsParsing = false
+                    }
                 },
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)
