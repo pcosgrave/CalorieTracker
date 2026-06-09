@@ -1,9 +1,18 @@
 import { json, route } from "../lib/http.js";
+import { FoodCandidateService } from "../lib/food-candidate-service.js";
 import { aiFoodLogParseSchema } from "../lib/schemas.js";
+
+const foodCandidateService = new FoodCandidateService();
 
 export const parseFoodLog = route(aiFoodLogParseSchema, async ({ userId, body }) => {
   const transcript = body.transcript.trim();
   const meal = body.fallbackMeal;
+  const foods = await foodCandidateService.loadUserFoods(userId);
+
+  console.info("AI parse loaded user foods", {
+    userId,
+    foodCount: foods.length,
+  });
 
   return json(200, {
     entries: [
@@ -29,12 +38,6 @@ export const parseFoodLog = route(aiFoodLogParseSchema, async ({ userId, body })
         servingUnit: "cup",
       },
     ],
-    createdFoods: [
-      {
-        foodId: `mock-food-${userId.slice(0, 8)}`,
-        foodName: "Mocked oatmeal bowl",
-        brand: "AI Mock",
-      },
-    ],
+    createdFoods: [],
   });
 });
