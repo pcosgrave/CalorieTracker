@@ -39,6 +39,8 @@ import com.philipcosgrave.calorietracker.data.remote.CanadianNutrientFileLookupS
 import com.philipcosgrave.calorietracker.data.remote.CloudFoodCatalogService
 import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
+import com.philipcosgrave.calorietracker.data.repository.FakeAiLogRepository
+import com.philipcosgrave.calorietracker.data.repository.ParsedDiaryEntryDraft
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
 import com.philipcosgrave.calorietracker.data.repository.RoomBarcodeAliasRepository
@@ -172,6 +174,7 @@ fun CalorieTrackerApp(
     val cloudFoodCatalogService = remember { CloudFoodCatalogService(localStore) }
     val openFoodFactsLookupService = remember { OpenFoodFactsLookupService() }
     val healthConnectExporter = remember { HealthConnectNutritionExporter(context) }
+    val aiLogRepository = remember { FakeAiLogRepository() }
     val textToSpeech = remember(context) { TextToSpeech(context, null) }
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
@@ -216,6 +219,7 @@ fun CalorieTrackerApp(
     var searchFoodInitialQuery by remember { mutableStateOf("") }
     var voiceFeedback by remember { mutableStateOf(VoiceLogFeedback()) }
     var pendingVoiceCommand by remember { mutableStateOf<VoiceFoodCommand?>(null) }
+    var aiLogParsedDrafts by remember { mutableStateOf<List<ParsedDiaryEntryDraft>>(emptyList()) }
 
     fun navigateTo(target: AppScreen) {
         if (screen != target) {
@@ -1154,6 +1158,39 @@ fun CalorieTrackerApp(
                     navigateTo(AppScreen.SearchFood)
                 },
                 onVoiceLog = launchVoiceRecognition,
+                onAiLogParse = { transcript ->
+                    scope.launch {
+                        aiLogParsedDrafts = aiLogRepository.parseTranscript(transcript)
+                    }
+                },
+                aiLogParsedDrafts = aiLogParsedDrafts,
+                onAiLogConfirm = { drafts ->
+                    scope.launch {
+                        drafts.forEach { draft ->
+                            val entry = DiaryEntry(
+                                id = createId("entry"),
+                                food = FoodItem(
+                                    id = createId("ai-log"),
+                                    kind = FoodKind.Ingredient,
+                                    name = draft.foodName,
+                                    servingQuantity = 1.0,
+                                    servingUnit = "entry",
+                                    nutrients = Nutrients(calories = draft.calories),
+                                ),
+                                date = selectedDate,
+                                meal = draft.meal,
+                                servingMultiplier = 1.0,
+                            )
+                            diary = listOf(entry) + diary
+                            saveDiaryEntry(entry)
+                        }
+                        aiLogParsedDrafts = emptyList()
+                        refreshState()
+                    }
+                },
+                onAiLogCancelReview = {
+                    aiLogParsedDrafts = emptyList()
+                },
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)
                 },

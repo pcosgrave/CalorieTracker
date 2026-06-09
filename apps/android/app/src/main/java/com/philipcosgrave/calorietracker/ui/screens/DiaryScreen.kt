@@ -20,9 +20,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.philipcosgrave.calorietracker.data.repository.ParsedDiaryEntryDraft
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.totalsForEntries
 import com.philipcosgrave.calorietracker.model.DiaryEntry
@@ -59,6 +66,7 @@ import java.time.YearMonth
 import kotlin.math.max
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun DiaryScreen(
     selectedDate: LocalDate,
     entries: List<DiaryEntry>,
@@ -68,6 +76,10 @@ fun DiaryScreen(
     onBack: () -> Unit,
     onAddFood: () -> Unit,
     onVoiceLog: () -> Unit,
+    onAiLogParse: (String) -> Unit,
+    aiLogParsedDrafts: List<ParsedDiaryEntryDraft>,
+    onAiLogConfirm: (List<ParsedDiaryEntryDraft>) -> Unit,
+    onAiLogCancelReview: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onEditEntry: (DiaryEntry) -> Unit,
@@ -86,6 +98,9 @@ fun DiaryScreen(
     val pageScrollState = rememberScrollState()
     var expandedEntryId by remember(selectedDate) { mutableStateOf<String?>(null) }
     var pendingDeleteEntry by remember(selectedDate) { mutableStateOf<DiaryEntry?>(null) }
+    var aiLogSheetOpen by remember { mutableStateOf(false) }
+    var aiLogTranscript by remember { mutableStateOf("") }
+    var reviewDrafts by remember { mutableStateOf<List<ParsedDiaryEntryDraft>>(emptyList()) }
     val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
     val totals = totalsForEntries(selectedEntries)
@@ -193,6 +208,20 @@ fun DiaryScreen(
                             Text("\uD83C\uDFA4", color = AppBlue, style = MaterialTheme.typography.titleLarge)
                         }
                     }
+                    Box(
+                        modifier = Modifier
+                            .height(52.dp)
+                            .background(appSoftColor(), RoundedCornerShape(999.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(onClick = {
+                            expandedEntryId = null
+                            aiLogTranscript = ""
+                            aiLogSheetOpen = true
+                        }) {
+                            Text("AI Log", color = AppBlue, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
                 }
             }
         }
@@ -285,6 +314,111 @@ fun DiaryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteEntry = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (aiLogSheetOpen) {
+        ModalBottomSheet(onDismissRequest = { aiLogSheetOpen = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("AI Log", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(
+                    value = aiLogTranscript,
+                    onValueChange = { aiLogTranscript = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Transcript") },
+                    minLines = 4,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { aiLogSheetOpen = false }) {
+                        Text("Cancel")
+                    }
+                    Button(onClick = { onAiLogParse(aiLogTranscript) }) {
+                        Text("Parse")
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(aiLogParsedDrafts) {
+        if (aiLogParsedDrafts.isNotEmpty()) {
+            reviewDrafts = aiLogParsedDrafts
+            aiLogSheetOpen = false
+        }
+    }
+
+    if (reviewDrafts.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Review parsed foods") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    reviewDrafts.forEachIndexed { index, draft ->
+                        var mealMenuExpanded by remember(index) { mutableStateOf(false) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(draft.foodName, fontWeight = FontWeight.Bold)
+                                Text("${formatNumber(draft.calories)} cal", color = AppMuted)
+                            }
+                            Box {
+                                TextButton(onClick = { mealMenuExpanded = true }) {
+                                    Text(draft.meal.label, fontWeight = FontWeight.Bold)
+                                }
+                                DropdownMenu(
+                                    expanded = mealMenuExpanded,
+                                    onDismissRequest = { mealMenuExpanded = false },
+                                ) {
+                                    Meal.entries.forEach { meal ->
+                                        DropdownMenuItem(
+                                            text = { Text(meal.label) },
+                                            onClick = {
+                                                reviewDrafts = reviewDrafts.toMutableList().also {
+                                                    it[index] = draft.copy(meal = meal)
+                                                }
+                                                mealMenuExpanded = false
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                            TextButton(onClick = { reviewDrafts = reviewDrafts.filterIndexed { i, _ -> i != index } }) {
+                                Text("Remove", color = Color(0xFFFF5449))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onAiLogConfirm(reviewDrafts)
+                        reviewDrafts = emptyList()
+                    },
+                ) {
+                    Text("Confirm", color = AppBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    reviewDrafts = emptyList()
+                    onAiLogCancelReview()
+                }) {
                     Text("Cancel")
                 }
             },
@@ -722,6 +856,10 @@ private fun DiaryScreenPreview() {
             onBack = {},
             onAddFood = {},
             onVoiceLog = {},
+            onAiLogParse = {},
+            aiLogParsedDrafts = emptyList(),
+            onAiLogConfirm = {},
+            onAiLogCancelReview = {},
             onOpenSyncSettings = {},
             onDeleteEntry = {},
             onEditEntry = {},
