@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit"
+  short_description: "Create git commits with conventional subjects"
+  default_prompt: "Use this skill when the user wants a git commit created. Prefer Conventional Commit subjects like feat: and fix: unless the conversation or repository context specifies a different rule."

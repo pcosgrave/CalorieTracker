@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan"
+  short_description: "Inspect, plan, and ask before large edits"
+  default_prompt: "Use this skill when a request may require large code changes and you should inspect the codebase, plan the work, identify risks, and pause for approval before implementing."
