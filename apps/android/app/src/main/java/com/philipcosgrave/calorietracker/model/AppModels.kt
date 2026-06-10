@@ -75,12 +75,30 @@ data class AiFoodLogResponse(
     val createdFoods: List<AiCreatedFoodSummary> = emptyList(),
 )
 
+enum class AiDiaryEntryMatchStatus {
+    Matched,
+    Creatable,
+    Unresolved,
+}
+
 data class AiDiaryEntryDraft(
     val foodName: String,
-    val calories: Double,
+    val brand: String = "",
     val meal: Meal,
-    val servingQuantity: Double = 1.0,
-    val servingUnit: String = "entry",
+    val quantity: Double? = null,
+    val unit: String = "",
+    val matchStatus: AiDiaryEntryMatchStatus,
+    val matchedFoodId: String? = null,
+    val creatableFood: AiCreatableFoodDraft? = null,
+    val notes: String = "",
+)
+
+data class AiCreatableFoodDraft(
+    val name: String,
+    val brand: String = "",
+    val servingQuantity: Double,
+    val servingUnit: String,
+    val nutrients: Nutrients,
 )
 
 data class AiCreatedFoodSummary(

@@ -40,7 +40,9 @@ import com.philipcosgrave.calorietracker.data.remote.CloudFoodCatalogService
 import com.philipcosgrave.calorietracker.data.remote.OpenFoodFactsLookupService
 import com.philipcosgrave.calorietracker.data.repository.AndroidLocalStore
 import com.philipcosgrave.calorietracker.data.repository.ApiAiFoodLogRepository
+import com.philipcosgrave.calorietracker.model.AiCreatableFoodDraft
 import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryMatchStatus
 import com.philipcosgrave.calorietracker.data.repository.DataStoreSyncStateRepository
 import com.philipcosgrave.calorietracker.data.repository.LocalRepositoryFactory
 import com.philipcosgrave.calorietracker.data.repository.RoomBarcodeAliasRepository
@@ -1191,15 +1193,19 @@ fun CalorieTrackerApp(
                 onAiLogConfirm = { drafts ->
                     scope.launch {
                         drafts.forEach { draft ->
+                            val calories = draft.creatableFood?.nutrients?.calories ?: 0.0
+                            val servingQuantity = draft.creatableFood?.servingQuantity ?: 1.0
+                            val servingUnit = draft.creatableFood?.servingUnit ?: "entry"
                             val entry = DiaryEntry(
                                 id = createId("entry"),
                                 food = FoodItem(
                                     id = createId("ai-log"),
                                     kind = FoodKind.Ingredient,
                                     name = draft.foodName,
-                                    servingQuantity = 1.0,
-                                    servingUnit = "entry",
-                                    nutrients = Nutrients(calories = draft.calories),
+                                    brand = draft.brand,
+                                    servingQuantity = servingQuantity,
+                                    servingUnit = servingUnit,
+                                    nutrients = Nutrients(calories = calories),
                                 ),
                                 date = selectedDate,
                                 meal = draft.meal,

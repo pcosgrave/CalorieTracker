@@ -2,7 +2,9 @@ package com.philipcosgrave.calorietracker.data.local
 
 import com.philipcosgrave.calorietracker.model.BarcodeAliasRecord
 import com.philipcosgrave.calorietracker.model.AiCreatedFoodSummary
+import com.philipcosgrave.calorietracker.model.AiCreatableFoodDraft
 import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryMatchStatus
 import com.philipcosgrave.calorietracker.model.AiFoodLogRequest
 import com.philipcosgrave.calorietracker.model.AiFoodLogResponse
 import com.philipcosgrave.calorietracker.model.DiaryEntry
@@ -227,10 +229,22 @@ private fun Nutrients.toJson(): JSONObject =
 private fun AiDiaryEntryDraft.toJson(): JSONObject =
     JSONObject()
         .put("foodName", foodName)
-        .put("calories", calories)
+        .put("brand", brand)
         .put("meal", meal.name)
+        .put("quantity", quantity)
+        .put("unit", unit)
+        .put("matchStatus", matchStatus.name)
+        .put("matchedFoodId", matchedFoodId)
+        .put("creatableFood", creatableFood?.toJson())
+        .put("notes", notes)
+
+private fun AiCreatableFoodDraft.toJson(): JSONObject =
+    JSONObject()
+        .put("name", name)
+        .put("brand", brand)
         .put("servingQuantity", servingQuantity)
         .put("servingUnit", servingUnit)
+        .put("nutrients", nutrients.toJson())
 
 private fun AiCreatedFoodSummary.toJson(): JSONObject =
     JSONObject()
@@ -279,10 +293,23 @@ private fun nutrientsFromJson(json: JSONObject): Nutrients =
 private fun aiDiaryEntryDraftFromJson(json: JSONObject): AiDiaryEntryDraft =
     AiDiaryEntryDraft(
         foodName = json.getString("foodName"),
-        calories = json.getDouble("calories"),
+        brand = json.optString("brand"),
         meal = Meal.valueOf(json.getString("meal")),
+        quantity = json.optDouble("quantity").takeIf { !it.isNaN() && it > 0 },
+        unit = json.optString("unit"),
+        matchStatus = AiDiaryEntryMatchStatus.valueOf(json.optString("matchStatus", AiDiaryEntryMatchStatus.Unresolved.name)),
+        matchedFoodId = json.optString("matchedFoodId").takeIf { it.isNotBlank() },
+        creatableFood = json.optJSONObject("creatableFood")?.let(::aiCreatableFoodDraftFromJson),
+        notes = json.optString("notes"),
+    )
+
+private fun aiCreatableFoodDraftFromJson(json: JSONObject): AiCreatableFoodDraft =
+    AiCreatableFoodDraft(
+        name = json.getString("name"),
+        brand = json.optString("brand"),
         servingQuantity = json.optDouble("servingQuantity").takeIf { !it.isNaN() && it > 0 } ?: 1.0,
-        servingUnit = json.optString("servingUnit").ifBlank { "entry" },
+        servingUnit = json.optString("servingUnit").ifBlank { "serving" },
+        nutrients = nutrientsFromJson(json.getJSONObject("nutrients")),
     )
 
 private fun aiCreatedFoodSummaryFromJson(json: JSONObject): AiCreatedFoodSummary =

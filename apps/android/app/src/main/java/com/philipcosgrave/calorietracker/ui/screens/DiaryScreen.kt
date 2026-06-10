@@ -43,7 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.philipcosgrave.calorietracker.model.AiCreatableFoodDraft
 import com.philipcosgrave.calorietracker.model.AiDiaryEntryDraft
+import com.philipcosgrave.calorietracker.model.AiDiaryEntryMatchStatus
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.totalsForEntries
 import com.philipcosgrave.calorietracker.model.DiaryEntry
@@ -404,7 +406,15 @@ fun DiaryScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(draft.foodName, fontWeight = FontWeight.Bold)
-                                Text("${formatNumber(draft.calories)} cal", color = AppMuted)
+                                val detailText = when (draft.matchStatus) {
+                                    AiDiaryEntryMatchStatus.Matched -> "Matched"
+                                    AiDiaryEntryMatchStatus.Creatable -> {
+                                        val calories = draft.creatableFood?.nutrients?.calories
+                                        if (calories != null) "${formatNumber(calories)} cal • Create new food" else "Create new food"
+                                    }
+                                    AiDiaryEntryMatchStatus.Unresolved -> "Needs review"
+                                }
+                                Text(detailText, color = AppMuted)
                             }
                             Box {
                                 TextButton(onClick = { mealMenuExpanded = true }) {
@@ -889,7 +899,19 @@ private fun DiaryScreenPreview() {
             onAiLogParse = {},
             aiLogIsParsing = false,
             aiLogErrorMessage = null,
-            aiLogParsedDrafts = emptyList(),
+            aiLogParsedDrafts = listOf(
+                AiDiaryEntryDraft(
+                    foodName = "Greek yogurt",
+                    meal = Meal.Breakfast,
+                    matchStatus = AiDiaryEntryMatchStatus.Creatable,
+                    creatableFood = AiCreatableFoodDraft(
+                        name = "Greek yogurt",
+                        servingQuantity = 1.0,
+                        servingUnit = "cup",
+                        nutrients = com.philipcosgrave.calorietracker.model.Nutrients(calories = 170.0),
+                    ),
+                ),
+            ),
             onAiLogConfirm = {},
             onAiLogCancelReview = {},
             onRetryAiLogParse = {},
