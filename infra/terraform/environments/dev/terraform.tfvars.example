@@ -27,3 +27,4 @@ lambda_runtime         = "nodejs22.x"
 lambda_memory_mb       = 512
 lambda_timeout_seconds = 15
 api_stage_name         = "dev"
+gemini_api_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret:bitewise/dev/gemini-api-key-example"

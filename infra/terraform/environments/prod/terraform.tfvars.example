@@ -28,3 +28,4 @@ lambda_memory_mb       = 512
 lambda_timeout_seconds = 15
 api_stage_name         = "prod"
 log_retention_days     = 30
+gemini_api_secret_arn  = "arn:aws:secretsmanager:us-east-1:123456789012:secret:bitewise/prod/gemini-api-key-example"

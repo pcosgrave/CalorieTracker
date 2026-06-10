@@ -112,6 +112,7 @@ jobs:
           TF_GOOGLE_CLIENT_SECRET: ${{ secrets.TF_GOOGLE_CLIENT_SECRET }}
           TF_GOOGLE_AUTHORIZE_SCOPES: ${{ vars.TF_GOOGLE_AUTHORIZE_SCOPES }}
           TF_LOG_RETENTION_DAYS: ${{ vars.TF_LOG_RETENTION_DAYS }}
+          TF_GEMINI_API_SECRET_ARN: ${{ secrets.TF_VAR_GEMINI_API_SECRET_ARN }}
           AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           $tfDir = Join-Path $PWD "infra/terraform/environments/${{ inputs.terraform_environment }}"
@@ -158,6 +159,9 @@ jobs:
           }
           if ($env:TF_LOG_RETENTION_DAYS) {
             $lines += "log_retention_days = $env:TF_LOG_RETENTION_DAYS"
+          }
+          if ($env:TF_GEMINI_API_SECRET_ARN) {
+            $lines += "gemini_api_secret_arn = ""$env:TF_GEMINI_API_SECRET_ARN"""
           }
 
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM

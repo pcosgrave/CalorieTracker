@@ -106,3 +106,9 @@ variable "manage_lambda_log_groups" {
   type        = bool
   default     = false
 }
+
+variable "gemini_api_secret_arn" {
+  description = "Optional ARN of the AWS Secrets Manager secret containing the Gemini API key for the AI parse endpoint."
+  type        = string
+  default     = null
+}

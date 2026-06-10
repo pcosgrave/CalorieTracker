@@ -15,6 +15,12 @@ locals {
     SYNC_CHANGES_TABLE_NAME    = aws_dynamodb_table.sync_changes.name
     USER_POOL_ID               = aws_cognito_user_pool.main.id
   }
+  ai_lambda_environment = merge(
+    local.lambda_environment,
+    var.gemini_api_secret_arn == null ? {} : {
+      GEMINI_API_SECRET_ARN = var.gemini_api_secret_arn
+    },
+  )
 
   api_lambda_function_names = var.create_api ? [
     "${local.name_prefix}-foods-create",
@@ -468,6 +474,79 @@ resource "aws_iam_role_policy" "api_lambda" {
   })
 }
 
+resource "aws_iam_role" "ai_api_lambda" {
+  count = var.create_api ? 1 : 0
+
+  name = "${local.name_prefix}-ai-api-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "ai_api_lambda" {
+  count = var.create_api ? 1 : 0
+
+  name = "${local.name_prefix}-ai-api-lambda-policy"
+  role = aws_iam_role.ai_api_lambda[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat([
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = var.manage_lambda_log_groups ? flatten([
+          for log_group in values(aws_cloudwatch_log_group.api_lambdas) : [
+            log_group.arn,
+            "${log_group.arn}:*"
+          ]
+        ]) : ["arn:aws:logs:*:*:*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+        ]
+        Resource = [
+          aws_dynamodb_table.products.arn,
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+        ]
+        Resource = aws_kms_key.app_storage.arn
+      },
+      ], var.gemini_api_secret_arn == null ? [] : [{
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = var.gemini_api_secret_arn
+    }])
+  })
+}
+
 resource "aws_lambda_function" "foods_create" {
   count = var.create_api ? 1 : 0
 
@@ -833,7 +912,7 @@ resource "aws_lambda_function" "ai_parse_food_log" {
   count = var.create_api ? 1 : 0
 
   function_name    = "${local.name_prefix}-ai-parse-food-log"
-  role             = aws_iam_role.api_lambda[0].arn
+  role             = aws_iam_role.ai_api_lambda[0].arn
   runtime          = var.lambda_runtime
   handler          = "handlers/ai.parseFoodLog"
   filename         = var.api_lambda_package_path
@@ -842,7 +921,7 @@ resource "aws_lambda_function" "ai_parse_food_log" {
   memory_size      = var.lambda_memory_mb
 
   environment {
-    variables = local.lambda_environment
+    variables = local.ai_lambda_environment
   }
 
   tags = local.tags

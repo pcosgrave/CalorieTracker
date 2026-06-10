@@ -94,3 +94,9 @@ variable "google_authorize_scopes" {
   type        = string
   default     = "openid email profile"
 }
+
+variable "gemini_api_secret_arn" {
+  description = "Optional ARN of the AWS Secrets Manager secret containing the Gemini API key for the AI parse endpoint."
+  type        = string
+  default     = null
+}
