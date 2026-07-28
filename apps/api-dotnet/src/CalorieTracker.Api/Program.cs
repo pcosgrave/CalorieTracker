@@ -1,5 +1,6 @@
 using CalorieTracker.Api.Configuration;
 using CalorieTracker.Api.Endpoints;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,10 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services
     .AddProblemDetails()
     .AddEndpointsApiExplorer()
+    .ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(namingPolicy: System.Text.Json.JsonNamingPolicy.CamelCase));
+    })
     .AddApiConfiguration(builder.Configuration);
 
 var app = builder.Build();

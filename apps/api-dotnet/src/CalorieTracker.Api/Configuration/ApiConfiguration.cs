@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using CalorieTracker.Api.Services.Foods;
 
 namespace CalorieTracker.Api.Configuration;
 
@@ -43,6 +44,8 @@ public static class ApiConfiguration
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<StorageOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<CognitoOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<AiOptions>>().Value);
+        services.AddSingleton<IFoodRepository, InMemoryFoodRepository>();
+        services.AddSingleton<FoodService>();
 
         return services;
     }

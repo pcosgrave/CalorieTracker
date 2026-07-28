@@ -1,4 +1,5 @@
 using CalorieTracker.Api.Contracts;
+using CalorieTracker.Api.Handlers.Foods;
 
 namespace CalorieTracker.Api.Endpoints;
 
@@ -8,17 +9,17 @@ public static class FoodEndpoints
     {
         var foods = app.MapGroup("/foods").WithTags("Foods");
 
-        foods.MapGet("/", () => EndpointResponses.NotImplemented("List foods"));
-        foods.MapPost("/", (CreateFoodProductRequest _) => EndpointResponses.NotImplemented("Create food"));
-        foods.MapPut("/{productId}", (string productId, UpdateFoodProductRequest _) => EndpointResponses.NotImplemented($"Update food {productId}"));
-        foods.MapDelete("/{productId}", (string productId) => EndpointResponses.NotImplemented($"Delete food {productId}"));
-        foods.MapGet("/barcode/{barcode}", (string barcode) => EndpointResponses.NotImplemented($"Lookup barcode {barcode}"));
-        foods.MapGet("/search", (string? query) => EndpointResponses.NotImplemented($"Search foods with query '{query}'"));
+        foods.MapGet("/", FoodHandlers.ListFoodsAsync);
+        foods.MapPost("/", FoodHandlers.CreateFoodAsync);
+        foods.MapPut("/{productId}", FoodHandlers.UpdateFoodAsync);
+        foods.MapDelete("/{productId}", FoodHandlers.DeleteFoodAsync);
+        foods.MapGet("/barcode/{barcode}", FoodHandlers.LookupBarcodeAsync);
+        foods.MapGet("/search", FoodHandlers.SearchFoodsAsync);
 
         var community = foods.MapGroup("/community");
-        community.MapGet("/barcode/{barcode}", (string barcode) => EndpointResponses.NotImplemented($"Lookup community barcode {barcode}"));
-        community.MapGet("/search", (string? query) => EndpointResponses.NotImplemented($"Search community foods with query '{query}'"));
-        community.MapPost("/", (PublishCommunityFoodRequest _) => EndpointResponses.NotImplemented("Publish community food"));
+        community.MapGet("/barcode/{barcode}", FoodHandlers.LookupCommunityBarcodeAsync);
+        community.MapGet("/search", FoodHandlers.SearchCommunityFoodsAsync);
+        community.MapPost("/", FoodHandlers.PublishCommunityFoodAsync);
 
         return app;
     }
