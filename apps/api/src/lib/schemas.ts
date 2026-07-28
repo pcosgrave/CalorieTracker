@@ -63,6 +63,20 @@ export const aiFoodLogParseSchema = z.object({
   fallbackMeal: z.enum(["Breakfast", "Lunch", "Dinner", "Snack"]),
 });
 
+export const geminiParsedFoodItemSchema = z.object({
+  foodName: z.string().min(1),
+  brand: z.string().optional(),
+  meal: z.enum(["Breakfast", "Lunch", "Dinner", "Snack"]).optional(),
+  quantity: z.number().positive().optional(),
+  unit: z.string().min(1).optional(),
+  date: z.string().date().optional(),
+  notes: z.string().optional(),
+});
+
+export const geminiParsedFoodLogSchema = z.object({
+  entries: z.array(geminiParsedFoodItemSchema),
+});
+
 const syncMetadataSchema = z.object({
   recordId: z.string().min(1),
   version: z.number().int().positive(),
