@@ -1,0 +1,63 @@
+name: Destroy Backend Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: Branch, tag, or commit SHA to check out before destroy
+        required: true
+        type: string
+      preview_name:
+        description: Preview identifier used when the environment was deployed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: backend-preview-${{ inputs.preview_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      preview_slug: ${{ steps.compute.outputs.preview_slug }}
+      state_key: ${{ steps.compute.outputs.state_key }}
+      cognito_domain_prefix: ${{ steps.compute.outputs.cognito_domain_prefix }}
+    steps:
+      - name: Compute preview identifiers
+        id: compute
+        env:
+          APP_NAME: ${{ vars.TF_APP_NAME }}
+          PREVIEW_NAME: ${{ inputs.preview_name }}
+        run: |
+          base="$(printf '%s' "${PREVIEW_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\{2,\}/-/g' | sed 's/^-//' | sed 's/-$//')"
+          if [ -z "${base}" ]; then
+            echo "Preview name produced an empty slug."
+            exit 1
+          fi
+
+          preview_slug="preview-${base}"
+          app_name="${APP_NAME:-calorie-tracker}"
+          app_slug="$(printf '%s' "${app_name}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\{2,\}/-/g' | sed 's/^-//' | sed 's/-$//')"
+          cognito_domain_prefix="$(printf '%s' "${app_slug}-${preview_slug}" | cut -c1-63 | sed 's/-$//')"
+          state_key="${app_slug}/previews/${preview_slug}/terraform.tfstate"
+
+          echo "preview_slug=${preview_slug}" >> "$GITHUB_OUTPUT"
+          echo "state_key=${state_key}" >> "$GITHUB_OUTPUT"
+          echo "cognito_domain_prefix=${cognito_domain_prefix}" >> "$GITHUB_OUTPUT"
+
+  destroy:
+    needs: prepare
+    uses: ./.github/workflows/_destroy-backend-and-infra.yml
+    with:
+      github_environment: dev
+      terraform_environment: dev
+      checkout_ref: ${{ inputs.branch_ref }}
+      terraform_state_key: ${{ needs.prepare.outputs.state_key }}
+      app_environment_name: ${{ needs.prepare.outputs.preview_slug }}
+      cognito_domain_prefix: ${{ needs.prepare.outputs.cognito_domain_prefix }}
+    secrets: inherit

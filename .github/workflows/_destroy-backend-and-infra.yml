@@ -1,4 +1,4 @@
-name: Reusable Backend And Infra Deploy
+name: Reusable Backend And Infra Destroy
 
 on:
   workflow_call:
@@ -27,8 +27,8 @@ on:
         default: ""
 
 jobs:
-  deploy:
-    name: Deploy Backend ${{ inputs.github_environment }}
+  destroy:
+    name: Destroy Backend ${{ inputs.github_environment }}
     runs-on: windows-latest
     environment: ${{ inputs.github_environment }}
     permissions:
@@ -42,11 +42,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.event.pull_request.base.ref || github.ref_name }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: 22
-          cache: npm
+          dotnet-version: 8.0.x
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -67,10 +66,6 @@ jobs:
           key: ${{ runner.os }}-terraform-${{ hashFiles('infra/terraform/environments/**/.terraform.lock.hcl') }}
           restore-keys: |
             ${{ runner.os }}-terraform-
-
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm.cmd ci
 
       - name: Prepare Terraform backend and variables
         shell: pwsh
@@ -145,25 +140,14 @@ jobs:
 
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
 
-      - name: Show Terraform backend target
-        shell: pwsh
-        run: |
-          Write-Host "Terraform environment: ${{ inputs.terraform_environment }}"
-          Write-Host "Backend file:"
-          Get-Content "infra/terraform/environments/${{ inputs.terraform_environment }}/backend.ci.hcl"
-
       - name: Build API Lambda package
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-lambda.ps1
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-dotnet-lambda.ps1
 
       - name: Terraform init
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
 
-      - name: Show Terraform state addresses
+      - name: Terraform destroy
         shell: pwsh
-        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} state list
-
-      - name: Terraform apply
-        shell: pwsh
-        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} apply -auto-approve -var-file="ci.auto.tfvars"
+        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} destroy -auto-approve -var-file="ci.auto.tfvars"
