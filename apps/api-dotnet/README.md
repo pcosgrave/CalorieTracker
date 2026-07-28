@@ -22,6 +22,12 @@ Current status:
 - `src/CalorieTracker.Api/Endpoints` - route mapping grouped by capability
 - `src/CalorieTracker.Api/Configuration` - options and environment binding
 
+## Repository Pattern Rule
+
+- Production repositories live only under `src/CalorieTracker.Api`.
+- In-memory and fake repository implementations live only under `tests/CalorieTracker.Api.Tests/Fakes`.
+- As `diary`, `weights`, and `sync` migrate, they should follow the same split as `foods`.
+
 ## Phase 1 Exit Criteria
 
 - the .NET backend builds locally

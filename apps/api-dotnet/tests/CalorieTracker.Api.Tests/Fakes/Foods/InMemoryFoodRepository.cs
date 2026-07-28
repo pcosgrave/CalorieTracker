@@ -2,7 +2,7 @@ using CalorieTracker.Api.Contracts;
 using CalorieTracker.Api.Services.Foods;
 using System.Collections.Concurrent;
 
-namespace CalorieTracker.Api.Tests.Fakes;
+namespace CalorieTracker.Api.Tests.Fakes.Foods;
 
 public sealed class InMemoryFoodRepository : IFoodRepository
 {

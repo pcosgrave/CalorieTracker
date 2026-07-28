@@ -1,4 +1,5 @@
 using CalorieTracker.Api.Contracts;
+using CalorieTracker.Api.Handlers.Diary;
 
 namespace CalorieTracker.Api.Endpoints;
 
@@ -8,9 +9,9 @@ public static class DiaryEndpoints
     {
         var diary = app.MapGroup("/diary").WithTags("Diary");
 
-        diary.MapPost("/", (CreateDiaryEntryRequest _) => EndpointResponses.NotImplemented("Create diary entry"));
-        diary.MapPut("/{entryId}", (string entryId, UpdateDiaryEntryRequest _) => EndpointResponses.NotImplemented($"Update diary entry {entryId}"));
-        diary.MapDelete("/{entryId}", (string entryId) => EndpointResponses.NotImplemented($"Delete diary entry {entryId}"));
+        diary.MapPost("/", DiaryHandlers.CreateAsync);
+        diary.MapPut("/{entryId}", DiaryHandlers.UpdateAsync);
+        diary.MapDelete("/{entryId}", DiaryHandlers.DeleteAsync);
 
         return app;
     }

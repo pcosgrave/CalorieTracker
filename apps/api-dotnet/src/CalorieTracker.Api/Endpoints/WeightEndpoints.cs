@@ -1,4 +1,5 @@
 using CalorieTracker.Api.Contracts;
+using CalorieTracker.Api.Handlers.Weights;
 
 namespace CalorieTracker.Api.Endpoints;
 
@@ -8,10 +9,10 @@ public static class WeightEndpoints
     {
         var weights = app.MapGroup("/weights").WithTags("Weights");
 
-        weights.MapGet("/", () => EndpointResponses.NotImplemented("List weights"));
-        weights.MapPost("/", (CreateWeightEntryRequest _) => EndpointResponses.NotImplemented("Create weight entry"));
-        weights.MapPut("/{entryId}", (string entryId, UpdateWeightEntryRequest _) => EndpointResponses.NotImplemented($"Update weight entry {entryId}"));
-        weights.MapDelete("/{entryId}", (string entryId) => EndpointResponses.NotImplemented($"Delete weight entry {entryId}"));
+        weights.MapGet("/", WeightHandlers.ListAsync);
+        weights.MapPost("/", WeightHandlers.CreateAsync);
+        weights.MapPut("/{entryId}", WeightHandlers.UpdateAsync);
+        weights.MapDelete("/{entryId}", WeightHandlers.DeleteAsync);
 
         return app;
     }

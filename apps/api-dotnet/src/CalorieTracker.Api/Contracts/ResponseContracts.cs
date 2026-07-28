@@ -11,14 +11,16 @@ public sealed record PublishCommunityFoodResponse(
     FoodProduct Product,
     bool Existed);
 
-public sealed record AiParsedFoodEntry(
+public sealed record AiParsedFoodLogEntry(
     string FoodName,
     string Brand,
-    AiMealType? Meal,
+    string Meal,
     double? Quantity,
     string Unit,
+    string MatchStatus,
+    string? MatchedFoodId,
     string Notes);
 
 public sealed record AiFoodLogParseResponse(
-    IReadOnlyList<AiParsedFoodEntry> Entries,
+    IReadOnlyList<AiParsedFoodLogEntry> Entries,
     IReadOnlyList<FoodProduct> CreatedFoods);

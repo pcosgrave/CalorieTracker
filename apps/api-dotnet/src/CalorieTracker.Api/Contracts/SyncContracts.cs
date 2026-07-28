@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace CalorieTracker.Api.Contracts;
 
 public sealed record SyncMetadata(
@@ -38,7 +40,7 @@ public sealed record SyncChange(
     DateTimeOffset ChangedAt,
     string DeviceId,
     int? BaseVersion,
-    object? Payload);
+    JsonElement? Payload);
 
 public sealed record SyncPushRequest(
     string DeviceId,

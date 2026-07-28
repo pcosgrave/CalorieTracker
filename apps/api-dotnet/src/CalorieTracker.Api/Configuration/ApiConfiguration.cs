@@ -1,6 +1,13 @@
 using Amazon.DynamoDBv2;
+using Amazon.CognitoIdentityProvider;
+using Amazon.SecretsManager;
+using CalorieTracker.Api.Services.Account;
+using CalorieTracker.Api.Services.Ai;
+using CalorieTracker.Api.Services.Diary;
 using Microsoft.Extensions.Options;
 using CalorieTracker.Api.Services.Foods;
+using CalorieTracker.Api.Services.Sync;
+using CalorieTracker.Api.Services.Weights;
 
 namespace CalorieTracker.Api.Configuration;
 
@@ -46,8 +53,18 @@ public static class ApiConfiguration
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<CognitoOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<AiOptions>>().Value);
         services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
+        services.AddSingleton<IAmazonCognitoIdentityProvider>(_ => new AmazonCognitoIdentityProviderClient());
+        services.AddSingleton<IAmazonSecretsManager>(_ => new AmazonSecretsManagerClient());
+        services.AddHttpClient<AiFoodLogService>();
         services.AddSingleton<IFoodRepository, DynamoDbFoodRepository>();
+        services.AddSingleton<IDiaryRepository, DynamoDbDiaryRepository>();
+        services.AddSingleton<IWeightRepository, DynamoDbWeightRepository>();
+        services.AddSingleton<ISyncChangeRepository, DynamoDbSyncChangeRepository>();
         services.AddSingleton<FoodService>();
+        services.AddSingleton<DiaryService>();
+        services.AddSingleton<WeightService>();
+        services.AddSingleton<SyncService>();
+        services.AddSingleton<AccountService>();
 
         return services;
     }

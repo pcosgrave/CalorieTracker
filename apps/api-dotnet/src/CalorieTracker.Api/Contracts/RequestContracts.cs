@@ -51,12 +51,4 @@ public sealed record UpdateWeightEntryRequest(
 public sealed record AiFoodLogParseRequest(
     string Transcript,
     DateOnly Date,
-    AiMealType FallbackMeal);
-
-public enum AiMealType
-{
-    Breakfast,
-    Lunch,
-    Dinner,
-    Snack,
-}
+    string FallbackMeal);

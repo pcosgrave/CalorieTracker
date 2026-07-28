@@ -1,4 +1,5 @@
 using CalorieTracker.Api.Contracts;
+using CalorieTracker.Api.Handlers.Sync;
 
 namespace CalorieTracker.Api.Endpoints;
 
@@ -8,8 +9,8 @@ public static class SyncEndpoints
     {
         var sync = app.MapGroup("/sync").WithTags("Sync");
 
-        sync.MapPost("/push", (SyncPushRequest _) => EndpointResponses.NotImplemented("Push sync changes"));
-        sync.MapPost("/pull", (SyncPullRequest _) => EndpointResponses.NotImplemented("Pull sync changes"));
+        sync.MapPost("/push", SyncHandlers.PushAsync);
+        sync.MapPost("/pull", SyncHandlers.PullAsync);
 
         return app;
     }

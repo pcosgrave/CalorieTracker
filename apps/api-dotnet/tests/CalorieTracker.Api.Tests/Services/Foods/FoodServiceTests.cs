@@ -1,9 +1,9 @@
 using CalorieTracker.Api.Contracts;
 using CalorieTracker.Api.Services.Foods;
-using CalorieTracker.Api.Tests.Fakes;
+using CalorieTracker.Api.Tests.Fakes.Foods;
 using Xunit;
 
-namespace CalorieTracker.Api.Tests;
+namespace CalorieTracker.Api.Tests.Services.Foods;
 
 public sealed class FoodServiceTests
 {

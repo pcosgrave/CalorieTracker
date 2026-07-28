@@ -1,4 +1,5 @@
 using CalorieTracker.Api.Contracts;
+using CalorieTracker.Api.Handlers.Ai;
 
 namespace CalorieTracker.Api.Endpoints;
 
@@ -8,7 +9,7 @@ public static class AiEndpoints
     {
         var ai = app.MapGroup("/ai").WithTags("AI");
 
-        ai.MapPost("/parse-food-log", (AiFoodLogParseRequest _) => EndpointResponses.NotImplemented("Parse AI food log"));
+        ai.MapPost("/parse-food-log", AiHandlers.ParseFoodLogAsync);
 
         return app;
     }
