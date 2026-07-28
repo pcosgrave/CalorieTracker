@@ -17,6 +17,7 @@ Current status:
 
 - `CalorieTracker.Api.sln` - solution container for the .NET backend
 - `src/CalorieTracker.Api` - API host project
+- `tests/CalorieTracker.Api.Tests` - test project using `InMemoryFoodRepository` for fast service-level coverage
 - `src/CalorieTracker.Api/Contracts` - request/response and entity contracts used for parity work
 - `src/CalorieTracker.Api/Endpoints` - route mapping grouped by capability
 - `src/CalorieTracker.Api/Configuration` - options and environment binding
@@ -35,4 +36,5 @@ From `apps/api-dotnet`:
 ```powershell
 dotnet restore .\CalorieTracker.Api.sln --configfile .\NuGet.Config
 dotnet build .\CalorieTracker.Api.sln --no-restore
+dotnet test .\CalorieTracker.Api.sln --no-build
 ```
