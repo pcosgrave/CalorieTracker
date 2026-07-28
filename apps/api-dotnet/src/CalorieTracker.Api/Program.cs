@@ -1,5 +1,6 @@
 using CalorieTracker.Api.Configuration;
 using CalorieTracker.Api.Endpoints;
+using Amazon.Lambda.AspNetCoreServer.Hosting;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services
     .AddProblemDetails()
     .AddEndpointsApiExplorer()
+    .AddAWSLambdaHosting(LambdaEventSource.RestApi)
     .ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(namingPolicy: System.Text.Json.JsonNamingPolicy.CamelCase));

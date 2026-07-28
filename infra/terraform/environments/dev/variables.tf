@@ -47,19 +47,19 @@ variable "cognito_domain_prefix" {
 }
 
 variable "lambda_runtime" {
-  description = "Lambda runtime for the API handlers."
+  description = "Lambda runtime for the API."
   type        = string
-  default     = "nodejs22.x"
+  default     = "dotnet8"
 }
 
 variable "lambda_memory_mb" {
-  description = "Memory size for API Lambda functions."
+  description = "Memory size for the API Lambda function."
   type        = number
   default     = 512
 }
 
 variable "lambda_timeout_seconds" {
-  description = "Execution timeout for API Lambda functions."
+  description = "Execution timeout for the API Lambda function."
   type        = number
   default     = 15
 }
@@ -74,6 +74,12 @@ variable "manage_lambda_log_groups" {
   description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
   type        = bool
   default     = false
+}
+
+variable "log_retention_days" {
+  description = "Retention period for API Lambda CloudWatch log groups."
+  type        = number
+  default     = 30
 }
 
 variable "google_client_id" {
@@ -93,4 +99,11 @@ variable "google_authorize_scopes" {
   description = "OAuth scopes requested from Google through Cognito."
   type        = string
   default     = "openid email profile"
+}
+
+variable "gemini_api_secret_arn" {
+  description = "Optional Secrets Manager ARN for the Gemini API secret."
+  type        = string
+  default     = null
+  sensitive   = true
 }

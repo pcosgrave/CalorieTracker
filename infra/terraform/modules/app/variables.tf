@@ -41,7 +41,7 @@ variable "create_api" {
 }
 
 variable "api_lambda_package_path" {
-  description = "Path to the Lambda deployment zip for the API handlers."
+  description = "Path to the Lambda deployment zip for the API."
   type        = string
   default     = ""
 }
@@ -53,19 +53,19 @@ variable "api_lambda_source_code_hash" {
 }
 
 variable "lambda_runtime" {
-  description = "Lambda runtime for the API handlers."
+  description = "Lambda runtime for the API."
   type        = string
-  default     = "nodejs22.x"
+  default     = "dotnet8"
 }
 
 variable "lambda_memory_mb" {
-  description = "Memory size for API Lambda functions."
+  description = "Memory size for the API Lambda function."
   type        = number
   default     = 512
 }
 
 variable "lambda_timeout_seconds" {
-  description = "Execution timeout for API Lambda functions."
+  description = "Execution timeout for the API Lambda function."
   type        = number
   default     = 15
 }
@@ -93,6 +93,13 @@ variable "google_authorize_scopes" {
   description = "OAuth scopes requested from Google through Cognito."
   type        = string
   default     = "openid email profile"
+}
+
+variable "gemini_api_secret_arn" {
+  description = "Optional Secrets Manager ARN for the Gemini API secret."
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "log_retention_days" {
