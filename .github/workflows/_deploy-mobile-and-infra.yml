@@ -51,11 +51,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: 22
-          cache: npm
+          dotnet-version: 8.0.x
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -94,10 +93,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-terraform-
 
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm.cmd ci
-
       - name: Prepare Terraform backend and variables
         shell: pwsh
         env:
@@ -112,6 +107,7 @@ jobs:
           TF_GOOGLE_CLIENT_SECRET: ${{ secrets.TF_GOOGLE_CLIENT_SECRET }}
           TF_GOOGLE_AUTHORIZE_SCOPES: ${{ vars.TF_GOOGLE_AUTHORIZE_SCOPES }}
           TF_LOG_RETENTION_DAYS: ${{ vars.TF_LOG_RETENTION_DAYS }}
+          TF_GEMINI_API_SECRET_ARN: ${{ secrets.TF_VAR_GEMINI_API_SECRET_ARN }}
           AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           $tfDir = Join-Path $PWD "infra/terraform/environments/${{ inputs.terraform_environment }}"
@@ -159,6 +155,9 @@ jobs:
           if ($env:TF_LOG_RETENTION_DAYS) {
             $lines += "log_retention_days = $env:TF_LOG_RETENTION_DAYS"
           }
+          if ($env:TF_GEMINI_API_SECRET_ARN) {
+            $lines += "gemini_api_secret_arn = ""$env:TF_GEMINI_API_SECRET_ARN"""
+          }
 
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
 
@@ -171,7 +170,7 @@ jobs:
 
       - name: Build API Lambda package
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-lambda.ps1
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-dotnet-lambda.ps1
 
       - name: Terraform init
         shell: pwsh

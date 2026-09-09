@@ -12,7 +12,7 @@ terraform {
 }
 
 locals {
-  api_lambda_package_path   = abspath("${path.root}/../../../../apps/api/dist/lambda/api.zip")
+  api_lambda_package_path   = abspath("${path.root}/../../../../apps/api-dotnet/dist/lambda/api.zip")
   api_lambda_package_exists = fileexists(local.api_lambda_package_path)
 }
 
@@ -44,4 +44,5 @@ module "app" {
   google_client_id            = var.google_client_id
   google_client_secret        = var.google_client_secret
   google_authorize_scopes     = var.google_authorize_scopes
+  gemini_api_secret_arn       = var.gemini_api_secret_arn
 }

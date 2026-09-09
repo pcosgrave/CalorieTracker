@@ -21,3 +21,9 @@ apps/android/release.properties
 .gradle-user-home/
 .idea/
 *.iml
+bin/
+obj/
+*.user
+apps/api-dotnet/.nuget-appdata/
+apps/api-dotnet/.vs
+infra/terraform/environments/prod/.terraform.lock.hcl

@@ -1,20 +1,20 @@
 # Terraform
 
-This directory now scaffolds AWS environments for:
+This directory provisions the shared AWS foundation for the .NET backend and mobile/web clients:
 
 - Amazon Cognito user pool and hosted domain
 - Web and Android Cognito app clients
-- DynamoDB tables for products, barcode aliases, diary entries, and sync changes
+- DynamoDB tables for products, barcode aliases, diary entries, weight entries, and sync changes
 - A private encrypted S3 bucket for future event/export ingestion
 - A customer-managed KMS key used by DynamoDB, S3, and Lambda CloudWatch log groups
-- Lambda definitions for the API handlers
-- API Gateway with Cognito-protected routes for foods, diary, and sync
+- A single ASP.NET Core Lambda for the API
+- API Gateway with a public `GET /` and `GET /health`, plus Cognito-protected application routes
 
 ## Layout
 
 - `modules/app`: the shared infrastructure module
 - `environments/dev`: the local testing / development environment
-- `environments/prod`: the production scaffold for future publishing
+- `environments/prod`: the production scaffold
 
 Helpful local files:
 
@@ -26,16 +26,16 @@ Helpful local files:
 
 ## Current Deployment Model
 
-The Terraform `dev` environment always creates Cognito, DynamoDB, and S3.
+Each Terraform environment always creates Cognito, DynamoDB, S3, and KMS.
 
-Lambda and API Gateway are created only when the API deployment zip exists at:
+API Gateway and the .NET Lambda are created only when the deployment zip exists at:
 
-`apps/api/dist/lambda/api.zip`
+`apps/api-dotnet/dist/lambda/api.zip`
 
-That zip can be built from the repo root with:
+Build that zip from the repo root with:
 
 ```powershell
-.\scripts\build-api-lambda.ps1
+.\scripts\build-api-dotnet-lambda.ps1
 ```
 
 ## Recommended Remote State Setup
@@ -63,7 +63,7 @@ Fill in your real bucket, lock table, region, and Cognito domain prefix before r
 From the repo root:
 
 ```powershell
-.\scripts\build-api-lambda.ps1
+.\scripts\build-api-dotnet-lambda.ps1
 terraform -chdir=infra/terraform/environments/dev init -backend-config="backend.hcl"
 terraform -chdir=infra/terraform/environments/dev plan -var-file="terraform.tfvars"
 terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfvars"
@@ -71,10 +71,8 @@ terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfv
 
 ## Prod Apply Flow
 
-When you are ready to separate production from dev, the equivalent prod flow is:
-
 ```powershell
-.\scripts\build-api-lambda.ps1
+.\scripts\build-api-dotnet-lambda.ps1
 terraform -chdir=infra/terraform/environments/prod init -backend-config="backend.hcl"
 terraform -chdir=infra/terraform/environments/prod plan -var-file="terraform.tfvars"
 terraform -chdir=infra/terraform/environments/prod apply -var-file="terraform.tfvars"
@@ -82,18 +80,16 @@ terraform -chdir=infra/terraform/environments/prod apply -var-file="terraform.tf
 
 ## First-Time Operator Checklist
 
-From your side, here is the step-by-step flow:
-
 1. Install prerequisites locally:
    - AWS CLI
    - Terraform
-   - Node.js/npm
+   - .NET 8 SDK
 
 2. Configure AWS credentials:
    - `aws configure`
-   - or use AWS SSO / named profiles if you prefer
+   - or AWS SSO / named profiles
 
-3. Pick values you want to use:
+3. Pick the values you want to use:
    - AWS region, for example `ca-central-1`
    - Terraform state bucket name, which must be globally unique
    - Terraform lock table name
@@ -121,12 +117,12 @@ Copy-Item infra\terraform\environments\dev\terraform.tfvars.example infra\terraf
 
 8. Edit `infra/terraform/environments/dev/terraform.tfvars` with your real values.
    - At minimum, set `aws_region` and `cognito_domain_prefix`
-   - Update callback/logout URLs later if your auth flow changes
+   - Set `gemini_api_secret_arn` if you want the AI endpoint to resolve its key from Secrets Manager
 
 9. Build the Lambda deployment zip:
 
 ```powershell
-.\scripts\build-api-lambda.ps1
+.\scripts\build-api-dotnet-lambda.ps1
 ```
 
 10. Initialize Terraform using the remote backend:
@@ -147,7 +143,7 @@ terraform -chdir=infra/terraform/environments/dev plan -var-file="terraform.tfva
 terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfvars"
 ```
 
-13. Capture the outputs you’ll need for the apps:
+13. Capture the outputs you will need for the apps:
    - `cognito_user_pool_id`
    - `cognito_web_client_id`
    - `cognito_android_client_id`
@@ -155,8 +151,6 @@ terraform -chdir=infra/terraform/environments/dev apply -var-file="terraform.tfv
    - `api_base_url`
 
 ## Important Outputs
-
-After apply, useful outputs include:
 
 - `cognito_user_pool_id`
 - `cognito_web_client_id`
@@ -167,11 +161,6 @@ After apply, useful outputs include:
 
 ## Notes
 
-- Stored application data now uses a customer-managed KMS key instead of only service-default encryption.
-- Lambda log groups are pre-created with retention and KMS encryption so production logs follow the same storage policy.
+- Stored application data uses a customer-managed KMS key instead of only service-default encryption.
 - Pre-created encrypted Lambda log groups are optional and should be enabled only on clean environments or after importing existing log groups into Terraform state.
-- Google federation is still intentionally out of scope for this first pass.
-- The Android and web apps still need Cognito client integration and token handling.
-- The Lambda package currently vendors `zod` and the shared package, while relying on the AWS Lambda Node.js runtime's included AWS SDK v3. See AWS Lambda Node.js runtime docs for the runtime-included SDK behavior: [Building Lambda functions with Node.js](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html).
 - `backend.hcl` and `terraform.tfvars` are intended to stay local and are ignored by git.
-- Right now it is fine to keep both Android flavors pointed at the `dev` Terraform environment until you are ready to stand up real production AWS resources.
