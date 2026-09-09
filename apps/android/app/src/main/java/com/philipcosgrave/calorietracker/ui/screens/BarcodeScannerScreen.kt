@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,11 +46,13 @@ import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 fun BarcodeScannerScreen(
     onBack: () -> Unit,
-    onBarcodeDetected: (String) -> Unit,
+    onBarcodeDetected: suspend (String) -> Unit,
 ) {
     val context = LocalContext.current
     var hasCameraPermission by remember {
@@ -61,10 +64,16 @@ fun BarcodeScannerScreen(
         hasCameraPermission = granted
     }
     var isResolving by remember { mutableStateOf(false) }
+    var lookupError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Page {
         PageHeader("Scan Barcode", onBack = onBack)
         Text("Point the camera at a package barcode to find a saved food or create a new one.")
+        lookupError?.let { message ->
+            Text(message, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { lookupError = null; isResolving = false }) { Text("Try again") }
+        }
         if (!hasCameraPermission) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -88,7 +97,15 @@ fun BarcodeScannerScreen(
                         onBarcodeDetected = { barcode ->
                             if (!isResolving) {
                                 isResolving = true
-                                onBarcodeDetected(barcode)
+                                scope.launch {
+                                    try {
+                                        onBarcodeDetected(barcode)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (exception: Exception) {
+                                        lookupError = "Unable to look up or save this barcode. Please try again."
+                                    }
+                                }
                             }
                         },
                     )

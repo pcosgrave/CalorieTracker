@@ -317,7 +317,7 @@ private fun InteractiveFoodRow(
                 onDoubleClick = onDoubleClick,
                 onLongClick = onLongClick,
             ) {
-                Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(com.philipcosgrave.calorietracker.domain.foodTitle(title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 if (!supporting.isNullOrBlank()) {
                     Text(
                         supporting,

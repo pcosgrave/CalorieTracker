@@ -50,6 +50,7 @@ private const val DATABASE_NAME = "calorie-tracker.db"
 object LocalRepositoryFactory {
     fun database(context: Context): CalorieTrackerDatabase =
         Room.databaseBuilder(context, CalorieTrackerDatabase::class.java, DATABASE_NAME)
+            .addMigrations(com.philipcosgrave.calorietracker.data.local.LeftoverMigration)
             .fallbackToDestructiveMigration()
             .build()
 }

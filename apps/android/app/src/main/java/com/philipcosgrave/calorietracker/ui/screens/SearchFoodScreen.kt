@@ -66,6 +66,7 @@ fun SearchFoodScreen(
     onScanBarcode: () -> Unit,
     onAddIngredient: () -> Unit,
     onAddRecipe: () -> Unit,
+    onOpenLeftovers: () -> Unit = {},
     onSelectFood: (FoodItem) -> Unit,
     onQuickLogFood: (FoodItem) -> Unit,
     personalOnlineResults: List<FoodItem>,
@@ -220,9 +221,12 @@ fun SearchFoodScreen(
             }
 
             AppSegmentedControl(
-                options = listOf("Ingredient", "Recipe"),
+                options = listOf("Ingredient", "Recipe", "Leftovers"),
                 selectedIndex = if (activeKind == FoodKind.Ingredient) 0 else 1,
-                onSelectedIndexChange = { activeKind = if (it == 0) FoodKind.Ingredient else FoodKind.Recipe },
+                onSelectedIndexChange = {
+                    if (it == 2) onOpenLeftovers()
+                    else activeKind = if (it == 0) FoodKind.Ingredient else FoodKind.Recipe
+                },
             )
 
             if (results.isEmpty()) {

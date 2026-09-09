@@ -12,4 +12,8 @@ enum class AppScreen {
     RecipeBuilder,
     LogFood,
     BarcodeScanner,
+    PhotoFood,
+    VoiceReview,
+    ManageFoods,
+    Leftovers,
 }

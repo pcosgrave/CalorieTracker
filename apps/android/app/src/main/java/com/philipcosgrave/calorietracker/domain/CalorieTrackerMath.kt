@@ -33,16 +33,26 @@ fun formatNumber(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else roundOne(value).toString()
 
 fun convertAmount(amount: Double, fromUnit: String, toUnit: String): Double? {
-    if (fromUnit == toUnit) return amount
-    val group = conversionGroups.firstOrNull { it.containsKey(fromUnit) && it.containsKey(toUnit) } ?: return null
-    return amount * (group[fromUnit] ?: return null) / (group[toUnit] ?: return null)
+    val from = canonicalMeasurementUnit(fromUnit)
+    val to = canonicalMeasurementUnit(toUnit)
+    if (from == to) return amount
+    val group = conversionGroups.firstOrNull { it.containsKey(from) && it.containsKey(to) } ?: return null
+    return amount * (group[from] ?: return null) / (group[to] ?: return null)
+}
+
+private fun canonicalMeasurementUnit(unit: String): String = when (val normalized = unit.trim().lowercase()) {
+    "g", "grams" -> "gram"
+    "mg", "milligrams" -> "milligram"
+    else -> normalized
 }
 
 fun compatibleMeasurementUnits(baseUnit: String): List<String> {
     if (baseUnit.isBlank()) return listOf("serving")
-    val group = conversionGroups.firstOrNull { it.containsKey(baseUnit) }
+    val canonical = canonicalMeasurementUnit(baseUnit)
+    val group = conversionGroups.firstOrNull { it.containsKey(canonical) }
     return if (group != null) {
         group.keys.sortedBy { unit -> measurementUnits.indexOf(unit).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+            .map { if (it == canonical) baseUnit else it }
     } else {
         listOf(baseUnit)
     }
@@ -111,7 +121,7 @@ fun RecipeDraft.toFoodItem(existingId: String? = null): FoodItem {
     return FoodItem(
         id = existingId ?: createId("recipe"),
         kind = FoodKind.Recipe,
-        name = name.trim(),
+        name = foodTitle(name),
         brand = brand.trim(),
         servingQuantity = quantity,
         servingUnit = servingUnit,

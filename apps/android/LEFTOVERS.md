@@ -1,0 +1,11 @@
+# Leftovers
+
+In Food Log, choose **＋ Create leftover** beside Meal Log, then choose a meal. Select the foods, enter a name and a percentage greater than 0 and up to 100. The same percentage is moved from every selected item. Unselected items stay unchanged. At 100%, selected diary entries are removed rather than retained at zero.
+
+Open **Saved leftovers (count)** beside Meal Log in the diary, or the **Leftovers** button alongside Ingredient and Recipe on food search. Each saved leftover starts collapsed to its name and original meal date. Tap it to review its individual ingredients and nutrition totals, select the destination date and meal within that card, then add it. Existing leftovers derive their date from their persisted original entries. Each original food is added as an individual diary entry with its original units, saved nutrition snapshot, and reserved amount. The entire leftover is consumed once and removed from the list. Amounts and multipliers are stored without rounding; displayed nutrition uses the app's usual rounding.
+
+Leftovers persist locally in the Room database, scoped to the current local owner. The saved leftovers list does not sync across devices. Resulting diary edits and additions use the existing sync outbox; Health Connect updates run after the local transaction commits.
+
+Creation verifies selected diary entries have not changed, then stores the leftover and reduces/deletes originals in one transaction. Consumption reads the stored snapshot, writes all destination entries and deletes the leftover in one transaction. Duplicate consumption finds no saved leftover and cannot add another copy. Room migration 2 to 3 adds only the leftovers table and preserves prior records.
+
+Checks: portion/nutrient conservation, mixed units, partial selections, 100% transfer, invalid percentages and mixed-meal selections, serialization round trip, and distinct destination entry IDs. Migration SQL was compared to Room's generated schema and exercised with existing food, diary and weight rows in SQLite. Physical-device checks remain: create/cancel, restart with leftovers saved, consume once into another date/meal, and verify Health Connect updates when enabled.

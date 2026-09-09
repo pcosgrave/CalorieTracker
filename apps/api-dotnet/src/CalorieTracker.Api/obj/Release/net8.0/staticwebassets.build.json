@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "ixj8YLlPba1HPQr8E3txUMRuwYrMR7ny9jb5Jnodh9Q=",
+  "Source": "CalorieTracker.Api",
+  "BasePath": "_content/CalorieTracker.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

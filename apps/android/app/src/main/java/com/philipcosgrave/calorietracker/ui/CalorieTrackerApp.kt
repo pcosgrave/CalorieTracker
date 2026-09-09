@@ -21,6 +21,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +32,16 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.room.withTransaction
+import com.philipcosgrave.calorietracker.domain.Leftover
+import com.philipcosgrave.calorietracker.domain.splitLeftover
+import com.philipcosgrave.calorietracker.domain.leftoverDiaryEntries
+import com.philipcosgrave.calorietracker.data.local.toRecord
+import com.philipcosgrave.calorietracker.data.local.toLeftover
+import com.philipcosgrave.calorietracker.ui.screens.LeftoversScreen
+import com.philipcosgrave.calorietracker.ui.screens.PhotoFoodScreen
+import com.philipcosgrave.calorietracker.ui.screens.ManageFoodsScreen
+import com.philipcosgrave.calorietracker.domain.foodTitle
 import com.philipcosgrave.calorietracker.BuildConfig
 import com.philipcosgrave.calorietracker.data.auth.CognitoAuthRepository
 import com.philipcosgrave.calorietracker.data.health.HealthConnectAvailability
@@ -93,6 +107,8 @@ import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
 import com.philipcosgrave.calorietracker.ui.screens.WeightScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.Locale
@@ -176,11 +192,15 @@ fun CalorieTrackerApp(
 
     var customFoods by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var recipes by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+    var leftovers by remember { mutableStateOf<List<Leftover>>(emptyList()) }
     var diary by remember { mutableStateOf<List<DiaryEntry>>(emptyList()) }
     var weights by remember { mutableStateOf<List<WeightEntry>>(emptyList()) }
     var hiddenSeedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val screenStack = remember { mutableStateListOf(AppScreen.Home) }
+    val screenStack = rememberSaveable(saver = listSaver<SnapshotStateList<AppScreen>, String>(
+        save = { stack -> stack.map { it.name } },
+        restore = { names -> names.map { AppScreen.valueOf(it) }.toMutableStateList() },
+    )) { mutableStateListOf(AppScreen.Home) }
     val screen = screenStack.last()
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var recipeDraft by remember { mutableStateOf(RecipeDraft()) }
@@ -216,6 +236,7 @@ fun CalorieTrackerApp(
     var searchFoodInitialQuery by remember { mutableStateOf("") }
     var voiceFeedback by remember { mutableStateOf(VoiceLogFeedback()) }
     var pendingVoiceCommand by remember { mutableStateOf<VoiceFoodCommand?>(null) }
+    var voiceReviewEntries by remember { mutableStateOf<List<DiaryEntry>>(emptyList()) }
 
     fun navigateTo(target: AppScreen) {
         if (screen != target) {
@@ -259,6 +280,7 @@ fun CalorieTrackerApp(
     }
 
     suspend fun refreshState() {
+        leftovers = database.leftoverDao().list(localStore.currentOwnerUserId()).map { it.toLeftover() }
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
         customFoods = foodRecords.filter { it.food.kind == FoodKind.Ingredient }.map { it.food }
         recipes = foodRecords.filter { it.food.kind == FoodKind.Recipe }.map { it.food }
@@ -439,7 +461,7 @@ fun CalorieTrackerApp(
         )
     }
 
-    suspend fun saveDiaryEntry(entry: DiaryEntry) {
+    suspend fun saveDiaryEntry(entry: DiaryEntry, exportHealth: Boolean = true) {
         val deviceId = localStore.deviceId()
         val existing = localStore.diaryRepository.getById(entry.id)
         if (existing == null) {
@@ -471,7 +493,7 @@ fun CalorieTrackerApp(
                 baseVersion = existing?.sync?.version,
             ),
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+        if (exportHealth && healthConnectAvailability == HealthConnectAvailability.Available &&
             healthConnectPermissionGranted &&
             healthConnectExportEnabled
         ) {
@@ -541,17 +563,10 @@ fun CalorieTrackerApp(
             loggedAmount = loggedAmount,
             loggedUnit = loggedUnit,
         )
-        diary = listOf(entry) + diary
+        voiceReviewEntries = listOf(entry)
         selectedDate = today
-        saveDiaryEntry(entry)
-        refreshState()
-        voiceFeedback = VoiceLogFeedback(
-            phase = VoiceLogPhase.Success,
-            transcript = transcript,
-            query = command.ingredientQuery,
-            message = "Added ${food.name} to ${meal.label.lowercase(Locale.CANADA)}.",
-        )
-        pendingVoiceCommand = null
+        clearVoiceFeedback()
+        navigateTo(AppScreen.VoiceReview)
     }
 
     suspend fun handleVoiceMealCopyTranscript(transcript: String): Boolean {
@@ -691,7 +706,8 @@ fun CalorieTrackerApp(
         }
     }
 
-    suspend fun saveFood(item: FoodItem) {
+    suspend fun saveFood(rawItem: FoodItem, publishCommunity: Boolean = true) {
+        val item = rawItem.copy(name = foodTitle(rawItem.name))
         val deviceId = localStore.deviceId()
         val existing = localStore.foodRepository.getById(item.id)
         val record = createFoodRecord(item, deviceId, existing)
@@ -719,7 +735,7 @@ fun CalorieTrackerApp(
             )
         }
 
-        if (existing == null && item.isUserCreated) {
+        if (publishCommunity && existing == null && item.isUserCreated) {
             runCatching { cloudFoodCatalogService.publishCommunityFood(item) }
         }
     }
@@ -787,7 +803,7 @@ fun CalorieTrackerApp(
         )
     }
 
-    suspend fun deleteDiaryEntry(entry: DiaryEntry) {
+    suspend fun deleteDiaryEntry(entry: DiaryEntry, exportHealth: Boolean = true) {
         val existing = localStore.diaryRepository.getById(entry.id) ?: return
         val deletedAt = nowIsoString()
         val deletedRecord = existing.copy(
@@ -808,12 +824,59 @@ fun CalorieTrackerApp(
                 baseVersion = existing.sync.version,
             ),
         )
-        if (healthConnectAvailability == HealthConnectAvailability.Available &&
+        if (exportHealth && healthConnectAvailability == HealthConnectAvailability.Available &&
             healthConnectPermissionGranted &&
             healthConnectExportEnabled
         ) {
             runCatching { healthConnectExporter.deleteEntry(entry.id) }
         }
+    }
+
+    fun exportLeftoverChanges(updated: List<DiaryEntry>, removed: List<DiaryEntry> = emptyList()) {
+        scope.launch {
+            if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectPermissionGranted && healthConnectExportEnabled) {
+                removed.forEach { runCatching { healthConnectExporter.deleteEntry(it.id) } }
+                updated.forEach { entry ->
+                    localStore.diaryRepository.getById(entry.id)?.let { record -> runCatching { healthConnectExporter.exportEntry(record) } }
+                }
+            }
+        }
+    }
+
+    suspend fun createLeftover(selected: List<DiaryEntry>, percentage: Double, name: String) {
+        val split = splitLeftover(selected, percentage, name)
+        val owner = localStore.currentOwnerUserId()
+        val removed = if (split.remaining.isEmpty()) selected else emptyList()
+        database.withTransaction {
+            selected.forEach { expected ->
+                val current = localStore.diaryRepository.getById(expected.id)
+                check(current != null && current.sync.deletedAt == null && current.entry == expected) {
+                    "The meal changed. Close this dialog and select the foods again."
+                }
+            }
+            database.leftoverDao().insert(split.leftover.toRecord(owner))
+            split.remaining.forEach { saveDiaryEntry(it, exportHealth = false) }
+            removed.forEach { deleteDiaryEntry(it, exportHealth = false) }
+        }
+        val selectedIds = selected.map { it.id }.toSet()
+        diary = diary.filterNot { it.id in selectedIds } + split.remaining
+        leftovers = listOf(split.leftover) + leftovers
+        exportLeftoverChanges(split.remaining, removed)
+    }
+
+    suspend fun useLeftover(leftover: Leftover, date: LocalDate, meal: Meal) {
+        val owner = localStore.currentOwnerUserId()
+        val added = database.withTransaction {
+            val stored = checkNotNull(database.leftoverDao().get(leftover.id, owner)) { "This leftover has already been used." }.toLeftover()
+            val entries = leftoverDiaryEntries(stored, date, meal)
+            entries.forEach { saveDiaryEntry(it, exportHealth = false) }
+            check(database.leftoverDao().delete(stored.id, owner) == 1)
+            entries
+        }
+        diary = added + diary
+        leftovers = leftovers.filterNot { it.id == leftover.id }
+        selectedDate = date
+        exportLeftoverChanges(added)
     }
 
     suspend fun saveWeightEntry(entry: WeightEntry): String? {
@@ -1154,6 +1217,10 @@ fun CalorieTrackerApp(
                     navigateTo(AppScreen.SearchFood)
                 },
                 onVoiceLog = launchVoiceRecognition,
+                onPhotoLog = { navigateTo(AppScreen.PhotoFood) },
+                onOpenLeftovers = { navigateTo(AppScreen.Leftovers) },
+                leftoverCount = leftovers.size,
+                onCreateLeftover = { entries, percent, name -> createLeftover(entries, percent, name) },
                 onOpenSyncSettings = {
                     navigateTo(AppScreen.SyncSettings)
                 },
@@ -1269,6 +1336,7 @@ fun CalorieTrackerApp(
             )
 
             AppScreen.SearchFood -> SearchFoodScreen(
+                onOpenLeftovers = { navigateTo(AppScreen.Leftovers) },
                 date = selectedDate,
                 foods = mergeSearchFoods(
                     localFoods = customFoods + recipes + seedFoods.filterNot { hiddenSeedIds.contains(it.id) },
@@ -1370,64 +1438,125 @@ fun CalorieTrackerApp(
                 },
             )
 
-            AppScreen.BarcodeScanner -> BarcodeScannerScreen(
+            AppScreen.PhotoFood, AppScreen.VoiceReview -> PhotoFoodScreen(
+                date = selectedDate,
+                reviewOnly = screen == AppScreen.VoiceReview,
+                initialEntries = if (screen == AppScreen.VoiceReview) voiceReviewEntries else emptyList(),
+                foods = mergeSearchFoods(customFoods + recipes + seedFoods.filterNot { it.id in hiddenSeedIds }, personalCloudFoods),
                 onBack = { popScreen() },
-                onBarcodeDetected = { barcode ->
+                onLookupBarcode = { barcode -> lookupFoodForBarcode(barcode) },
+                onCreateFood = { food ->
+                    database.withTransaction { saveFood(food, publishCommunity = false) }
+                    customFoods = (listOf(food) + customFoods).distinctBy { it.id }
+                },
+                onSave = { entries ->
+                    database.withTransaction {
+                        entries.map { it.food }.distinctBy { it.id }.forEach { food ->
+                            if (localStore.foodRepository.getById(food.id) == null) {
+                                saveFood(food, publishCommunity = false)
+                            }
+                        }
+                        entries.forEach { saveDiaryEntry(it, exportHealth = false) }
+                    }
+                    diary = entries + diary.filterNot { old -> entries.any { it.id == old.id } }
+                    customFoods = (entries.map { it.food }.filter { it.kind == FoodKind.Ingredient } + customFoods).distinctBy { it.id }
+                    selectedDate = entries.first().date
+                    // Export only after the entire local batch and sync outbox commit successfully.
                     scope.launch {
-                        val found = findFoodByBarcode(barcode)
-                        if (found != null) {
-                            selectedFood = found
-                            navigateTo(AppScreen.LogFood)
-                        } else {
-                            val personalCloudFood = if (authSession != null) {
-                                runCatching { cloudFoodCatalogService.lookupPersonalBarcode(barcode) }.getOrNull()
-                            } else {
-                                null
+                        if (healthConnectAvailability == HealthConnectAvailability.Available && healthConnectPermissionGranted && healthConnectExportEnabled) {
+                            entries.forEach { entry ->
+                                localStore.diaryRepository.getById(entry.id)?.let { record ->
+                                    runCatching { healthConnectExporter.exportEntry(record) }
+                                }
                             }
-                            val communityFood = if (personalCloudFood == null) {
-                                runCatching { cloudFoodCatalogService.lookupCommunityBarcode(barcode) }.getOrNull()
-                            } else {
-                                null
-                            }
-                            val openFoodFactsFood = if (personalCloudFood == null && communityFood == null) {
-                                runCatching { openFoodFactsLookupService.lookupFoodByBarcode(barcode) }.getOrNull()
-                            } else {
-                                null
-                            }
+                        }
+                        refreshState()
+                    }
+                },
+                onSaved = { voiceReviewEntries = emptyList(); resetTo(AppScreen.Diary) },
+            )
 
-                            when {
-                                personalCloudFood != null -> {
-                                    beginImportRemoteFood(personalCloudFood, openLogAfterSave = true)
-                                }
-                                communityFood != null -> {
-                                    beginImportRemoteFood(communityFood, openLogAfterSave = true)
-                                }
-                                openFoodFactsFood != null -> {
-                                    beginImportRemoteFood(openFoodFactsFood, openLogAfterSave = true)
-                                }
-                                else -> {
-                                    addIngredientBarcodeLookupResult = null
-                                    isLookingUpAddIngredientBarcode = false
-                                    editingFood = FoodItem(
-                                        id = createId("custom"),
-                                        kind = FoodKind.Ingredient,
-                                        name = "",
-                                        brand = "",
-                                        barcode = barcode,
-                                        servingQuantity = 1.0,
-                                        servingUnit = "serving",
-                                        nutrients = Nutrients(calories = 0.0),
-                                    )
-                                    openLogAfterIngredientSave = true
-                                    navigateTo(AppScreen.AddIngredient)
-                                }
+            AppScreen.Leftovers -> LeftoversScreen(
+                leftovers = leftovers, initialDate = selectedDate,
+                onBack = { popScreen() },
+                onUse = { leftover, date, meal -> useLeftover(leftover, date, meal) },
+            )
+
+            AppScreen.ManageFoods -> ManageFoodsScreen(
+                foods = (customFoods + recipes + seedFoods.filterNot { it.id in hiddenSeedIds }).distinctBy { it.id },
+                onBack = { popScreen() },
+                onAddFood = {
+                    editingFood = null
+                    addIngredientBarcodeLookupResult = null
+                    openLogAfterIngredientSave = false
+                    returnToRecipeAfterIngredientSave = false
+                    navigateTo(AppScreen.AddIngredient)
+                },
+                onAddRecipe = {
+                    editingFood = null
+                    recipeDraft = RecipeDraft()
+                    parentRecipeDraft = null
+                    navigateTo(AppScreen.RecipeBuilder)
+                },
+                onEdit = { food ->
+                    editingFood = food
+                    openLogAfterIngredientSave = false
+                    returnToRecipeAfterIngredientSave = false
+                    if (food.kind == FoodKind.Recipe) {
+                        recipeDraft = food.toRecipeDraft()
+                        parentRecipeDraft = null
+                        navigateTo(AppScreen.RecipeBuilder)
+                    } else {
+                        addIngredientBarcodeLookupResult = null
+                        navigateTo(AppScreen.AddIngredient)
+                    }
+                },
+                onDelete = { food ->
+                    scope.launch {
+                        try {
+                            if (customFoods.any { it.id == food.id } || recipes.any { it.id == food.id }) deleteFood(food)
+                            if (seedFoods.any { it.id == food.id }) {
+                                hiddenSeedIds = hiddenSeedIds + food.id
+                                localStore.saveHiddenSeedIds(hiddenSeedIds)
                             }
+                            refreshState()
+                        } catch (exception: Exception) {
+                            Toast.makeText(context, "Could not delete the food. Please try again.", Toast.LENGTH_LONG).show()
                         }
                     }
                 },
             )
 
+            AppScreen.BarcodeScanner -> BarcodeScannerScreen(
+                onBack = { popScreen() },
+                onBarcodeDetected = { barcode ->
+                    val found = findFoodByBarcode(barcode)
+                    val remote = if (found == null) lookupFoodForBarcode(barcode) else null
+                    currentCoroutineContext().ensureActive()
+                    val food = found ?: remote?.copy(id = createId("custom"), barcode = barcode, isUserCreated = false)?.also { imported ->
+                        database.withTransaction { saveFood(imported, publishCommunity = false) }
+                        customFoods = listOf(imported) + customFoods
+                    }
+                    if (food != null) {
+                        selectedFood = food
+                        popScreen()
+                        navigateTo(AppScreen.LogFood)
+                    } else {
+                        addIngredientBarcodeLookupResult = null
+                        isLookingUpAddIngredientBarcode = false
+                        editingFood = FoodItem(
+                            id = createId("custom"), kind = FoodKind.Ingredient,
+                            name = "", barcode = barcode, servingQuantity = 1.0,
+                            servingUnit = "serving", nutrients = Nutrients(calories = 0.0),
+                        )
+                        openLogAfterIngredientSave = true
+                        navigateTo(AppScreen.AddIngredient)
+                    }
+                },
+            )
+
             AppScreen.SyncSettings -> SyncSettingsScreen(
+                onManageFoods = { navigateTo(AppScreen.ManageFoods) },
                 settings = syncSettings,
                 pendingChangeCount = pendingChangeCount,
                 authSession = authSession,
@@ -1585,6 +1714,7 @@ fun CalorieTrackerApp(
                     }
                 },
                 onSave = { item ->
+                    if (selectedFood?.id == item.id) selectedFood = item
                     if (item.kind == FoodKind.Recipe) {
                         recipes = listOf(item) + recipes.filterNot { it.id == item.id }
                     } else {
@@ -1671,6 +1801,14 @@ fun CalorieTrackerApp(
                     food = food,
                     date = selectedDate,
                     existingEntry = editingDiaryEntry,
+                    onEditNutrition = {
+                        editingFood = food
+                        addIngredientBarcodeLookupResult = null
+                        isLookingUpAddIngredientBarcode = false
+                        openLogAfterIngredientSave = false
+                        returnToRecipeAfterIngredientSave = false
+                        navigateTo(AppScreen.AddIngredient)
+                    },
                     onBack = {
                         editingDiaryEntry = null
                         popScreen()

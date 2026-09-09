@@ -68,6 +68,7 @@ fun SyncSettingsScreen(
     onSetHealthConnectExportEnabled: (Boolean) -> Unit,
     onImportWeightHistory: () -> Unit,
     onImportNutritionHistory: () -> Unit,
+    onManageFoods: () -> Unit = {},
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var syncEnabled by remember(settings) { mutableStateOf(settings.syncEnabled) }
@@ -101,6 +102,7 @@ fun SyncSettingsScreen(
 
     Page {
         PageHeader("Settings", onBack = onBack)
+        AppPrimaryButton("Manage foods & recipes", onClick = onManageFoods, modifier = Modifier.fillMaxWidth())
 
         AppCardContainer {
             Text("Health Connect", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

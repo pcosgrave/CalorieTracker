@@ -60,6 +60,7 @@ fun LogFoodScreen(
     existingEntry: DiaryEntry? = null,
     onBack: () -> Unit,
     onLog: (DiaryEntry, Boolean) -> Unit,
+    onEditNutrition: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val isDarkTheme = colorScheme.background.luminance() < 0.5f
@@ -99,7 +100,10 @@ fun LogFoodScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         PageHeader(if (existingEntry == null) "Add foods" else "Edit foods", onBack = onBack)
-        Text(food.name, style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
+        Text(com.philipcosgrave.calorietracker.domain.foodTitle(food.name), style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
+        if (food.kind == com.philipcosgrave.calorietracker.model.FoodKind.Ingredient) {
+            TextButton(onClick = onEditNutrition) { Text("Edit food / scan nutrition label") }
+        }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Serving size", color = colorScheme.onBackground)
             OutlinedTextField(

@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
@@ -32,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +72,10 @@ fun DiaryScreen(
     onBack: () -> Unit,
     onAddFood: () -> Unit,
     onVoiceLog: () -> Unit,
+    onPhotoLog: () -> Unit = {},
+    onOpenLeftovers: () -> Unit = {},
+    leftoverCount: Int = 0,
+    onCreateLeftover: suspend (List<DiaryEntry>, Double, String) -> Unit = { _, _, _ -> },
     onOpenSyncSettings: () -> Unit,
     onDeleteEntry: (DiaryEntry) -> Unit,
     onEditEntry: (DiaryEntry) -> Unit,
@@ -83,6 +91,9 @@ fun DiaryScreen(
     onDismissVoiceFeedback: () -> Unit = {},
     onSelectVoiceCandidate: (FoodItem) -> Unit = {},
 ) {
+    var choosingLeftoverMeal by remember { mutableStateOf(false) }
+    var leftoverEntries by remember(selectedDate) { mutableStateOf<List<DiaryEntry>?>(null) }
+    leftoverEntries?.let { CreateLeftoverDialog(it, { leftoverEntries = null }, onCreateLeftover) }
     val pageScrollState = rememberScrollState()
     var expandedEntryId by remember(selectedDate) { mutableStateOf<String?>(null) }
     var pendingDeleteEntry by remember(selectedDate) { mutableStateOf<DiaryEntry?>(null) }
@@ -193,6 +204,17 @@ fun DiaryScreen(
                             Text("\uD83C\uDFA4", color = AppBlue, style = MaterialTheme.typography.titleLarge)
                         }
                     }
+                    Box(
+                        modifier = Modifier.size(52.dp).background(appSoftColor(), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(
+                            onClick = { expandedEntryId = null; onPhotoLog() },
+                            modifier = Modifier.semantics { contentDescription = "Photograph meal" },
+                        ) {
+                            Text("\uD83D\uDCF7", color = AppBlue, style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
                 }
             }
         }
@@ -211,7 +233,23 @@ fun DiaryScreen(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Meal Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Meal Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                Box {
+                    TextButton(enabled = selectedEntries.isNotEmpty(), onClick = { choosingLeftoverMeal = true }) {
+                        Text("＋ Create leftover")
+                    }
+                    DropdownMenu(expanded = choosingLeftoverMeal, onDismissRequest = { choosingLeftoverMeal = false }) {
+                        Meal.entries.filter { meal -> selectedEntries.any { it.meal == meal } }.forEach { meal ->
+                            DropdownMenuItem(text = { Text(meal.label) }, onClick = {
+                                choosingLeftoverMeal = false
+                                leftoverEntries = selectedEntries.filter { it.meal == meal }
+                            })
+                        }
+                    }
+                }
+            }
+            TextButton(onClick = onOpenLeftovers) { Text("Saved leftovers ($leftoverCount)") }
             Meal.entries.forEach { meal ->
                 val mealEntries = selectedEntries.filter { it.meal == meal }
                 val copyOptions = mealCopyOptions[meal] ?: MealCopyOptions()

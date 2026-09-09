@@ -3,6 +3,8 @@ package com.philipcosgrave.calorietracker.data.remote
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.Nutrients
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -16,14 +18,14 @@ private const val CanadianNutrientFileBaseUrl =
 class CanadianNutrientFileLookupService {
     private var cachedFoods: List<CnfFoodSummary>? = null
 
-    suspend fun searchFoodsByName(query: String, limit: Int = 8): List<FoodItem> = withContext(Dispatchers.IO) {
+    suspend fun searchFoodsByName(query: String, limit: Int = 8, per100Grams: Boolean = false): List<FoodItem> = withContext(Dispatchers.IO) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.length < 2) return@withContext emptyList()
 
-        val foods = cachedFoods ?: fetchFoodSummaries().also { cachedFoods = it }
+        val foods = cachedFoods ?: fetchFoodSummaries().also { if (it.isNotEmpty()) cachedFoods = it }
         val matches = foods
             .asSequence()
-            .filter { it.description.contains(normalizedQuery, ignoreCase = true) }
+            .filter { matchesNutritionQuery(normalizedQuery, it.description) }
             .sortedWith(
                 compareBy<CnfFoodSummary>(
                     { !it.description.startsWith(normalizedQuery, ignoreCase = true) },
@@ -33,7 +35,10 @@ class CanadianNutrientFileLookupService {
             .take(limit)
             .toList()
 
-        matches.mapNotNull { fetchFoodDetails(it) }
+        matches.mapNotNull {
+            currentCoroutineContext().ensureActive()
+            fetchFoodDetails(it, per100Grams)
+        }
     }
 
     private fun fetchFoodSummaries(): List<CnfFoodSummary> {
@@ -49,11 +54,16 @@ class CanadianNutrientFileLookupService {
         }
     }
 
-    private fun fetchFoodDetails(summary: CnfFoodSummary): FoodItem? {
+    private fun fetchFoodDetails(summary: CnfFoodSummary, per100Grams: Boolean): FoodItem? {
         val nutrientResponse = getJson(
             "$CanadianNutrientFileBaseUrl/nutrientamount/?lang=en&type=json&id=${summary.foodCode}",
         ) ?: return null
-        val nutrients = parseNutrients(jsonArrayFromResponse(nutrientResponse))
+        val nutrients = parseCnfNutrients(jsonArrayFromResponse(nutrientResponse)) ?: return null
+        if (per100Grams) return FoodItem(
+            id = "cnf-${summary.foodCode}", kind = FoodKind.Ingredient,
+            name = summary.description, servingQuantity = 100.0, servingUnit = "g",
+            nutrients = nutrients, isUserCreated = false,
+        )
 
         val servingResponse = getJson(
             "$CanadianNutrientFileBaseUrl/servingsize/?lang=en&type=json&id=${summary.foodCode}",
@@ -70,34 +80,6 @@ class CanadianNutrientFileLookupService {
             servingUnit = serving.unit,
             nutrients = nutrients.scale(serving.conversionFactor),
             isUserCreated = false,
-        )
-    }
-
-    private fun parseNutrients(items: List<JSONObject>): Nutrients {
-        var calories = 0.0
-        var protein = 0.0
-        var carbs = 0.0
-        var fat = 0.0
-
-        items.forEach { item ->
-            val name = item.optString("nutrient_web_name").trim()
-            val value = item.optDouble("nutrient_value").takeUnless { it.isNaN() } ?: 0.0
-            when {
-                name.equals("Energy (kCal)", ignoreCase = true) ||
-                    name.equals("Calories", ignoreCase = true) -> calories = value
-                name.equals("Protein", ignoreCase = true) -> protein = value
-                name.equals("Carbohydrate", ignoreCase = true) -> carbs = value
-                name.equals("Fat (total)", ignoreCase = true) ||
-                    name.equals("Total lipid (fat)", ignoreCase = true) ||
-                    name.equals("Fat, total", ignoreCase = true) -> fat = value
-            }
-        }
-
-        return Nutrients(
-            calories = calories,
-            proteinGrams = protein,
-            carbohydrateGrams = carbs,
-            fatGrams = fat,
         )
     }
 
@@ -140,6 +122,8 @@ class CanadianNutrientFileLookupService {
 
     private fun getJson(url: String): Any? {
         val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
         connection.requestMethod = "GET"
         connection.setRequestProperty("Accept", "application/json")
         return try {
