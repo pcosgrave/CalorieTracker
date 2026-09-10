@@ -22,7 +22,7 @@ data class PhotoFoodDraft(
     fun isValid(foods: List<FoodItem>): Boolean = name.isNotBlank() &&
         grams.toDoubleOrNull()?.let { it.isFinite() && it > 0 && it <= 100_000 } == true &&
         (matchedFood(foods)?.let { food ->
-            food.servingQuantity.isFinite() && food.servingQuantity > 0 && convertAmount(1.0, amountUnit, food.servingUnit) != null
+            food.servingQuantity.isFinite() && food.servingQuantity > 0 && food.amountInBaseUnits(1.0, amountUnit) != null
         } ?: false)
 }
 
@@ -75,7 +75,7 @@ fun photoDiaryEntries(drafts: List<PhotoFoodDraft>, foods: List<FoodItem>, date:
         val grams = draft.grams.toDouble()
         DiaryEntry(
             id = "photo-entry-${draft.id}", food = food, date = date, meal = meal,
-            servingMultiplier = requireNotNull(convertAmount(grams, draft.amountUnit, food.servingUnit)) / food.servingQuantity,
+            servingMultiplier = requireNotNull(food.amountInBaseUnits(grams, draft.amountUnit)) / food.servingQuantity,
             loggedAmount = grams, loggedUnit = draft.amountUnit,
         )
     }
@@ -83,7 +83,7 @@ fun photoDiaryEntries(drafts: List<PhotoFoodDraft>, foods: List<FoodItem>, date:
 
 /** Keep the pictured amount only when it can be expressed in the saved food's units. */
 fun linkReviewFood(draft: PhotoFoodDraft, food: FoodItem): PhotoFoodDraft {
-    val compatible = convertAmount(1.0, draft.amountUnit, food.servingUnit) != null
+    val compatible = food.amountInBaseUnits(1.0, draft.amountUnit) != null
     return draft.copy(
         name = foodTitle(food.name), matchedFoodId = food.id,
         grams = if (compatible) draft.grams else "",

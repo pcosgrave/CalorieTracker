@@ -58,6 +58,9 @@ import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appBorderStrongColor
 import com.philipcosgrave.calorietracker.ui.components.appSoftColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import kotlinx.coroutines.launch
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.max
@@ -69,8 +72,11 @@ fun DiaryScreen(
     targetRangeMin: Int,
     targetRangeMax: Int,
     onDateChange: (LocalDate) -> Unit,
+    onCopyDay: suspend (LocalDate) -> Unit = {},
+    onOpenCopyMeals: () -> Unit = {},
     onBack: () -> Unit,
     onAddFood: () -> Unit,
+    onAddMealFood: (Meal) -> Unit = { onAddFood() },
     onVoiceLog: () -> Unit,
     onPhotoLog: () -> Unit = {},
     onOpenLeftovers: () -> Unit = {},
@@ -91,6 +97,24 @@ fun DiaryScreen(
     onDismissVoiceFeedback: () -> Unit = {},
     onSelectVoiceCandidate: (FoodItem) -> Unit = {},
 ) {
+    var choosingAddMeal by remember { mutableStateOf(false) }
+    var choosingCopyDay by remember { mutableStateOf(false) }
+    var copySource by remember { mutableStateOf<LocalDate?>(null) }
+    var copying by remember { mutableStateOf(false) }
+    var copyError by remember { mutableStateOf<String?>(null) }
+    val copyScope = androidx.compose.runtime.rememberCoroutineScope()
+    if (choosingCopyDay) MealCopyCalendarDialog(Meal.Breakfast,
+        entries.map { it.date }.distinct().filter { it != selectedDate },
+        { choosingCopyDay = false }, { choosingCopyDay = false; copySource = it }, title = "Copy day from")
+    copySource?.let { source -> AlertDialog(onDismissRequest = { if (!copying) copySource = null },
+        title = { Text("Copy day?") }, text = { Text(copyError ?: "Add all foods from $source to $selectedDate? Existing foods will stay.") },
+        confirmButton = { TextButton(enabled = !copying, onClick = { copying = true; copyScope.launch {
+            try { onCopyDay(source); copySource = null; copyError = null }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { copyError = "Could not copy day. Please retry." }
+            finally { copying = false }
+        } }) { Text(if (copying) "Copying…" else "Copy") } },
+        dismissButton = { TextButton(enabled = !copying, onClick = { copySource = null; copyError = null }) { Text("Cancel") } }) }
     var choosingLeftoverMeal by remember { mutableStateOf(false) }
     var leftoverEntries by remember(selectedDate) { mutableStateOf<List<DiaryEntry>?>(null) }
     leftoverEntries?.let { CreateLeftoverDialog(it, { leftoverEntries = null }, onCreateLeftover) }
@@ -100,156 +124,41 @@ fun DiaryScreen(
     val today = LocalDate.now()
     val selectedEntries = entries.filter { it.date == selectedDate }
     val totals = totalsForEntries(selectedEntries)
-    val isViewingToday = selectedDate == today
-    val rangeMin = targetRangeMin.coerceAtLeast(0)
-    val rangeMax = max(targetRangeMax, rangeMin + 1)
-    val overflowSpan = max(rangeMax - rangeMin, 200)
-    val currentCalories = totals.calories.toFloat()
-    val currentProgress =
-        when {
-            currentCalories <= rangeMin -> {
-                if (rangeMin == 0) 0f else (currentCalories / rangeMin.toFloat()) * (1f / 3f)
-            }
-
-            currentCalories <= rangeMax -> {
-                val inRangeProgress = (currentCalories - rangeMin.toFloat()) / (rangeMax - rangeMin).toFloat()
-                (1f / 3f) + inRangeProgress * (1f / 3f)
-            }
-
-            else -> {
-                val overProgress = ((currentCalories - rangeMax.toFloat()) / overflowSpan.toFloat()).coerceIn(0f, 1f)
-                (2f / 3f) + overProgress * (1f / 3f)
-            }
-        }.coerceIn(0f, 1f)
     LaunchedEffect(pageScrollState.isScrollInProgress, selectedDate) {
         if (pageScrollState.isScrollInProgress) {
             expandedEntryId = null
         }
     }
     Page(scrollState = pageScrollState) {
-        PageHeader(
-            title = "Food Log",
-            onBack = onBack,
-        )
+        Text("Food Log", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
 
-        AppCardContainer {
-            DatePillsRow(
-                selectedDate = selectedDate,
-                today = today,
-                onDateChange = onDateChange,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        DatePillsRow(selectedDate, today, onDateChange, Modifier.fillMaxWidth())
 
-            AppCardContainer(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Transparent, RoundedCornerShape(28.dp)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .background(appSoftColor(), RoundedCornerShape(32.dp))
-                        .padding(horizontal = 20.dp, vertical = 15.dp),
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            formatNumber(totals.calories),
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.ExtraBold,
-                        )
-                        Text("$rangeMin-$rangeMax target", color = AppMuted)
-                    }
+        com.philipcosgrave.calorietracker.ui.components.ExpandableNutritionSummary(totals, targetRangeMin, targetRangeMax)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) {
+                Button(onClick = onAddFood, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) { Text("⊕ Add Food", style = MaterialTheme.typography.labelMedium) }
+                DropdownMenu(choosingAddMeal, { choosingAddMeal = false }) { Meal.entries.forEach { meal ->
+                    DropdownMenuItem(text = { Text(meal.label) }, onClick = { choosingAddMeal = false; onAddMealFood(meal) })
+                } }
+            }
+            OutlinedButton(onClick = onOpenCopyMeals, enabled = entries.isNotEmpty(), modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+                com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Copy", modifier = Modifier.size(18.dp))
+                Text(" Copy", style = MaterialTheme.typography.labelMedium)
+            }
+            Box(Modifier.weight(1f)) {
+                OutlinedButton(onClick = { choosingLeftoverMeal = true }, enabled = selectedEntries.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+                    com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Leftover", modifier = Modifier.size(18.dp))
+                    Text(" Create\nLeftover", style = MaterialTheme.typography.labelMedium)
                 }
-
-                IntakeRangeBar(
-                    currentProgress = currentProgress,
-                    lowerTarget = rangeMin,
-                    upperTarget = rangeMax,
-                )
-
-                MacroRow(
-                    protein = totals.protein,
-                    carbs = totals.carbs,
-                    fat = totals.fat,
-                )
-
-                Row(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .background(AppBlue, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TextButton(onClick = {
-                            expandedEntryId = null
-                            onAddFood()
-                        }) {
-                            Text("+", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .background(appSoftColor(), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TextButton(onClick = {
-                            expandedEntryId = null
-                            onVoiceLog()
-                        }) {
-                            Text("\uD83C\uDFA4", color = AppBlue, style = MaterialTheme.typography.titleLarge)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier.size(52.dp).background(appSoftColor(), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TextButton(
-                            onClick = { expandedEntryId = null; onPhotoLog() },
-                            modifier = Modifier.semantics { contentDescription = "Photograph meal" },
-                        ) {
-                            Text("\uD83D\uDCF7", color = AppBlue, style = MaterialTheme.typography.titleLarge)
-                        }
+                DropdownMenu(choosingLeftoverMeal, { choosingLeftoverMeal = false }) {
+                    Meal.entries.filter { meal -> selectedEntries.any { it.meal == meal } }.forEach { meal ->
+                        DropdownMenuItem(text = { Text(meal.label) }, onClick = { choosingLeftoverMeal = false; leftoverEntries = selectedEntries.filter { it.meal == meal } })
                     }
                 }
             }
         }
-
-        if (!voiceStatusLabel.isNullOrBlank() || !voiceTranscript.isNullOrBlank() || voiceCandidateMatches.isNotEmpty()) {
-            VoiceStatusCard(
-                label = voiceStatusLabel,
-                transcript = voiceTranscript,
-                message = voiceStatusMessage,
-                candidateMatches = voiceCandidateMatches,
-                retryVisible = voiceRetryVisible,
-                onRetry = onRetryVoiceLog,
-                onDismiss = onDismissVoiceFeedback,
-                onSelectCandidate = onSelectVoiceCandidate,
-            )
-        }
-
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Meal Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                Box {
-                    TextButton(enabled = selectedEntries.isNotEmpty(), onClick = { choosingLeftoverMeal = true }) {
-                        Text("＋ Create leftover")
-                    }
-                    DropdownMenu(expanded = choosingLeftoverMeal, onDismissRequest = { choosingLeftoverMeal = false }) {
-                        Meal.entries.filter { meal -> selectedEntries.any { it.meal == meal } }.forEach { meal ->
-                            DropdownMenuItem(text = { Text(meal.label) }, onClick = {
-                                choosingLeftoverMeal = false
-                                leftoverEntries = selectedEntries.filter { it.meal == meal }
-                            })
-                        }
-                    }
-                }
-            }
-            TextButton(onClick = onOpenLeftovers) { Text("Saved leftovers ($leftoverCount)") }
             Meal.entries.forEach { meal ->
                 val mealEntries = selectedEntries.filter { it.meal == meal }
                 val copyOptions = mealCopyOptions[meal] ?: MealCopyOptions()
@@ -260,20 +169,6 @@ fun DiaryScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
-                        )
-                        MealCopyHeaderActions(
-                            meal = meal,
-                            copyOptions = copyOptions,
-                            isViewingToday = isViewingToday,
-                            hasMealEntries = mealEntries.isNotEmpty(),
-                            onCopyMealFromDate = { selectedMeal, sourceDate ->
-                                expandedEntryId = null
-                                onCopyMealFromDate(selectedMeal, sourceDate)
-                            },
-                            onCopyMealToToday = { selectedMeal ->
-                                expandedEntryId = null
-                                onCopyMealToToday(selectedMeal)
-                            },
                         )
                         Text(
                             if (mealEntries.isEmpty()) "0 cal" else "${formatNumber(totalsForEntries(mealEntries).calories)} cal",
@@ -301,6 +196,7 @@ fun DiaryScreen(
                             )
                         }
                     }
+
                 }
             }
         }
@@ -418,6 +314,7 @@ private fun MealCopyCalendarDialog(
     selectableDates: List<LocalDate>,
     onDismiss: () -> Unit,
     onSelectDate: (LocalDate) -> Unit,
+    title: String? = null,
 ) {
     val selectableDateSet = remember(selectableDates) { selectableDates.toSet() }
     val mostRecentMonth = remember(selectableDates) { YearMonth.from(selectableDates.maxOrNull() ?: LocalDate.now()) }
@@ -444,9 +341,9 @@ private fun MealCopyCalendarDialog(
         },
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Copy ${meal.label.lowercase()} from", fontWeight = FontWeight.ExtraBold)
+                Text(title ?: "Copy ${meal.label.lowercase()} from", fontWeight = FontWeight.ExtraBold)
                 Text(
-                    "Days without this meal are unavailable.",
+                    if (title == null) "Days without this meal are unavailable." else "Choose a day with logged foods.",
                     color = AppMuted,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -477,62 +374,21 @@ private fun MealCopyCalendarDialog(
                     }
                 }
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    maxItemsInEachRow = 7,
-                ) {
-                    listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
-                        Box(
-                            modifier = Modifier.width(36.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                label,
-                                color = AppMuted,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
+                            Text(label, Modifier.weight(1f), textAlign = TextAlign.Center, color = AppMuted, style = MaterialTheme.typography.labelSmall)
                         }
                     }
-
-                    monthDays.forEach { date ->
-                        if (date == null) {
-                            Box(modifier = Modifier.width(36.dp).height(36.dp))
-                        } else {
-                            val selectable = date in selectableDateSet
-                            val isToday = date == today
-                            Box(
-                                modifier = Modifier
-                                    .width(36.dp)
-                                    .height(36.dp)
-                                    .background(
-                                        when {
-                                            selectable -> AppBlue.copy(alpha = 0.12f)
-                                            else -> appSoftColor()
-                                        },
-                                        RoundedCornerShape(12.dp),
-                                    )
-                                    .border(
-                                        width = if (isToday) 1.dp else 0.dp,
-                                        color = if (isToday) appBorderStrongColor() else Color.Transparent,
-                                        shape = RoundedCornerShape(12.dp),
-                                    )
-                                    .then(
-                                        if (selectable) {
-                                            Modifier.clickable { onSelectDate(date) }
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    date.dayOfMonth.toString(),
-                                    color = if (selectable) AppBlue else AppMuted.copy(alpha = 0.45f),
-                                    fontWeight = if (selectable) FontWeight.Bold else FontWeight.Normal,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                    monthDays.chunked(7).forEach { week ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            (week + List(7 - week.size) { null }).forEach { date ->
+                                val selectable = date != null && date in selectableDateSet
+                                Box(Modifier.weight(1f).height(40.dp)
+                                    .background(if (selectable) AppBlue.copy(alpha = .12f) else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .clickable(enabled = selectable) { date?.let(onSelectDate) }, contentAlignment = Alignment.Center) {
+                                    Text(date?.dayOfMonth?.toString().orEmpty(), color = if (selectable) AppBlue else AppMuted.copy(alpha = .45f), fontWeight = if (selectable) FontWeight.Bold else FontWeight.Normal)
+                                }
                             }
                         }
                     }
@@ -624,101 +480,6 @@ private fun DiaryVoiceCandidateRow(
     }
 }
 
-@Composable
-private fun IntakeRangeBar(
-    currentProgress: Float,
-    lowerTarget: Int,
-    upperTarget: Int,
-) {
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp),
-    ) {
-        val barWidth = maxWidth
-        val firstBreak = maxWidth / 3f
-        val secondBreak = firstBreak * 2f
-        val markerOffset = ((barWidth - 18.dp) * currentProgress).coerceIn(0.dp, barWidth - 18.dp)
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp)
-                    .background(appBorderColor(), RoundedCornerShape(999.dp)),
-            ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .background(Color(0xFFF0D58A), RoundedCornerShape(topStart = 999.dp, bottomStart = 999.dp)),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .background(Color(0xFF9BE2AB)),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .background(Color(0xFFFFC4BA), RoundedCornerShape(topEnd = 999.dp, bottomEnd = 999.dp)),
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .padding(start = firstBreak - 1.dp)
-                        .width(2.dp)
-                        .height(16.dp)
-                        .background(Color.White),
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(start = secondBreak - 1.dp)
-                        .width(2.dp)
-                        .height(16.dp)
-                        .background(Color.White),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = markerOffset)
-                        .size(18.dp)
-                        .background(AppBlue, CircleShape),
-                )
-            }
-
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "$lowerTarget",
-                    color = AppMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .width(72.dp)
-                        .align(Alignment.CenterStart)
-                        .absoluteOffset((firstBreak - 36.dp).coerceAtLeast(0.dp), 0.dp)
-                )
-                Text(
-                    "$upperTarget",
-                    color = AppMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .width(72.dp)
-                        .align(Alignment.CenterStart)
-                        .absoluteOffset((secondBreak - 36.dp).coerceAtLeast(0.dp), 0.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun MacroRow(protein: Double, carbs: Double, fat: Double) {

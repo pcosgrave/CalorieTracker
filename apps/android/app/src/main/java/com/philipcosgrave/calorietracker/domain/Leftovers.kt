@@ -22,3 +22,14 @@ fun splitLeftover(entries: List<DiaryEntry>, percentage: Double, name: String, i
 
 fun leftoverDiaryEntries(leftover: Leftover, date: LocalDate, meal: Meal): List<DiaryEntry> =
     leftover.entries.mapIndexed { index, entry -> entry.copy(id = "${leftover.id}-entry-$index", date = date, meal = meal) }
+
+/** A display-only recipe snapshot. Consumption logs the original entries, never this wrapper. */
+fun leftoverAsFood(leftover: Leftover): com.philipcosgrave.calorietracker.model.FoodItem {
+    val totals = totalsForEntries(leftover.entries)
+    return com.philipcosgrave.calorietracker.model.FoodItem(
+        id = leftover.id, kind = com.philipcosgrave.calorietracker.model.FoodKind.Recipe,
+        name = leftover.name, servingQuantity = 1.0, servingUnit = "leftover",
+        nutrients = com.philipcosgrave.calorietracker.model.Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat),
+        components = leftover.entries.map { com.philipcosgrave.calorietracker.model.RecipeComponent(it.food, it.loggedAmount, it.loggedUnit) },
+    )
+}

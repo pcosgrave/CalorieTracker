@@ -9,14 +9,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.philipcosgrave.calorietracker.data.local.LocalPhotoFoodAnalyzer
 import com.philipcosgrave.calorietracker.domain.NutritionLabel
 import com.philipcosgrave.calorietracker.ui.components.Page
 import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import kotlinx.coroutines.*
 
 @Composable
-internal fun NutritionLabelCamera(onBack: () -> Unit, onParsed: (NutritionLabel) -> Unit) {
+internal fun NutritionLabelCamera(onBack: () -> Unit, onParsed: (NutritionLabel) -> Unit, onAnalyze: suspend (android.graphics.Bitmap, (String) -> Unit) -> NutritionLabel, title: String = "Scan nutrition label", guidance: String = "Include the serving size and nutrition numbers. The photo stays in memory and is discarded after reading.") {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var allowed by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
@@ -29,8 +28,8 @@ internal fun NutritionLabelCamera(onBack: () -> Unit, onParsed: (NutritionLabel)
     fun close() { job?.cancel(); onBack() }
     BackHandler { close() }
     Page {
-        PageHeader("Scan nutrition label", onBack = ::close)
-        Text("Include the serving size and nutrition numbers. The photo stays in memory and is discarded after reading.")
+        PageHeader(title, onBack = ::close)
+        Text(guidance)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (busy) {
             LinearProgressIndicator()
@@ -44,7 +43,7 @@ internal fun NutritionLabelCamera(onBack: () -> Unit, onParsed: (NutritionLabel)
                 error = null
                 job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
-                        val result = withTimeout(300_000) { LocalPhotoFoodAnalyzer().analyzeLabel(bitmap) { status = it } }
+                        val result = withTimeout(300_000) { onAnalyze(bitmap) { status = it } }
                         onParsed(result)
                     } catch (timeout: TimeoutCancellationException) {
                         error = "Reading took too long. Please retake the label photo."

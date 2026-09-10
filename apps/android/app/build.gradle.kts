@@ -204,6 +204,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.0")
     implementation("androidx.room:room-runtime:2.7.0")
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
     ksp("androidx.room:room-compiler:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")

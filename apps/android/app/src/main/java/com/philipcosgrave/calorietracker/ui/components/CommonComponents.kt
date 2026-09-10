@@ -66,6 +66,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.philipcosgrave.calorietracker.domain.componentSummary
 import com.philipcosgrave.calorietracker.domain.compatibleMeasurementUnits
+import com.philipcosgrave.calorietracker.domain.formatAmount
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.measurementUnits
 import com.philipcosgrave.calorietracker.domain.scale
@@ -82,11 +83,11 @@ import kotlinx.coroutines.android.awaitFrame
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-val AppBlue = Color(0xFF1677F0)
+val AppBlue = Color(0xFF0CBD69)
 val AppSuccess = Color(0xFF36C15B)
 val AppBackground = Color(0xFFF3F6FB)
 val AppCard = Color(0xFFFFFFFF)
-val AppMuted = Color(0xFF7B8594)
+val AppMuted = Color(0xFFAAB7C4)
 val AppBorder = Color(0xFFD9DFEA)
 val AppBorderStrong = Color(0xFFC4CBD8)
 val AppSoft = Color(0xFFF6F8FC)
@@ -117,6 +118,7 @@ fun normalizeDecimalNumberInput(value: String): String = if (value.startsWith(".
 @Composable
 fun Page(
     scrollState: ScrollState = rememberScrollState(),
+    spacing: androidx.compose.ui.unit.Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -125,7 +127,7 @@ fun Page(
             .background(appBackgroundColor())
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(spacing),
         content = content,
     )
 }
@@ -142,7 +144,7 @@ fun PageHeader(
     ) {
         Text(
             title,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center,
         )
@@ -150,7 +152,7 @@ fun PageHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("Back", color = AppBlue) }
+            TextButton(onClick = onBack) { Text("‹", color = AppBlue, style = MaterialTheme.typography.headlineSmall) }
             Box(modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier.width(72.dp),
@@ -195,19 +197,16 @@ fun DiaryEntryRow(
 ) {
     val nutrients = entry.food.nutrients.scale(entry.servingMultiplier)
     InteractiveFoodRow(
+        photoPath = entry.food.photoPath,
         rowKey = entry.id,
         title = entry.food.name,
         trailing = "${formatNumber(nutrients.calories)} cal",
-        onClick = {},
+        onClick = onEdit,
         onLongClick = onToggleExpanded,
         onEdit = onEdit,
         onDelete = onDelete,
         compact = false,
-        supporting = if (expanded) {
-            "${entry.food.brand.ifBlank { entry.food.servingLabel }} - ${formatNumber(entry.loggedAmount)} ${entry.loggedUnit}"
-        } else {
-            null
-        },
+        supporting = "${formatNumber(entry.loggedAmount)} ${entry.loggedUnit}" + if (expanded && entry.food.brand.isNotBlank()) " · ${entry.food.brand}" else "",
     )
 }
 
@@ -224,6 +223,7 @@ fun FoodSearchRow(
 ) {
     val manageable = onEdit != null && onToggleExpanded != null
     InteractiveFoodRow(
+        photoPath = item.photoPath,
         rowKey = item.id,
         title = item.name,
         trailing = if (showCalories) "${formatNumber(item.nutrients.calories)} cal" else null,
@@ -233,7 +233,7 @@ fun FoodSearchRow(
         onEdit = onEdit,
         onDelete = onDelete,
         compact = true,
-        supporting = if (!manageable || expanded) {
+        supporting = if (true) {
             buildList {
                 if (item.kind == FoodKind.Recipe) add("Recipe")
                 if (item.brand.isNotBlank()) add(item.brand)
@@ -259,6 +259,7 @@ private fun InteractiveFoodRow(
     onDelete: (() -> Unit)? = null,
     compact: Boolean,
     supporting: String?,
+    photoPath: String? = null,
 ) {
     key(rowKey) {
         val currentOnEdit by rememberUpdatedState(onEdit)
@@ -310,6 +311,7 @@ private fun InteractiveFoodRow(
             },
         ) {
             FoodRowCardContent(
+                photoPath = photoPath,
                 title = title,
                 trailing = trailing,
                 compact = compact,
@@ -338,11 +340,12 @@ private fun FoodRowCardContent(
     onClick: () -> Unit,
     onDoubleClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    photoPath: String? = null,
     supporting: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = appSoftColor()),
         border = androidx.compose.foundation.BorderStroke(1.dp, appBorderStrongColor()),
     ) {
@@ -362,6 +365,7 @@ private fun FoodRowCardContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
+            FoodPhoto(photoPath)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
@@ -401,7 +405,7 @@ fun RecipeComponentRow(
     onChange: (RecipeComponent) -> Unit,
     onRemove: () -> Unit,
 ) {
-    var amount by remember(component.item.id, component.amount) { mutableStateOf(formatNumber(component.amount)) }
+    var amount by remember(component.item.id, component.amount) { mutableStateOf(formatAmount(component.amount)) }
     val availableUnits = remember(component.unit, component.item.servingUnit) {
         buildList {
             if (component.unit.isNotBlank()) add(component.unit)
@@ -411,7 +415,7 @@ fun RecipeComponentRow(
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = appSoftColor()),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -436,10 +440,7 @@ fun RecipeComponentRow(
                     shape = RoundedCornerShape(14.dp),
                 )
                 UnitPicker(component.unit, { onChange(component.copy(unit = it)) }, Modifier.weight(1f), availableUnits)
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "Delete",
-                )
+                androidx.compose.material3.IconButton(onClick = onRemove) { Icon(imageVector = Icons.Filled.Delete, contentDescription = "Remove ingredient") }
             }
         }
     }
@@ -481,16 +482,16 @@ fun OverflowMenu(
 
 @Composable
 fun MealPicker(meal: Meal, onMealChange: (Meal) -> Unit, darkMode: Boolean = false) {
-    val textColor = if (darkMode) Color.White else Color.Unspecified
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Meal.entries.take(2).forEach { option ->
-                MealChoice(option, meal == option, onMealChange, textColor, Modifier.weight(1f))
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Meal.entries.drop(2).forEach { option ->
-                MealChoice(option, meal == option, onMealChange, textColor, Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Meal.entries.forEachIndexed { index, option ->
+            val selected = meal == option
+            androidx.compose.material3.OutlinedCard(onClick = { onMealChange(option) }, modifier = Modifier.weight(1f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) AppBlue else appBorderColor()),
+                colors = androidx.compose.material3.CardDefaults.outlinedCardColors(containerColor = if (selected) AppBlue.copy(alpha = .16f) else appSoftColor())) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(listOf("☀", "☼", "☾", "♧")[index], color = if (selected) AppBlue else AppMuted)
+                    Text(option.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
             }
         }
     }
@@ -600,7 +601,7 @@ fun AppPrimaryButton(
 fun AppCardContainer(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = appCardColor()),
     ) {
         Column(

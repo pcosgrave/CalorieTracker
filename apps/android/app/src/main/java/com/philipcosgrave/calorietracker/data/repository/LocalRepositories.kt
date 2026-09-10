@@ -3,6 +3,7 @@ package com.philipcosgrave.calorietracker.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.Room
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
@@ -270,6 +271,7 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
     private fun calorieTargetMinKey(userId: String) = stringPreferencesKey("calorie_target_min.$userId")
     private fun calorieTargetMaxKey(userId: String) = stringPreferencesKey("calorie_target_max.$userId")
     private fun weightUnitKey(userId: String) = stringPreferencesKey("weight_unit.$userId")
+    private fun dailyStepGoalKey(userId: String) = intPreferencesKey("daily_step_goal.$userId")
     private fun goalWeightKgKey(userId: String) = stringPreferencesKey("goal_weight_kg.$userId")
     private fun lastPulledAtKey(userId: String) = stringPreferencesKey("last_pulled_at.$userId")
     private fun lastAcknowledgedChangeIdKey(userId: String) = stringPreferencesKey("last_acknowledged_change_id.$userId")
@@ -308,6 +310,7 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             weightUnit = prefs[weightUnitKey(userId)]?.let { SyncSettings.WeightUnit.valueOf(it) }
                 ?: SyncSettings.WeightUnit.Kilograms,
             goalWeightKg = prefs[goalWeightKgKey(userId)]?.toDoubleOrNull(),
+            dailyStepGoal = prefs[dailyStepGoalKey(userId)]?.takeIf { it > 0 },
         )
     }
 
@@ -324,6 +327,8 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             prefs[calorieTargetMinKey(userId)] = settings.calorieTargetMin.toString()
             prefs[calorieTargetMaxKey(userId)] = settings.calorieTargetMax.toString()
             prefs[weightUnitKey(userId)] = settings.weightUnit.name
+            if (settings.dailyStepGoal == null) prefs.remove(dailyStepGoalKey(userId))
+            else prefs[dailyStepGoalKey(userId)] = settings.dailyStepGoal
             if (settings.goalWeightKg == null) {
                 prefs.remove(goalWeightKgKey(userId))
             } else {

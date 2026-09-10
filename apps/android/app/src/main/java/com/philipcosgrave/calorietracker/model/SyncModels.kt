@@ -68,6 +68,7 @@ data class SyncSettings(
     val calorieTargetMax: Int = 2200,
     val weightUnit: WeightUnit = WeightUnit.Kilograms,
     val goalWeightKg: Double? = null,
+    val dailyStepGoal: Int? = null,
 ) {
     enum class BackupMode {
         Disabled,

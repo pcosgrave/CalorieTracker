@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,116 +61,90 @@ fun RecipeBuilderScreen(
     onAddIngredient: () -> Unit,
     onStartNestedRecipe: () -> Unit,
     onSave: (RecipeDraft) -> Unit,
+    onSaveIngredient: suspend (FoodItem) -> Unit = {},
+    isSaving: Boolean = false,
+    saveError: String? = null,
 ) {
-    var search by remember { mutableStateOf("") }
-    val results = foods.filter { item ->
-        search.isBlank() ||
-            item.name.contains(search, ignoreCase = true) ||
-            item.brand.contains(search, ignoreCase = true) ||
-            item.components.any { it.item.name.contains(search, ignoreCase = true) }
+    var scanning by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var step by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    var unresolvedIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Int?>(null) }
+    var resolving by remember { mutableStateOf(false) }
+    var resolveError by remember { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    if (scanning) {
+        RecipeScanScreen(onBack = { scanning = false }, onExtracted = { text, image ->
+            onDraftChange(com.philipcosgrave.calorietracker.domain.parseRecipeText(text, foods).copy(photoPath = image)); scanning = false
+        })
+        return
+    }
+    val unresolved = unresolvedIndex?.let { draft.unresolvedIngredients.getOrNull(it) }
+    if (unresolved != null) {
+        val parsed = com.philipcosgrave.calorietracker.domain.parseRecipeIngredient(unresolved)
+        AddIngredientScreen(knownFoods = foods, existing = null, initialName = parsed.name, onBack = { unresolvedIndex = null }, isSaving = resolving, saveError = resolveError,
+            onSave = { food -> resolving = true; scope.launch {
+                try {
+                    onSaveIngredient(food)
+                    val component = com.philipcosgrave.calorietracker.domain.recipeComponentFromLine(unresolved, food)
+                        ?: RecipeComponent(food, 0.0, food.servingUnit)
+                    onDraftChange(draft.copy(components = draft.components + component, unresolvedIngredients = draft.unresolvedIngredients.filterIndexed { index, _ -> index != unresolvedIndex }))
+                    unresolvedIndex = null; resolveError = null
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { resolveError = "Could not save ingredient. Please retry." }
+                finally { resolving = false }
+            } })
+        return
     }
     val totals = totalComponents(draft.components)
-    val draftServingUnits = remember(draft.servingUnit) {
-        buildList {
-            if (draft.servingUnit.isNotBlank()) add(draft.servingUnit)
-            addAll(measurementUnits.filterNot { it in this })
-        }
-    }
-
+    androidx.activity.compose.BackHandler { if (step > 0) step-- else onBack() }
     Page {
-        PageHeader("Add Recipe", onBack = onBack)
-
-        AppCardContainer {
-            AppFormField(draft.name, { onDraftChange(draft.copy(name = it)) }, "Recipe Name", Modifier.fillMaxWidth())
-            AppFormField(draft.brand, { onDraftChange(draft.copy(brand = it)) }, "Brand (Optional)", Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AppFormField(
-                    draft.servingQuantity,
-                    {
-                        val normalized = normalizeDecimalNumberInput(it)
-                        if (isDecimalNumberInput(normalized)) {
-                            onDraftChange(draft.copy(servingQuantity = normalized))
-                        }
-                    },
-                    "Servings",
-                    Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                UnitPicker(draft.servingUnit, { onDraftChange(draft.copy(servingUnit = it)) }, Modifier.weight(1f), draftServingUnits)
+        PageHeader(if (step == 0) "Review Recipe" else "Add Instructions", onBack = { if (step > 0) step-- else onBack() })
+        saveError?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
+        if (step == 0) {
+            if (draft.name.isBlank() && draft.components.isEmpty()) {
+                AppPrimaryButton("Create from a photo", { scanning = true }, Modifier.fillMaxWidth())
+                Text("Or create manually below", color = AppMuted)
             }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(appSoftColor(), RoundedCornerShape(18.dp)),
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    Text("Nutrition", color = AppMuted)
-                    Text(
-                        "${formatNumber(totals.calories)} Cal • ${formatNumber(totals.protein)}g Protein",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Ingredients", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
+            com.philipcosgrave.calorietracker.ui.components.FoodPhotoPicker(draft.photoPath) { onDraftChange(draft.copy(photoPath = it)) }
+            AppFormField(draft.name, { onDraftChange(draft.copy(name = it)) }, "Recipe name", Modifier.fillMaxWidth())
+            AppFormField(draft.description, { onDraftChange(draft.copy(description = it)) }, "Description (optional)", Modifier.fillMaxWidth())
+            AppFormField(draft.servingQuantity, { if (isDecimalNumberInput(it)) onDraftChange(draft.copy(servingQuantity = it)) }, "Servings", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            AppFormField(draft.prepMinutes?.toString().orEmpty(), { value -> if (value.all(Char::isDigit)) onDraftChange(draft.copy(prepMinutes = value.toIntOrNull()?.takeIf { it > 0 })) }, "Prep time (minutes, optional)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            AppFormField(draft.totalMinutes?.toString().orEmpty(), { value -> if (value.all(Char::isDigit)) onDraftChange(draft.copy(totalMinutes = value.toIntOrNull()?.takeIf { it > 0 })) }, "Total time (minutes, optional)", Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            Text("Ingredients", fontWeight = FontWeight.Bold)
+            if (draft.components.any { it.amount <= 0 }) Text("Enter the amount for ingredients shown as zero.", color = MaterialTheme.colorScheme.error)
+            AppPrimaryButton("＋ Add Ingredient", onAddIngredient, Modifier.fillMaxWidth())
             draft.components.forEachIndexed { index, component ->
-                RecipeComponentRow(
-                    component = component,
-                    onChange = { updated ->
-                        onDraftChange(draft.copy(components = draft.components.mapIndexed { i, c -> if (i == index) updated else c }))
-                    },
-                    onRemove = {
-                        onDraftChange(draft.copy(components = draft.components.filterIndexed { i, _ -> i != index }))
-                    },
-                )
+                RecipeComponentRow(component = component,
+                    onChange = { updated -> onDraftChange(draft.copy(components = draft.components.mapIndexed { i, c -> if (i == index) updated else c })) },
+                    onRemove = { onDraftChange(draft.copy(components = draft.components.filterIndexed { i, _ -> i != index })) })
             }
-            AppPrimaryButton(
-                text = "Save Recipe",
-                onClick = { onSave(draft) },
-                enabled = draft.name.isNotBlank() && draft.components.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            SectionDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppFormField(search, { search = it }, "Search ingredients or recipes...", Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .padding(start = 10.dp)
-                        .size(42.dp)
-                        .background(AppBlue, CircleShape)
-                        .clickable(onClick = onAddIngredient),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("+", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            draft.unresolvedIngredients.forEachIndexed { index, line ->
+                AppCardContainer {
+                    Text(line)
+                    Text("Choose a known food or add its nutrition before saving.", color = AppMuted)
+                    foods.filter { it.name.contains(com.philipcosgrave.calorietracker.domain.parseRecipeIngredient(line).name, true) }.take(3).forEach { food ->
+                        androidx.compose.material3.TextButton(onClick = {
+                            val component = com.philipcosgrave.calorietracker.domain.recipeComponentFromLine(line, food) ?: RecipeComponent(food, 0.0, food.servingUnit)
+                            onDraftChange(draft.copy(components = draft.components + component, unresolvedIngredients = draft.unresolvedIngredients.filterIndexed { i, _ -> i != index }))
+                        }) { Text("Use ${food.name} · review amount") }
+                    }
+                    Row {
+                        androidx.compose.material3.TextButton(onClick = { unresolvedIndex = index }) { Text("Add food") }
+                        androidx.compose.material3.TextButton(onClick = { onDraftChange(draft.copy(unresolvedIngredients = draft.unresolvedIngredients.filterIndexed { i, _ -> i != index })) }) { Text("Remove") }
+                    }
                 }
             }
-
-            results.take(6).forEach { item ->
-                FoodSearchRow(
-                    item = item,
-                    showCalories = false,
-                    onClick = {
-                        onDraftChange(
-                            draft.copy(
-                                components = draft.components + RecipeComponent(item, item.servingQuantity, item.servingUnit),
-                            ),
-                        )
-                        search = ""
-                    },
-                )
+            com.philipcosgrave.calorietracker.ui.components.NutritionSummary(totals)
+            Text("Nutrition for the whole recipe", color = AppMuted)
+            AppPrimaryButton("Next", { step = 1 }, Modifier.fillMaxWidth(), enabled = draft.name.isNotBlank() && draft.components.isNotEmpty() && draft.unresolvedIngredients.isEmpty() && draft.components.all { it.amount.isFinite() && it.amount > 0 } && draft.servingQuantity.toDoubleOrNull()?.let { it.isFinite() && it > 0 } == true)
+        } else {
+            Text("Instructions are optional.", color = AppMuted)
+            draft.instructions.forEachIndexed { index, instruction ->
+                AppFormField(instruction, { value -> onDraftChange(draft.copy(instructions = draft.instructions.mapIndexed { i, old -> if (i == index) value else old })) }, "Step ${index + 1}", Modifier.fillMaxWidth())
+                androidx.compose.material3.TextButton(onClick = { onDraftChange(draft.copy(instructions = draft.instructions.filterIndexed { i, _ -> i != index })) }) { Text("Remove step") }
             }
+            androidx.compose.material3.OutlinedButton(onClick = { onDraftChange(draft.copy(instructions = draft.instructions + "")) }, Modifier.fillMaxWidth()) { Text("＋ Add step") }
+            AppPrimaryButton(if (isSaving) "Saving…" else "Save Recipe", { onSave(draft.copy(instructions = draft.instructions.map(String::trim).filter(String::isNotBlank))) }, Modifier.fillMaxWidth(), enabled = !isSaving)
         }
     }
 }

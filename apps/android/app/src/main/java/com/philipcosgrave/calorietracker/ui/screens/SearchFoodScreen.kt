@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ import com.philipcosgrave.calorietracker.ui.components.SortMenu
 import com.philipcosgrave.calorietracker.ui.components.appBorderColor
 import com.philipcosgrave.calorietracker.ui.components.appCardColor
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.Instant
 import java.time.LocalTime
@@ -67,7 +69,16 @@ fun SearchFoodScreen(
     onAddIngredient: () -> Unit,
     onAddRecipe: () -> Unit,
     onOpenLeftovers: () -> Unit = {},
+    leftovers: List<com.philipcosgrave.calorietracker.domain.Leftover> = emptyList(),
+    initialLeftovers: Boolean = false,
+    allowLeftovers: Boolean = true,
+    destinationMeal: com.philipcosgrave.calorietracker.model.Meal? = null,
+    onUseLeftover: suspend (com.philipcosgrave.calorietracker.domain.Leftover, LocalDate, com.philipcosgrave.calorietracker.model.Meal) -> Unit = { _, _, _ -> },
+    localOnly: Boolean = true,
     onSelectFood: (FoodItem) -> Unit,
+    onImportReference: suspend (FoodItem) -> FoodItem = { it },
+    onPhoto: () -> Unit = {},
+    onVoice: () -> Unit = {},
     onQuickLogFood: (FoodItem) -> Unit,
     personalOnlineResults: List<FoodItem>,
     communityResults: List<FoodItem>,
@@ -80,9 +91,36 @@ fun SearchFoodScreen(
     onEditFood: (FoodItem) -> Unit,
     onPublishToCommunity: (FoodItem) -> Unit,
 ) {
-    var search by remember { mutableStateOf("") }
-    var activeKind by remember { mutableStateOf(FoodKind.Ingredient) }
-    var sortMode by remember { mutableStateOf(SortMode.Recent) }
+    var reference by remember { mutableStateOf<FoodItem?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    val referenceScope = androidx.compose.runtime.rememberCoroutineScope()
+    reference?.let { food ->
+        androidx.activity.compose.BackHandler { reference = null }
+        FoodDetailsScreen(food, { reference = null }, { referenceScope.launch {
+            if (!importing) { importing = true; try { onEditFood(onImportReference(food)); reference = null }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { importError = "Could not save ingredient. Retry." } finally { importing = false } }
+        } }, { referenceScope.launch {
+            if (!importing) { importing = true; try { onSelectFood(onImportReference(food)); reference = null }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { importError = "Could not save ingredient. Retry." } finally { importing = false } }
+        } }, if (importing) "Saving…" else "Add Ingredient")
+        importError?.let { message -> AlertDialog(onDismissRequest = { importError = null }, text = { Text(message) }, confirmButton = { TextButton(onClick = { importError = null }) { Text("OK") } }) }
+        return
+    }
+    var showingLeftovers by rememberSaveable { mutableStateOf(initialLeftovers) }
+    var selectedLeftoverId by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedLeftover = leftovers.firstOrNull { it.id == selectedLeftoverId }
+    if (selectedLeftover != null) {
+        androidx.activity.compose.BackHandler { selectedLeftoverId = null }
+        LogFoodScreen(food = com.philipcosgrave.calorietracker.domain.leftoverAsFood(selectedLeftover), date = date,
+            destinationMeal = destinationMeal, wholePortionOnly = true, subtitle = "Saved ${selectedLeftover.date}",
+            onBack = { selectedLeftoverId = null },
+            onLog = { entry, _ -> onUseLeftover(selectedLeftover, entry.date, entry.meal); selectedLeftoverId = null })
+        return
+    }
+    var search by rememberSaveable { mutableStateOf("") }
+    var activeKind by rememberSaveable { mutableStateOf(FoodKind.Ingredient) }
+    var sortMode by rememberSaveable { mutableStateOf(SortMode.Recent) }
     var addMenuExpanded by remember { mutableStateOf(false) }
     var expandedFoodId by remember { mutableStateOf<String?>(null) }
     var pendingDeleteFood by remember { mutableStateOf<FoodItem?>(null) }
@@ -95,7 +133,7 @@ fun SearchFoodScreen(
         .filter { it.kind == activeKind }
         .filter { item ->
             search.isBlank() ||
-                item.name.contains(search, ignoreCase = true) ||
+                com.philipcosgrave.calorietracker.domain.FoodSearchMatching.score(search, item.name) > 0 ||
                 item.brand.contains(search, ignoreCase = true) ||
                 item.components.any { it.item.name.contains(search, ignoreCase = true) }
         }
@@ -117,7 +155,7 @@ fun SearchFoodScreen(
             }
         }
     val shouldShowRemoteSearch =
-        search.trim().length >= 3 && activeKind == FoodKind.Ingredient && results.size < 2
+        !localOnly && search.trim().length >= 3 && activeKind == FoodKind.Ingredient && results.size < 2
     val showingRemoteResultsForCurrentSearch =
         remoteSearchQuery.equals(search.trim(), ignoreCase = true)
 
@@ -132,45 +170,7 @@ fun SearchFoodScreen(
     }
 
     Page {
-        PageHeader(
-            title = "Search foods",
-            onBack = onBack,
-            actions = {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(AppBlue, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TextButton(onClick = { addMenuExpanded = true }) {
-                        Text("+", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                    }
-                    DropdownMenu(expanded = addMenuExpanded, onDismissRequest = { addMenuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Quick add calories") },
-                            onClick = {
-                                addMenuExpanded = false
-                                onQuickCalories()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Add ingredient") },
-                            onClick = {
-                                addMenuExpanded = false
-                                onAddIngredient()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Add recipe") },
-                            onClick = {
-                                addMenuExpanded = false
-                                onAddRecipe()
-                            },
-                        )
-                    }
-                }
-            },
-        )
+        PageHeader("Search Foods", onBack = onBack)
 
         AppCardContainer {
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -210,25 +210,42 @@ fun SearchFoodScreen(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(sortModeLabel, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                SortMenu(
-                    value = sortMode,
-                    onChange = { sortMode = it },
-                    labelForMode = { mode ->
-                        if (mode == SortMode.MealTime) "Frequent ${currentMeal.label}" else mode.label
-                    },
-                )
+                var sortExpanded by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { sortExpanded = true }) { Text(if (sortMode == SortMode.Frequency) "Frequent ⌄" else "Recent ⌄") }
+                    DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
+                        DropdownMenuItem(text = { Text("Recent") }, onClick = { sortMode = SortMode.Recent; sortExpanded = false })
+                        DropdownMenuItem(text = { Text("Frequent") }, onClick = { sortMode = SortMode.Frequency; sortExpanded = false })
+                        // TODO: Enable when favorite-food storage is available.
+                        DropdownMenuItem(text = { Text("Favorites · coming later") }, onClick = {}, enabled = false)
+                    }
+                }
             }
 
             AppSegmentedControl(
-                options = listOf("Ingredient", "Recipe", "Leftovers"),
-                selectedIndex = if (activeKind == FoodKind.Ingredient) 0 else 1,
+                options = if (allowLeftovers) listOf("Ingredient", "Recipe", "Leftovers") else listOf("Ingredient", "Recipe"),
+                selectedIndex = if (showingLeftovers) 2 else if (activeKind == FoodKind.Ingredient) 0 else 1,
                 onSelectedIndexChange = {
-                    if (it == 2) onOpenLeftovers()
-                    else activeKind = if (it == 0) FoodKind.Ingredient else FoodKind.Recipe
+                    showingLeftovers = it == 2
+                    if (it != 2) activeKind = if (it == 0) FoodKind.Ingredient else FoodKind.Recipe
                 },
             )
 
+            if (showingLeftovers) {
+                val matching = leftovers.filter { search.isBlank() || it.name.contains(search, true) || it.entries.any { entry -> entry.food.name.contains(search, true) } }.sortedByDescending { it.date }
+                if (matching.isEmpty()) Text("No saved leftovers.", color = AppMuted)
+                matching.forEach { leftover ->
+                    androidx.compose.material3.OutlinedCard(onClick = { selectedLeftoverId = leftover.id }, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) { Text(leftover.name, fontWeight = FontWeight.Bold); Text(leftover.date.toString(), color = AppMuted, style = MaterialTheme.typography.bodySmall) }
+                            Text("›")
+                        }
+                    }
+                }
+            } else {
+                if (allowLeftovers || activeKind == FoodKind.Ingredient) TextButton(onClick = if (activeKind == FoodKind.Ingredient) onAddIngredient else onAddRecipe) {
+                    Text(if (activeKind == FoodKind.Ingredient) "Create ingredient" else "Create recipe")
+                }
             if (results.isEmpty()) {
                 Text("No matching foods.", color = AppMuted)
             } else {
@@ -248,7 +265,17 @@ fun SearchFoodScreen(
                 }
             }
 
-            if (shouldShowRemoteSearch) {
+            }
+            if (!showingLeftovers && activeKind == FoodKind.Ingredient) {
+                com.philipcosgrave.calorietracker.ui.components.ReferenceLookupResults(search, foods,
+                    onSelect = { reference = it }, onEmpty = {
+                        TextButton(onClick = onScanBarcode) { Text("Scan Barcode") }
+                        TextButton(onClick = onPhoto) { Text("Scan Nutrition Label / Photo") }
+                        TextButton(onClick = onVoice) { Text("Speak Food") }
+                        TextButton(onClick = onAddIngredient) { Text("Enter Manually") }
+                    })
+            }
+            if (!showingLeftovers && shouldShowRemoteSearch) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(
                         modifier = Modifier

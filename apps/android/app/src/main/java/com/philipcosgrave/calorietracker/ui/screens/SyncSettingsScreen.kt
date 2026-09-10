@@ -76,6 +76,7 @@ fun SyncSettingsScreen(
     var backupMode by remember(settings) { mutableStateOf(settings.backupMode) }
     var calorieTargetMin by remember(settings) { mutableStateOf(settings.calorieTargetMin.toString()) }
     var calorieTargetMax by remember(settings) { mutableStateOf(settings.calorieTargetMax.toString()) }
+    var stepGoal by remember(settings) { mutableStateOf(settings.dailyStepGoal?.toString().orEmpty()) }
     var weightUnit by remember(settings) { mutableStateOf(settings.weightUnit) }
     var goalWeightText by remember(settings) {
         mutableStateOf(settings.goalWeightKg?.let { formatWeightForUnit(it, settings.weightUnit) } ?: "")
@@ -89,6 +90,7 @@ fun SyncSettingsScreen(
             calorieTargetMax.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMax,
             calorieTargetMin.toIntOrNull()?.coerceAtLeast(0) ?: settings.calorieTargetMin,
         ),
+        dailyStepGoal = stepGoal.toIntOrNull()?.takeIf { it > 0 },
         weightUnit = weightUnit,
         goalWeightKg = goalWeightText.toDoubleOrNull()?.let { convertWeightToKg(it, weightUnit) },
     )
@@ -105,6 +107,64 @@ fun SyncSettingsScreen(
         AppPrimaryButton("Manage foods & recipes", onClick = onManageFoods, modifier = Modifier.fillMaxWidth())
 
         AppCardContainer {
+            Text("Goals · Daily Calorie Target", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AppFormField(
+                    value = calorieTargetMin,
+                    onValueChange = {
+                        if (isDigitsOnlyInput(it)) {
+                            calorieTargetMin = it
+                        }
+                    },
+                    label = "Min kcal",
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                AppFormField(
+                    value = calorieTargetMax,
+                    onValueChange = {
+                        if (isDigitsOnlyInput(it)) {
+                            calorieTargetMax = it
+                        }
+                    },
+                    label = "Max kcal",
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            }
+
+            SectionDivider()
+            AppFormField(value = stepGoal, onValueChange = { if (isDigitsOnlyInput(it)) stepGoal = it },
+                label = "Daily step goal (optional)", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            Text("Weight Goal & Units", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Weight Unit", modifier = Modifier.weight(1f), color = AppMuted)
+                WeightUnitPicker(
+                    value = weightUnit,
+                    onChange = { nextUnit ->
+                        val currentValue = goalWeightText.toDoubleOrNull()
+                        val currentKg = currentValue?.let { convertWeightToKg(it, weightUnit) }
+                        weightUnit = nextUnit
+                        goalWeightText = currentKg?.let { formatWeightForUnit(it, nextUnit) } ?: ""
+                    },
+                )
+            }
+
+            AppFormField(
+                    value = goalWeightText,
+                    onValueChange = {
+                    val normalized = normalizeDecimalNumberInput(it)
+                    if (isDecimalNumberInput(normalized)) {
+                        goalWeightText = normalized
+                    }
+                },
+                label = "Goal Weight (${weightUnitLabel(weightUnit)})",
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+
+            SectionDivider()
+            Text("Health & Devices", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("Health Connect", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
             Box(
@@ -165,61 +225,10 @@ fun SyncSettingsScreen(
             }
 
             SectionDivider()
-            Text("Calorie Target Range", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AppFormField(
-                    value = calorieTargetMin,
-                    onValueChange = {
-                        if (isDigitsOnlyInput(it)) {
-                            calorieTargetMin = it
-                        }
-                    },
-                    label = "Min kcal",
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-                AppFormField(
-                    value = calorieTargetMax,
-                    onValueChange = {
-                        if (isDigitsOnlyInput(it)) {
-                            calorieTargetMax = it
-                        }
-                    },
-                    label = "Max kcal",
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-            }
-
-            SectionDivider()
-            Text("Weight", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Weight Unit", modifier = Modifier.weight(1f), color = AppMuted)
-                WeightUnitPicker(
-                    value = weightUnit,
-                    onChange = { nextUnit ->
-                        val currentValue = goalWeightText.toDoubleOrNull()
-                        val currentKg = currentValue?.let { convertWeightToKg(it, weightUnit) }
-                        weightUnit = nextUnit
-                        goalWeightText = currentKg?.let { formatWeightForUnit(it, nextUnit) } ?: ""
-                    },
-                )
-            }
-
-            AppFormField(
-                    value = goalWeightText,
-                    onValueChange = {
-                    val normalized = normalizeDecimalNumberInput(it)
-                    if (isDecimalNumberInput(normalized)) {
-                        goalWeightText = normalized
-                    }
-                },
-                label = "Goal Weight (${weightUnitLabel(weightUnit)})",
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            )
-
-            SectionDivider()
+            Text("Account", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            var accountExpanded by remember { mutableStateOf(false) }
+            TextButton(onClick = { accountExpanded = !accountExpanded }) { Text(if (accountExpanded) "Hide account settings" else "Account & sync settings ›") }
+            if (accountExpanded) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Enable Cloud Sync", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -290,6 +299,7 @@ fun SyncSettingsScreen(
                     "Cloud sync is connected to your signed-in account.",
                     color = AppMuted,
                 )
+            }
             }
 
 

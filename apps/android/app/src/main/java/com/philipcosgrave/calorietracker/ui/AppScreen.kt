@@ -2,6 +2,9 @@ package com.philipcosgrave.calorietracker.ui
 
 enum class AppScreen {
     Home,
+    Scan,
+    Insights,
+    More,
     Diary,
     Weight,
     LogWeight,
@@ -11,9 +14,14 @@ enum class AppScreen {
     AddIngredient,
     RecipeBuilder,
     LogFood,
+    FoodDetails,
     BarcodeScanner,
     PhotoFood,
     VoiceReview,
+    SpeakFood,
     ManageFoods,
     Leftovers,
+    CopyMeals,
+    AddedFood,
+    FoodCreated,
 }

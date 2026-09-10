@@ -23,7 +23,7 @@ fun ManageFoodsScreen(foods: List<FoodItem>, onBack: () -> Unit, onAddFood: () -
         }
         AppFormField(query, { query = it }, "Search known foods and recipes", Modifier.fillMaxWidth())
         AppSegmentedControl(listOf("Foods", "Recipes"), if (recipes) 1 else 0, { recipes = it == 1 })
-        Text("Tap to edit. Swipe left to delete.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Tap to view details. Swipe left to delete.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         val results = foods.filter { (it.kind == FoodKind.Recipe) == recipes &&
             (it.name.contains(query, true) || it.brand.contains(query, true)) }.sortedBy { it.name.lowercase() }
         if (results.isEmpty()) Text("No ${if (recipes) "recipes" else "foods"} found.")
