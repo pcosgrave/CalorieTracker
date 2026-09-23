@@ -30,6 +30,12 @@ fun leftoverAsFood(leftover: Leftover): com.philipcosgrave.calorietracker.model.
         id = leftover.id, kind = com.philipcosgrave.calorietracker.model.FoodKind.Recipe,
         name = leftover.name, servingQuantity = 1.0, servingUnit = "leftover",
         nutrients = com.philipcosgrave.calorietracker.model.Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat),
-        components = leftover.entries.map { com.philipcosgrave.calorietracker.model.RecipeComponent(it.food, it.loggedAmount, it.loggedUnit) },
+        components = leftover.entries.map { entry ->
+            com.philipcosgrave.calorietracker.model.RecipeComponent(
+                entry.food,
+                entry.loggedAmount,
+                entry.loggedUnit.takeUnless { it.equals("entry", ignoreCase = true) } ?: entry.food.servingUnit,
+            )
+        },
     )
 }

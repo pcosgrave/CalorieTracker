@@ -10,6 +10,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -95,8 +96,13 @@ suspend fun readSelectedPhoto(context: android.content.Context, uri: android.net
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) camera = true else error = "Allow camera access to take a photo." }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            FoodPhoto(path, Modifier.size(104.dp))
-            TextButton(enabled = !saving, onClick = { options = true }) { Text(if (saving) "Saving photo…" else if (path == null) "Add Photo" else "Change Photo") }
+            Box(Modifier.size(104.dp).clickable(enabled = !saving) { options = true }) {
+                FoodPhoto(path, Modifier.fillMaxSize())
+                Surface(Modifier.align(Alignment.BottomEnd).size(32.dp), shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primary) {
+                    Box(contentAlignment = Alignment.Center) { Text("▣", color = MaterialTheme.colorScheme.onPrimary) }
+                }
+            }
+            if (saving) Text("Saving photo…")
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }

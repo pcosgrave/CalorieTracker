@@ -162,7 +162,7 @@ private fun FoodItem.toJson(): JSONObject {
         .put("description", description)
         .put("prepMinutes", prepMinutes).put("totalMinutes", totalMinutes)
         .put("source", source).put("sourceId", sourceId).put("sourceVersion", sourceVersion)
-        .put("servingOptions", JSONArray(servingOptions.map { JSONObject().put("id", it.id).put("description", it.description).put("grams", it.grams) }))
+        .put("servingOptions", JSONArray(servingOptions.map { option -> JSONObject().put("id", option.id).put("description", option.description).put("grams", option.grams).apply { option.amount?.let { put("amount", it) }; option.unit?.let { put("unit", it) } } }))
         .put("nutrients", nutrients.toJson())
         .put("components", componentsJson)
         .put("frequency", frequency)
@@ -208,7 +208,7 @@ private fun foodItemFromJson(json: JSONObject): FoodItem {
         source = json.optString("source").takeIf { it.isNotBlank() && it != "null" },
         sourceId = json.optString("sourceId").takeIf { it.isNotBlank() && it != "null" },
         sourceVersion = json.optString("sourceVersion").takeIf { it.isNotBlank() && it != "null" },
-        servingOptions = json.optJSONArray("servingOptions")?.let { a -> List(a.length()) { i -> a.getJSONObject(i).let { com.philipcosgrave.calorietracker.model.ReferenceServing(it.getString("id"), it.getString("description"), it.getDouble("grams")) } } }.orEmpty(),
+        servingOptions = json.optJSONArray("servingOptions")?.let { a -> List(a.length()) { i -> a.getJSONObject(i).let { option -> com.philipcosgrave.calorietracker.model.ReferenceServing(option.getString("id"), option.getString("description"), option.getDouble("grams"), option.optDouble("amount").takeUnless { option.isNull("amount") }, option.optString("unit").takeIf { it.isNotBlank() }) } } }.orEmpty(),
         nutrients = nutrientsFromJson(json.getJSONObject("nutrients")),
         components = List(componentsJson.length()) { index -> recipeComponentFromJson(componentsJson.getJSONObject(index)) },
         frequency = json.optInt("frequency"),

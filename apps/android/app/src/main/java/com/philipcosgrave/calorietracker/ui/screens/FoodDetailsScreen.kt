@@ -15,22 +15,43 @@ import com.philipcosgrave.calorietracker.ui.components.*
 /** Reference view has no editable portion or meal state. Logging starts explicitly. */
 @Composable
 fun FoodDetailsScreen(food: FoodItem, onBack: () -> Unit, onEdit: () -> Unit,
-    onLog: () -> Unit, primaryLabel: String = "Add to Meal", onEditIngredient: ((FoodItem) -> Unit)? = null) {
+    onLog: () -> Unit, primaryLabel: String = "Add to Meal", onEditIngredient: ((FoodItem) -> Unit)? = null,
+    onDelete: (() -> Unit)? = null) {
     var section by rememberSaveable(food.id) { mutableStateOf("") }
     var ingredient by remember { mutableStateOf<FoodItem?>(null) }
     var cookStep by rememberSaveable(food.id) { mutableStateOf(-1) }
+    var deleteConfirmationVisible by rememberSaveable(food.id) { mutableStateOf(false) }
     ingredient?.let { item ->
         BackHandler { ingredient = null }
         FoodDetailsScreen(item, { ingredient = null }, { onEditIngredient?.invoke(item) }, { ingredient = null }, "Back to Recipe", onEditIngredient)
         return
     }
     val recipe = food.kind == FoodKind.Recipe
-    val portion = if (recipe) food.nutrients.scale(1.0 / food.servingQuantity) else food.nutrients
+    val recipeNutrients = if (recipe) {
+        val totals = totalComponents(food.components)
+        Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat, componentAdditionalNutrients(food.components))
+    } else food.nutrients
+    val portion = if (recipe) recipeNutrients.scale(1.0 / food.servingQuantity.coerceAtLeast(0.1)) else recipeNutrients
+    // Older CNF imports may have been saved before their raw measurement rows
+    // were reduced to named portions. Keep the settings detail view consistent
+    // with the editor without changing the user's stored food until they save it.
+    val servingConversions = if (food.source?.contains("CNF", ignoreCase = true) == true ||
+        food.source?.contains("Canadian Nutrient", ignoreCase = true) == true
+    ) normalizedCnfServingOptions(food.servingOptions) else food.servingOptions
     BackHandler(enabled = section.isNotEmpty()) { if (cookStep >= 0) cookStep = -1 else section = "" }
     Page(spacing = 12.dp) {
         PageHeader(if (section.isNotEmpty()) section else if (recipe) "Recipe Details" else "Ingredient Details",
             onBack = { if (section.isNotEmpty()) { if (cookStep >= 0) cookStep = -1 else section = "" } else onBack() },
-            actions = { if (section.isEmpty() && (primaryLabel != "Back to Recipe" || onEditIngredient != null)) TextButton(onClick = onEdit) { Text("Edit") } })
+            actions = {
+                if (section.isEmpty() && (primaryLabel != "Back to Recipe" || onEditIngredient != null)) {
+                    IconButton(onClick = onEdit) { BiteWiseIcon("Edit", modifier = Modifier.size(22.dp)) }
+                }
+                if (section.isEmpty() && onDelete != null) {
+                    IconButton(onClick = { deleteConfirmationVisible = true }) {
+                        BiteWiseIcon("Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                    }
+                }
+            })
         when (section) {
             "Ingredients" -> food.components.forEach { component ->
                 OutlinedCard(onClick = { ingredient = component.item }, Modifier.fillMaxWidth()) {
@@ -58,12 +79,25 @@ fun FoodDetailsScreen(food: FoodItem, onBack: () -> Unit, onEdit: () -> Unit,
                 }
             }
             "Nutrition Details" -> AdditionalNutrition(portion)
+            "Serving Conversions" -> {
+                Text("Serving conversions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                servingConversions.forEach { option ->
+                    AppCardContainer {
+                        Text(option.description, fontWeight = FontWeight.Medium)
+                        Text(
+                            option.amount?.let { amount -> "= ${formatAmount(amount)} ${option.unit}" }
+                                ?: "= ${formatAmount(option.grams)} g",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             else -> {
                 FoodPhoto(food.photoPath, Modifier.fillMaxWidth().height(180.dp))
                 Text(food.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                food.source?.let { Text("Source: Health Canada / $it ${food.sourceVersion.orEmpty()}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 if (food.brand.isNotBlank()) Text(food.brand)
                 if (food.description.isNotBlank()) Text(food.description)
-                Text(if (recipe) "${formatAmount(food.servingQuantity)} servings · Nutrition per serving" else "Nutrition per ${food.servingLabel}")
                 food.servingWeightGrams?.let { Text("${food.servingLabel} = ${formatAmount(it)} g") }
                 NutritionSummary(Totals(portion.calories, portion.proteinGrams, portion.carbohydrateGrams, portion.fatGrams))
                 if (recipe) {
@@ -71,12 +105,26 @@ fun FoodDetailsScreen(food: FoodItem, onBack: () -> Unit, onEdit: () -> Unit,
                     OutlinedButton(onClick = { section = "Ingredients" }, Modifier.fillMaxWidth()) { Text("Ingredients ›") }
                     OutlinedButton(onClick = { section = "Instructions" }, Modifier.fillMaxWidth()) { Text("Instructions ›") }
                 }
-                TextButton(onClick = { section = "Nutrition Details" }) { Text("View full nutrition details ›") }
+                OutlinedButton(onClick = { section = "Nutrition Details" }, modifier = Modifier.fillMaxWidth()) { Text("View full nutrition details ›") }
                 if (food.barcode.isNotBlank()) Text("Barcode: ${food.barcode}")
-                food.source?.let { Text("Source: Health Canada / $it ${food.sourceVersion.orEmpty()}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                food.servingOptions.forEach { Text("${it.description} = ${formatAmount(it.grams)} g") }
+                if (servingConversions.isNotEmpty()) {
+                    OutlinedButton(onClick = { section = "Serving Conversions" }, modifier = Modifier.fillMaxWidth()) { Text("Serving conversions ›") }
+                }
                 AppPrimaryButton(primaryLabel, onLog, Modifier.fillMaxWidth())
             }
         }
+    }
+    if (deleteConfirmationVisible && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { deleteConfirmationVisible = false },
+            title = { Text("Delete ${food.name}?") },
+            text = { Text("This will remove this ${if (recipe) "recipe" else "ingredient"} from your saved foods.") },
+            confirmButton = {
+                TextButton(onClick = { deleteConfirmationVisible = false; onDelete() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deleteConfirmationVisible = false }) { Text("Cancel") } },
+        )
     }
 }

@@ -7,6 +7,7 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
+import com.philipcosgrave.calorietracker.model.ReferenceServing
 import com.philipcosgrave.calorietracker.model.Totals
 import java.util.UUID
 import kotlin.math.round
@@ -15,7 +16,11 @@ private val volumeUnits = listOf("tsp", "tbsp", "fl oz", "cup", "pint", "quart",
 private val massUnits = listOf("milligram", "gram", "kg", "oz", "lb")
 private val itemUnits = listOf("slice", "piece", "egg", "wrap", "clove", "medium", "bar", "bottle", "box", "can", "container", "jar", "package", "service", "serving")
 
-val measurementUnits = volumeUnits + massUnits + itemUnits
+/** Units for nutrition-label and equivalent-amount fields. */
+val nutritionMeasurementUnits = volumeUnits + massUnits
+/** Named portions for servings, kept separate from physical measurement units. */
+val servingUnits = itemUnits
+val measurementUnits = nutritionMeasurementUnits + servingUnits
 
 private val conversionGroups = listOf(
     mapOf("tsp" to 1.0, "tbsp" to 3.0, "fl oz" to 6.0, "cup" to 48.0, "pint" to 96.0, "quart" to 192.0, "ml" to 0.202884, "liter" to 202.884),
@@ -56,6 +61,21 @@ fun compatibleMeasurementUnits(baseUnit: String): List<String> {
     } else {
         listOf(baseUnit)
     }
+}
+
+/** CNF often lists ordinary quantities (for example, "125 mL chopped") beside genuine portions.
+ * Keep only named portions and make them natural multiplier labels such as "medium fruit". */
+fun normalizedCnfServingOptions(options: List<ReferenceServing>): List<ReferenceServing> {
+    val measurementOnly = Regex("""^\s*\d+(?:\.\d+)?\s*(?:ml|mL|millilit(?:er|re)s?|g|grams?|kg|oz|lb|tsp|tbsp|cup|pint|quart|fl\s*oz)\b""", RegexOption.IGNORE_CASE)
+    val leadingOne = Regex("""^\s*1\s+""")
+    val parenthetical = Regex("""\s*\([^)]*\)""")
+    return options
+        .asSequence()
+        .filterNot { measurementOnly.containsMatchIn(it.description) }
+        .map { option -> option.copy(description = option.description.replace(leadingOne, "").replace(parenthetical, "").trim()) }
+        .filter { it.description.isNotBlank() }
+        .distinctBy { it.description.lowercase() }
+        .toList()
 }
 
 fun totalComponents(components: List<RecipeComponent>): Totals =
@@ -142,12 +162,22 @@ fun FoodItem.toRecipeDraft(): RecipeDraft = RecipeDraft(
 /** Converts physical weight only when this food defines an equivalent weight. */
 fun FoodItem.amountInBaseUnits(amount: Double, unit: String): Double? {
     convertAmount(amount, unit, servingUnit)?.let { return it }
+    servingOptions.firstOrNull { it.description == unit }?.let { option ->
+        option.amount?.let { equivalent -> option.unit?.let { equivalentUnit ->
+            convertAmount(amount * equivalent, equivalentUnit, servingUnit)?.let { return it }
+        } }
+    }
     val grams = servingOptions.firstOrNull { it.description == unit }?.let { amount * it.grams } ?: convertAmount(amount, unit, "g") ?: return null
     convertAmount(grams, "g", servingUnit)?.let { return it }
     return servingWeightGrams?.takeIf { it > 0 }?.let { grams / it * servingQuantity }
 }
 fun FoodItem.amountInGrams(amount: Double, unit: String): Double? {
-    servingOptions.firstOrNull { it.description == unit }?.let { return amount * it.grams }
+    servingOptions.firstOrNull { it.description == unit }?.let { option ->
+        option.amount?.let { equivalent -> option.unit?.let { equivalentUnit ->
+            convertAmount(amount * equivalent, equivalentUnit, "g")?.let { return it }
+        } }
+        if (option.grams > 0) return amount * option.grams
+    }
     convertAmount(amount, unit, "g")?.let { return it }
     val base = convertAmount(amount, unit, servingUnit) ?: return null
     return servingWeightGrams?.let { base / servingQuantity * it }

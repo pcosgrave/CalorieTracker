@@ -26,6 +26,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -67,13 +70,15 @@ fun SearchFoodScreen(
     onQuickCalories: () -> Unit,
     onScanBarcode: () -> Unit,
     onAddIngredient: () -> Unit,
+    onAddNewFood: () -> Unit = onAddIngredient,
     onAddRecipe: () -> Unit,
     onOpenLeftovers: () -> Unit = {},
     leftovers: List<com.philipcosgrave.calorietracker.domain.Leftover> = emptyList(),
     initialLeftovers: Boolean = false,
     allowLeftovers: Boolean = true,
     destinationMeal: com.philipcosgrave.calorietracker.model.Meal? = null,
-    onUseLeftover: suspend (com.philipcosgrave.calorietracker.domain.Leftover, LocalDate, com.philipcosgrave.calorietracker.model.Meal) -> Unit = { _, _, _ -> },
+    onUseLeftover: suspend (com.philipcosgrave.calorietracker.domain.Leftover, LocalDate, com.philipcosgrave.calorietracker.model.Meal, Double) -> Unit = { _, _, _, _ -> },
+    onDeleteLeftover: (com.philipcosgrave.calorietracker.domain.Leftover) -> Unit = {},
     localOnly: Boolean = true,
     onSelectFood: (FoodItem) -> Unit,
     onImportReference: suspend (FoodItem) -> FoodItem = { it },
@@ -91,6 +96,7 @@ fun SearchFoodScreen(
     onEditFood: (FoodItem) -> Unit,
     onPublishToCommunity: (FoodItem) -> Unit,
 ) {
+    val addingToMeal = destinationMeal != null
     var reference by remember { mutableStateOf<FoodItem?>(null) }
     var importing by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -109,13 +115,14 @@ fun SearchFoodScreen(
     }
     var showingLeftovers by rememberSaveable { mutableStateOf(initialLeftovers) }
     var selectedLeftoverId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDeleteLeftover by remember { mutableStateOf<com.philipcosgrave.calorietracker.domain.Leftover?>(null) }
     val selectedLeftover = leftovers.firstOrNull { it.id == selectedLeftoverId }
     if (selectedLeftover != null) {
         androidx.activity.compose.BackHandler { selectedLeftoverId = null }
         LogFoodScreen(food = com.philipcosgrave.calorietracker.domain.leftoverAsFood(selectedLeftover), date = date,
-            destinationMeal = destinationMeal, wholePortionOnly = true, subtitle = "Saved ${selectedLeftover.date}",
+            destinationMeal = destinationMeal, leftoverPercentageMode = true, subtitle = "Saved ${selectedLeftover.date}",
             onBack = { selectedLeftoverId = null },
-            onLog = { entry, _ -> onUseLeftover(selectedLeftover, entry.date, entry.meal); selectedLeftoverId = null })
+            onLog = { entry, _ -> onUseLeftover(selectedLeftover, entry.date, entry.meal, entry.servingMultiplier); selectedLeftoverId = null })
         return
     }
     var search by rememberSaveable { mutableStateOf("") }
@@ -209,19 +216,6 @@ fun SearchFoodScreen(
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                var sortExpanded by remember { mutableStateOf(false) }
-                Box {
-                    TextButton(onClick = { sortExpanded = true }) { Text(if (sortMode == SortMode.Frequency) "Frequent ⌄" else "Recent ⌄") }
-                    DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
-                        DropdownMenuItem(text = { Text("Recent") }, onClick = { sortMode = SortMode.Recent; sortExpanded = false })
-                        DropdownMenuItem(text = { Text("Frequent") }, onClick = { sortMode = SortMode.Frequency; sortExpanded = false })
-                        // TODO: Enable when favorite-food storage is available.
-                        DropdownMenuItem(text = { Text("Favorites · coming later") }, onClick = {}, enabled = false)
-                    }
-                }
-            }
-
             AppSegmentedControl(
                 options = if (allowLeftovers) listOf("Ingredient", "Recipe", "Leftovers") else listOf("Ingredient", "Recipe"),
                 selectedIndex = if (showingLeftovers) 2 else if (activeKind == FoodKind.Ingredient) 0 else 1,
@@ -235,16 +229,55 @@ fun SearchFoodScreen(
                 val matching = leftovers.filter { search.isBlank() || it.name.contains(search, true) || it.entries.any { entry -> entry.food.name.contains(search, true) } }.sortedByDescending { it.date }
                 if (matching.isEmpty()) Text("No saved leftovers.", color = AppMuted)
                 matching.forEach { leftover ->
-                    androidx.compose.material3.OutlinedCard(onClick = { selectedLeftoverId = leftover.id }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) { Text(leftover.name, fontWeight = FontWeight.Bold); Text(leftover.date.toString(), color = AppMuted, style = MaterialTheme.typography.bodySmall) }
-                            Text("›")
-                        }
-                    }
+                    FoodSearchRow(
+                        item = com.philipcosgrave.calorietracker.domain.leftoverAsFood(leftover),
+                        showCalories = true,
+                        onClick = { selectedLeftoverId = leftover.id },
+                        onDelete = { pendingDeleteLeftover = leftover },
+                    )
                 }
             } else {
-                if (allowLeftovers || activeKind == FoodKind.Ingredient) TextButton(onClick = if (activeKind == FoodKind.Ingredient) onAddIngredient else onAddRecipe) {
-                    Text(if (activeKind == FoodKind.Ingredient) "Create ingredient" else "Create recipe")
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (allowLeftovers || activeKind == FoodKind.Ingredient) {
+                        val createLabel = if (activeKind == FoodKind.Ingredient) "Create ingredient" else "Create recipe"
+                        FloatingActionButton(
+                            onClick = if (activeKind == FoodKind.Ingredient) onAddNewFood else onAddRecipe,
+                            modifier = Modifier.size(48.dp).semantics { contentDescription = createLabel },
+                            shape = CircleShape,
+                            containerColor = AppBlue,
+                            contentColor = Color.White,
+                        ) {
+                            androidx.compose.foundation.Canvas(Modifier.size(24.dp)) {
+                                val stroke = 2.dp.toPx()
+                                drawLine(Color.White, androidx.compose.ui.geometry.Offset(size.width / 2, 3.dp.toPx()), androidx.compose.ui.geometry.Offset(size.width / 2, size.height - 3.dp.toPx()), stroke, androidx.compose.ui.graphics.StrokeCap.Round)
+                                drawLine(Color.White, androidx.compose.ui.geometry.Offset(3.dp.toPx(), size.height / 2), androidx.compose.ui.geometry.Offset(size.width - 3.dp.toPx(), size.height / 2), stroke, androidx.compose.ui.graphics.StrokeCap.Round)
+                            }
+                        }
+                    }
+                    var sortExpanded by remember { mutableStateOf(false) }
+                    Box(Modifier.align(Alignment.CenterEnd)) {
+                        androidx.compose.material3.IconButton(
+                            onClick = { sortExpanded = true },
+                            modifier = Modifier.semantics { contentDescription = "Sort foods"; stateDescription = sortMode.label },
+                        ) {
+                            androidx.compose.foundation.Canvas(Modifier.size(24.dp)) {
+                                val stroke = 2.dp.toPx()
+                                fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(AppBlue,
+                                    androidx.compose.ui.geometry.Offset(size.width * x1, size.height * y1),
+                                    androidx.compose.ui.geometry.Offset(size.width * x2, size.height * y2), stroke, androidx.compose.ui.graphics.StrokeCap.Round)
+                                line(.3f, .85f, .3f, .15f)
+                                line(.1f, .35f, .3f, .15f); line(.3f, .15f, .5f, .35f)
+                                line(.7f, .15f, .7f, .85f)
+                                line(.5f, .65f, .7f, .85f); line(.7f, .85f, .9f, .65f)
+                            }
+                        }
+                        DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
+                            DropdownMenuItem(text = { Text(if (sortMode == SortMode.Recent) "✓ Recent" else "Recent") }, onClick = { sortMode = SortMode.Recent; sortExpanded = false })
+                            DropdownMenuItem(text = { Text(if (sortMode == SortMode.Frequency) "✓ Frequent" else "Frequent") }, onClick = { sortMode = SortMode.Frequency; sortExpanded = false })
+                            DropdownMenuItem(text = { Text(if (sortMode == SortMode.Alphabetical) "✓ Alphabetical" else "Alphabetical") }, onClick = { sortMode = SortMode.Alphabetical; sortExpanded = false })
+                            DropdownMenuItem(text = { Text("Favorites · coming later") }, onClick = {}, enabled = false)
+                        }
+                    }
                 }
             if (results.isEmpty()) {
                 Text("No matching foods.", color = AppMuted)
@@ -255,25 +288,16 @@ fun SearchFoodScreen(
                         showCalories = true,
                         onClick = { onSelectFood(item) },
                         onDoubleClick = { onQuickLogFood(item) },
-                        expanded = expandedFoodId == item.id,
-                        onToggleExpanded = {
-                            expandedFoodId = if (expandedFoodId == item.id) null else item.id
+                        expanded = !addingToMeal && expandedFoodId == item.id,
+                        onToggleExpanded = if (addingToMeal) null else {
+                            { expandedFoodId = if (expandedFoodId == item.id) null else item.id }
                         },
-                        onEdit = { onEditFood(item) },
-                        onDelete = { pendingDeleteFood = item },
+                        onEdit = if (addingToMeal) null else { { onEditFood(item) } },
+                        onDelete = if (addingToMeal) null else { { pendingDeleteFood = item } },
                     )
                 }
             }
 
-            }
-            if (!showingLeftovers && activeKind == FoodKind.Ingredient) {
-                com.philipcosgrave.calorietracker.ui.components.ReferenceLookupResults(search, foods,
-                    onSelect = { reference = it }, onEmpty = {
-                        TextButton(onClick = onScanBarcode) { Text("Scan Barcode") }
-                        TextButton(onClick = onPhoto) { Text("Scan Nutrition Label / Photo") }
-                        TextButton(onClick = onVoice) { Text("Speak Food") }
-                        TextButton(onClick = onAddIngredient) { Text("Enter Manually") }
-                    })
             }
             if (!showingLeftovers && shouldShowRemoteSearch) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -380,6 +404,19 @@ fun SearchFoodScreen(
                     Text("Cancel")
                 }
             },
+        )
+    }
+    pendingDeleteLeftover?.let { leftover ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteLeftover = null },
+            title = { Text("Delete ${leftover.name}?") },
+            text = { Text("This saved leftover will be permanently removed.") },
+            confirmButton = {
+                TextButton(onClick = { pendingDeleteLeftover = null; onDeleteLeftover(leftover) }) {
+                    Text("Delete", color = Color(0xFFFF5449), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeleteLeftover = null }) { Text("Cancel") } },
         )
     }
 }

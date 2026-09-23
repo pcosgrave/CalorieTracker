@@ -12,7 +12,7 @@ import com.philipcosgrave.calorietracker.ui.components.*
 
 @Composable
 fun ManageFoodsScreen(foods: List<FoodItem>, onBack: () -> Unit, onAddFood: () -> Unit,
-    onAddRecipe: () -> Unit, onEdit: (FoodItem) -> Unit, onDelete: (FoodItem) -> Unit) {
+    onAddRecipe: () -> Unit, onEdit: (FoodItem) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var recipes by rememberSaveable { mutableStateOf(false) }
     Page {
@@ -23,14 +23,17 @@ fun ManageFoodsScreen(foods: List<FoodItem>, onBack: () -> Unit, onAddFood: () -
         }
         AppFormField(query, { query = it }, "Search known foods and recipes", Modifier.fillMaxWidth())
         AppSegmentedControl(listOf("Foods", "Recipes"), if (recipes) 1 else 0, { recipes = it == 1 })
-        Text("Tap to view details. Swipe left to delete.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Tap an item to view, edit, or delete it.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         val results = foods.filter { (it.kind == FoodKind.Recipe) == recipes &&
             (it.name.contains(query, true) || it.brand.contains(query, true)) }.sortedBy { it.name.lowercase() }
         if (results.isEmpty()) Text("No ${if (recipes) "recipes" else "foods"} found.")
         results.forEach { food ->
             key(food.id) {
-                FoodSearchRow(item = food.copy(name = foodTitle(food.name)), showCalories = true, onClick = { onEdit(food) },
-                    onEdit = { onEdit(food) }, onDelete = { onDelete(food) })
+                FoodSearchRow(
+                    item = food.copy(name = foodTitle(food.name)),
+                    showCalories = true,
+                    onClick = { onEdit(food) },
+                )
             }
         }
     }

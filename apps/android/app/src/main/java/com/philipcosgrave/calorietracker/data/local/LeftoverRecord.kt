@@ -21,7 +21,7 @@ interface LeftoverDao {
     suspend fun list(owner: String): List<LeftoverRecord>
     @Query("SELECT * FROM leftovers WHERE id = :id AND ownerUserId = :owner")
     suspend fun get(id: String, owner: String): LeftoverRecord?
-    @Insert suspend fun insert(record: LeftoverRecord)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(record: LeftoverRecord)
     @Query("DELETE FROM leftovers WHERE id = :id AND ownerUserId = :owner")
     suspend fun delete(id: String, owner: String): Int
 }

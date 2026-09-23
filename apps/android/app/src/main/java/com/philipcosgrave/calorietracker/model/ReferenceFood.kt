@@ -1,6 +1,13 @@
 package com.philipcosgrave.calorietracker.model
 
-data class ReferenceServing(val id: String, val description: String, val grams: Double)
+data class ReferenceServing(
+    val id: String,
+    val description: String,
+    val grams: Double,
+    /** Original equivalent amount when a serving is based on volume rather than mass. */
+    val amount: Double? = null,
+    val unit: String? = null,
+)
 
 data class ReferenceFood(
     val id: String,

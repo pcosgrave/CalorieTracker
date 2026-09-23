@@ -3,6 +3,7 @@ package com.philipcosgrave.calorietracker.data.remote
 import com.philipcosgrave.calorietracker.model.FoodItem
 import com.philipcosgrave.calorietracker.model.FoodKind
 import com.philipcosgrave.calorietracker.model.Nutrients
+import com.philipcosgrave.calorietracker.model.ReferenceServing
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
@@ -62,13 +63,14 @@ class CanadianNutrientFileLookupService {
         if (per100Grams) return FoodItem(
             id = "cnf-${summary.foodCode}", kind = FoodKind.Ingredient,
             name = summary.description, servingQuantity = 100.0, servingUnit = "g",
-            nutrients = nutrients, isUserCreated = false,
+            nutrients = nutrients, source = "CNF", sourceId = summary.foodCode.toString(), isUserCreated = false,
         )
 
         val servingResponse = getJson(
             "$CanadianNutrientFileBaseUrl/servingsize/?lang=en&type=json&id=${summary.foodCode}",
         )
         val serving = parseServing(jsonArrayFromResponse(servingResponse))
+        val servingOptions = parseServingOptions(jsonArrayFromResponse(servingResponse))
 
         return FoodItem(
             id = "cnf-${summary.foodCode}",
@@ -79,6 +81,9 @@ class CanadianNutrientFileLookupService {
             servingQuantity = serving.quantity,
             servingUnit = serving.unit,
             nutrients = nutrients.scale(serving.conversionFactor),
+            source = "CNF",
+            sourceId = summary.foodCode.toString(),
+            servingOptions = servingOptions,
             isUserCreated = false,
         )
     }
@@ -99,6 +104,13 @@ class CanadianNutrientFileLookupService {
         val unit = quantityMatch?.groupValues?.getOrNull(2)?.trim().orEmpty().ifBlank { "g" }
         return CnfServing(quantity = quantity, unit = unit, conversionFactor = conversionFactor)
     }
+
+    private fun parseServingOptions(items: List<JSONObject>): List<ReferenceServing> =
+        items.mapIndexedNotNull { index, item ->
+            val description = item.optString("measure_name").trim()
+            val factor = item.optDouble("conversion_factor_value").takeIf { it.isFinite() && it > 0 } ?: return@mapIndexedNotNull null
+            description.takeIf { it.isNotBlank() }?.let { ReferenceServing("cnf-serving-$index", it, factor * 100.0) }
+        }
 
     private fun jsonArrayFromResponse(response: Any?): List<JSONObject> =
         when (response) {

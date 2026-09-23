@@ -137,19 +137,19 @@ fun DiaryScreen(
         com.philipcosgrave.calorietracker.ui.components.ExpandableNutritionSummary(totals, targetRangeMin, targetRangeMax)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {
-                Button(onClick = onAddFood, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) { Text("⊕ Add Food", style = MaterialTheme.typography.labelMedium) }
+                Button(onClick = onAddFood, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+                    Text("+", style = MaterialTheme.typography.headlineMedium)
+                }
                 DropdownMenu(choosingAddMeal, { choosingAddMeal = false }) { Meal.entries.forEach { meal ->
                     DropdownMenuItem(text = { Text(meal.label) }, onClick = { choosingAddMeal = false; onAddMealFood(meal) })
                 } }
             }
-            OutlinedButton(onClick = onOpenCopyMeals, enabled = entries.isNotEmpty(), modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
-                com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Copy", modifier = Modifier.size(18.dp))
-                Text(" Copy", style = MaterialTheme.typography.labelMedium)
+            OutlinedButton(onClick = onOpenCopyMeals, enabled = entries.isNotEmpty(), modifier = Modifier.weight(1f).height(56.dp).semantics { contentDescription = "Copy" }, shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+                com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Copy", modifier = Modifier.size(32.dp))
             }
             Box(Modifier.weight(1f)) {
-                OutlinedButton(onClick = { choosingLeftoverMeal = true }, enabled = selectedEntries.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
-                    com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Leftover", modifier = Modifier.size(18.dp))
-                    Text(" Create\nLeftover", style = MaterialTheme.typography.labelMedium)
+                OutlinedButton(onClick = { choosingLeftoverMeal = true }, enabled = selectedEntries.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(56.dp).semantics { contentDescription = "Create leftover" }, shape = RoundedCornerShape(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+                    com.philipcosgrave.calorietracker.ui.components.BiteWiseIcon("Leftover", modifier = Modifier.size(32.dp))
                 }
                 DropdownMenu(choosingLeftoverMeal, { choosingLeftoverMeal = false }) {
                     Meal.entries.filter { meal -> selectedEntries.any { it.meal == meal } }.forEach { meal ->

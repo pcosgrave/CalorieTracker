@@ -155,7 +155,7 @@ fun PageHeader(
             TextButton(onClick = onBack) { Text("‹", color = AppBlue, style = MaterialTheme.typography.headlineSmall) }
             Box(modifier = Modifier.weight(1f))
             Row(
-                modifier = Modifier.width(72.dp),
+                modifier = Modifier.padding(end = 4.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
                 content = actions,
@@ -474,7 +474,7 @@ fun OverflowMenu(
             Text("\u22EE", color = AppMuted)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("Edit") }, onClick = { expanded = false; onEdit() })
+            DropdownMenuItem(text = { BiteWiseIcon("Edit", modifier = Modifier.size(22.dp)) }, onClick = { expanded = false; onEdit() })
             DropdownMenuItem(text = { Text("Delete") }, onClick = { expanded = false; onDelete() })
         }
     }
