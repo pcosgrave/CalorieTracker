@@ -8,4 +8,8 @@ public sealed class CognitoOptions
 
     [Required]
     public string? UserPoolId { get; set; }
+
+    public string? Region { get; set; }
+
+    public string? ClientId { get; set; }
 }

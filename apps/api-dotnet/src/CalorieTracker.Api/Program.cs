@@ -19,6 +19,9 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseExceptionHandler();
 
 app.MapGet("/", () => Results.Ok(new
@@ -50,5 +53,6 @@ app.MapWeightEndpoints();
 app.MapSyncEndpoints();
 app.MapAiEndpoints();
 app.MapAccountEndpoints();
+app.MapV1HouseholdEndpoints();
 
 app.Run();

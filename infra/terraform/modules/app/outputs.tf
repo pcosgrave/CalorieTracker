@@ -50,6 +50,14 @@ output "app_storage_kms_alias" {
   value = aws_kms_alias.app_storage.name
 }
 
+output "database_endpoint" {
+  value = aws_db_instance.main.address
+}
+
+output "database_secret_arn" {
+  value = aws_db_instance.main.master_user_secret[0].secret_arn
+}
+
 output "api_gateway_rest_api_id" {
   value = var.create_api ? aws_api_gateway_rest_api.main[0].id : null
 }

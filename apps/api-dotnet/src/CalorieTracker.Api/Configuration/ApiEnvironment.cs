@@ -10,5 +10,6 @@ public static class ApiEnvironment
         "WEIGHT_ENTRIES_TABLE_NAME",
         "SYNC_CHANGES_TABLE_NAME",
         "USER_POOL_ID",
+        "DATABASE_CONNECTION_STRING",
     ];
 }

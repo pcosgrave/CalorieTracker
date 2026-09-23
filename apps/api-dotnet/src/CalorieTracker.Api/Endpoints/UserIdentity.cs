@@ -16,15 +16,6 @@ internal static class UserIdentity
             return claim;
         }
 
-        if (context.Request.Headers.TryGetValue("X-User-Id", out var headerValue))
-        {
-            var value = headerValue.ToString().Trim();
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-        }
-
         return null;
     }
 

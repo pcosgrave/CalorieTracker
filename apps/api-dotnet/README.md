@@ -44,3 +44,14 @@ dotnet restore .\CalorieTracker.Api.sln --configfile .\NuGet.Config
 dotnet build .\CalorieTracker.Api.sln --no-restore
 dotnet test .\CalorieTracker.Api.sln --no-build
 ```
+
+## PostgreSQL and households
+
+The first `/v1/households` slice requires `DATABASE_CONNECTION_STRING` for local development,
+or `DATABASE_SECRET_ARN` in AWS. Apply `database/001_initial_schema.sql` before starting the
+API. Cognito JWT validation is enabled for `/v1` routes; the legacy `X-User-Id` development
+bypass is intentionally not supported.
+
+Household reads are membership-scoped and household creation inserts the user profile,
+settings row, household, and owner membership in one PostgreSQL transaction. Private user
+records remain user-scoped and are not exposed by household membership.

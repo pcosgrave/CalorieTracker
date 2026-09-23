@@ -5,6 +5,9 @@ using CalorieTracker.Api.Services.Account;
 using CalorieTracker.Api.Services.Ai;
 using CalorieTracker.Api.Services.Diary;
 using Microsoft.Extensions.Options;
+using Npgsql;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Text.Json;
 using CalorieTracker.Api.Services.Foods;
 using CalorieTracker.Api.Services.Sync;
 using CalorieTracker.Api.Services.Weights;
@@ -65,6 +68,44 @@ public static class ApiConfiguration
         services.AddSingleton<WeightService>();
         services.AddSingleton<SyncService>();
         services.AddSingleton<AccountService>();
+        services.AddOptions<DatabaseOptions>()
+            .BindConfiguration(DatabaseOptions.SectionName)
+            .PostConfigure(options =>
+            {
+                options.ConnectionString ??= configuration["DATABASE_CONNECTION_STRING"];
+                options.SecretArn ??= configuration["DATABASE_SECRET_ARN"];
+            })
+            .ValidateDataAnnotations()
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString) || !string.IsNullOrWhiteSpace(options.SecretArn), "Database connection string or secret ARN is required.")
+            .ValidateOnStart();
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                var region = configuration["AWS_REGION"] ?? configuration["AWS_DEFAULT_REGION"] ?? "us-east-1";
+                var userPoolId = configuration["USER_POOL_ID"];
+                options.Authority = $"https://cognito-idp.{region}.amazonaws.com/{userPoolId}";
+                options.TokenValidationParameters.ValidateIssuer = true;
+                options.TokenValidationParameters.ValidateLifetime = true;
+                options.TokenValidationParameters.ValidateAudience = false;
+            });
+        services.AddAuthorization();
+        services.AddSingleton(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            var connectionString = options.ConnectionString;
+            if (string.IsNullOrWhiteSpace(connectionString) && !string.IsNullOrWhiteSpace(options.SecretArn))
+            {
+                var secret = sp.GetRequiredService<IAmazonSecretsManager>()
+                    .GetSecretValueAsync(new Amazon.SecretsManager.Model.GetSecretValueRequest { SecretId = options.SecretArn })
+                    .GetAwaiter().GetResult();
+                connectionString = secret.SecretString;
+                if (!string.IsNullOrWhiteSpace(connectionString) && connectionString.TrimStart().StartsWith("{"))
+                    connectionString = JsonDocument.Parse(connectionString).RootElement.GetProperty("connectionString").GetString();
+            }
+            return NpgsqlDataSource.Create(connectionString!);
+        });
+        services.AddSingleton<Services.Households.HouseholdService>();
 
         return services;
     }

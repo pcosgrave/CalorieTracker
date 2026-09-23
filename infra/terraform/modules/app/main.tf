@@ -16,6 +16,7 @@ locals {
       WEIGHT_ENTRIES_TABLE_NAME  = aws_dynamodb_table.weight_entries.name
       SYNC_CHANGES_TABLE_NAME    = aws_dynamodb_table.sync_changes.name
       USER_POOL_ID               = aws_cognito_user_pool.main.id
+      DATABASE_SECRET_ARN        = aws_db_instance.main.master_user_secret[0].secret_arn
     },
     var.gemini_api_secret_arn != null && trimspace(var.gemini_api_secret_arn) != "" ? {
       GEMINI_API_SECRET_ARN = var.gemini_api_secret_arn
@@ -37,6 +38,17 @@ locals {
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
+
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
 
 resource "aws_kms_key" "app_storage" {
   description             = "Customer managed KMS key for ${local.name_prefix} application storage"
@@ -370,6 +382,63 @@ resource "aws_cloudwatch_log_group" "api_lambdas" {
   tags = local.tags
 }
 
+resource "aws_security_group" "database" {
+  name_prefix = "${local.name_prefix}-db-"
+  description = "Allow API Lambda access to PostgreSQL"
+  vpc_id      = data.aws_vpc.default.id
+  tags        = local.tags
+}
+
+resource "aws_security_group" "api_lambda" {
+  name_prefix = "${local.name_prefix}-api-"
+  description = "API Lambda network access"
+  vpc_id      = data.aws_vpc.default.id
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = local.tags
+}
+
+resource "aws_security_group_rule" "database_from_lambda" {
+  type                     = "ingress"
+  security_group_id        = aws_security_group.database.id
+  source_security_group_id = aws_security_group.api_lambda.id
+  protocol                 = "tcp"
+  from_port                = 5432
+  to_port                  = 5432
+}
+
+resource "aws_db_subnet_group" "main" {
+  name       = "${local.name_prefix}-db"
+  subnet_ids = data.aws_subnets.default.ids
+  tags       = local.tags
+}
+
+resource "aws_db_instance" "main" {
+  identifier                  = "${local.name_prefix}-postgres"
+  engine                      = "postgres"
+  instance_class              = var.database_instance_class
+  allocated_storage           = var.database_allocated_storage_gb
+  max_allocated_storage       = 100
+  db_name                     = var.database_name
+  username                    = "bitewise_admin"
+  manage_master_user_password = true
+  db_subnet_group_name        = aws_db_subnet_group.main.name
+  vpc_security_group_ids      = [aws_security_group.database.id]
+  publicly_accessible         = false
+  multi_az                    = false
+  storage_encrypted           = true
+  kms_key_id                  = aws_kms_key.app_storage.arn
+  backup_retention_period     = 7
+  skip_final_snapshot         = var.environment != "prod"
+  deletion_protection         = var.environment == "prod"
+  apply_immediately           = var.environment != "prod"
+  tags                        = local.tags
+}
+
 resource "aws_iam_role" "api_lambda" {
   count = var.create_api ? 1 : 0
 
@@ -464,7 +533,14 @@ resource "aws_iam_role_policy" "api_lambda" {
           ]
           Resource = var.gemini_api_secret_arn
         }
-      ] : []
+      ] : [],
+      [
+        {
+          Effect   = "Allow"
+          Action   = ["secretsmanager:GetSecretValue"]
+          Resource = aws_db_instance.main.master_user_secret[0].secret_arn
+        }
+      ]
     )
   })
 }
@@ -480,6 +556,11 @@ resource "aws_lambda_function" "api" {
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
   memory_size      = var.lambda_memory_mb
+
+  vpc_config {
+    subnet_ids         = data.aws_subnets.default.ids
+    security_group_ids = [aws_security_group.api_lambda.id]
+  }
 
   environment {
     variables = local.lambda_environment

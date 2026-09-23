@@ -113,3 +113,21 @@ variable "manage_lambda_log_groups" {
   type        = bool
   default     = false
 }
+
+variable "database_instance_class" {
+  description = "RDS PostgreSQL instance class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "database_allocated_storage_gb" {
+  description = "Initial encrypted RDS storage in GiB."
+  type        = number
+  default     = 20
+}
+
+variable "database_name" {
+  description = "Initial PostgreSQL database name."
+  type        = string
+  default     = "bitewise"
+}

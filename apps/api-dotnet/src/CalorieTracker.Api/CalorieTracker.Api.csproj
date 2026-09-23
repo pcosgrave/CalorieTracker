@@ -11,6 +11,8 @@
     <PackageReference Include="AWSSDK.CognitoIdentityProvider" Version="4.0.4.1" />
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.7.1" />
     <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.20" />
+    <PackageReference Include="Npgsql" Version="8.0.6" />
   </ItemGroup>
 
 </Project>
