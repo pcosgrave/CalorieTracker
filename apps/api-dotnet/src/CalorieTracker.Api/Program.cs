@@ -19,10 +19,8 @@ builder.Services
 
 var app = builder.Build();
 
-app.UseAuthentication();
-app.UseAuthorization();
-
 app.UseExceptionHandler();
+app.Use(async (context, next) => { context.Response.Headers["X-Correlation-Id"] = context.TraceIdentifier; await next(); });
 
 app.MapGet("/", () => Results.Ok(new
 {
@@ -53,6 +51,6 @@ app.MapWeightEndpoints();
 app.MapSyncEndpoints();
 app.MapAiEndpoints();
 app.MapAccountEndpoints();
-app.MapV1HouseholdEndpoints();
+app.MapV1Endpoints();
 
 app.Run();

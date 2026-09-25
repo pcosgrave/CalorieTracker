@@ -27,7 +27,7 @@ internal static class UserIdentity
             return null;
         }
 
-        return Results.Json(new { message = "Authentication is required" }, statusCode: StatusCodes.Status401Unauthorized);
+        return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Authentication required", detail: "A verified Cognito identity is required.", extensions: new Dictionary<string, object?> { ["code"] = "authentication_required", ["correlationId"] = context.TraceIdentifier });
     }
 
     public static bool TryRequireUserId(HttpContext context, out string userId, out IResult? unauthorizedResult)

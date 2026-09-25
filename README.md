@@ -117,6 +117,27 @@ npm run typecheck --workspace @calorie-tracker/api
 
 Run the main repository checks from the root:
 
+## New-chat feature workflow
+
+Start each feature in its own chat and Git worktree. From a new chat, use:
+
+```text
+Start a feature called <feature-name>. Create a new worktree from main,
+use the codex/<feature-name> branch convention, and keep this chat dedicated
+to that feature.
+```
+
+The chat runs `scripts/start-feature.ps1`, which creates or discovers the worktree without copying uncommitted changes from the base checkout. Multiple chats can work concurrently in separate worktrees.
+
+When the feature is ready, say:
+
+```text
+Complete this feature. Run the required tests, commit the feature changes,
+push the branch, and open a PR targeting main. Do not merge it.
+```
+
+The completion workflow runs tests, typecheck, and lint before committing. Install and authenticate the GitHub CLI (`gh`) for automatic PR creation.
+
 ```bash
 npm run typecheck
 git diff --check
