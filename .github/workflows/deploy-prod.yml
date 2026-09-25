@@ -1,12 +1,12 @@
-name: Deploy Prod
+name: Deploy Android Prod
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - prod
+  workflow_run:
+    workflows:
+      - Deploy Backend Prod
     types:
-      - closed
+      - completed
 
 permissions:
   contents: write
@@ -15,26 +15,27 @@ permissions:
 jobs:
   guard:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_run'
     steps:
-      - name: Ensure this workflow runs for dev merged into prod
+      - name: Ensure the backend deployment succeeded on prod
         run: |
-          if [ "${{ github.event.pull_request.base.ref }}" != "prod" ]; then
-            echo "This workflow must run for PRs merged into prod. Base branch: ${{ github.event.pull_request.base.ref }}"
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "The backend production deployment did not succeed."
             exit 1
           fi
-          if [ "${{ github.event.pull_request.head.ref }}" != "dev" ]; then
-            echo "This workflow only accepts dev -> prod merges. Head branch: ${{ github.event.pull_request.head.ref }}"
+          if [ "${{ github.event.workflow_run.head_branch }}" != "dev" ]; then
+            echo "The backend deployment was not triggered by the expected dev -> prod promotion. Branch: ${{ github.event.workflow_run.head_branch }}"
             exit 1
           fi
 
   deploy:
     needs: guard
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true) && (github.event_name != 'pull_request' || needs.guard.result == 'success')
+    if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && needs.guard.result == 'success'))
     uses: ./.github/workflows/_deploy-mobile-and-infra.yml
     with:
       github_environment: prod
       terraform_environment: prod
+      deploy_infrastructure: false
       android_flavor: prod
       android_package_name: com.cosgravelabs.bitewise
       play_track: production
