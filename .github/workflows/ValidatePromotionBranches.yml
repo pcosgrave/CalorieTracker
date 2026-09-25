@@ -1,0 +1,24 @@
+name: Validate Promotion Branches
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - prod
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate promotion source
+        shell: bash
+        run: |
+          if [ "${{ github.base_ref }}" = "dev" ] && [ "${{ github.head_ref }}" != "main" ]; then
+            echo "Only main may merge into dev."
+            exit 1
+          fi
+
+          if [ "${{ github.base_ref }}" = "prod" ] && [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "Only dev may merge into prod."
+            exit 1
+          fi
