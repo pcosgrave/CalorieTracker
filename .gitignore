@@ -31,3 +31,5 @@ apps/api-dotnet/tests/CalorieTracker.Api.Tests/bin
 apps/api-dotnet/tests/CalorieTracker.Api.Tests/obj
 apps/api-dotnet/src/CalorieTracker.Api/bin
 apps/api-dotnet/src/CalorieTracker.Api/obj
+infra/terraform/environments/dev/backend.hcl
+infra/terraform/environments/prod/backend.hcl
