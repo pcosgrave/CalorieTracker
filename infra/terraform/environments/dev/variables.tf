@@ -101,9 +101,3 @@ variable "google_authorize_scopes" {
   default     = "openid email profile"
 }
 
-variable "gemini_api_secret_arn" {
-  description = "Optional Secrets Manager ARN for the Gemini API secret."
-  type        = string
-  default     = null
-  sensitive   = true
-}

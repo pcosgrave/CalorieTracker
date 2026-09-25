@@ -2,7 +2,6 @@
 
 This repo now has three GitHub Actions workflows:
 
-- [`.github/workflows/deploy-dev-internal.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-dev-internal.yml)
 - [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml)
 - [`.github/workflows/_deploy-mobile-and-infra.yml`](/D:/Projects/CalorieTracker/.github/workflows/_deploy-mobile-and-infra.yml)
 
@@ -17,8 +16,8 @@ The intended branch model is:
   - when a PR into `dev` is merged, GitHub Actions automatically deploys dev
   - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/dev`
-  - builds Android `prodRelease` against the dev environment config
-  - uploads `com.cosgravelabs.bitewise` to the Google Play `internal` track
+  - deploys backend and infrastructure only
+  - never uploads an Android build to Google Play
 
 - `prod` branch
   - receives PRs from `dev` only
@@ -27,6 +26,8 @@ The intended branch model is:
   - applies `infra/terraform/environments/prod`
   - builds Android `prodRelease`
   - uploads `com.cosgravelabs.bitewise` to the Google Play `production` track
+
+All Play Store builds, including internal or closed-test builds, must use the production backend and production Android/Cognito configuration. Local development builds use the `dev` flavor and are installed directly on an emulator or device.
 
 ## 1. Create The Branches
 
@@ -332,7 +333,6 @@ Paste that into:
 1. Merge these workflow files into `main`.
 2. Either:
    - open a PR from `main` into `dev` and merge it, or
-   - open the `Deploy Dev Internal` workflow in the Actions tab and run it manually from the `dev` branch.
 3. Watch the workflow run.
 
 Expected result:
@@ -360,7 +360,6 @@ Expected result:
 - The prod workflow currently uploads directly to the `production` track.
 - If you want a safer first rollout, change [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
 - Deploys can be triggered either by merging the expected PR flow or by manual workflow dispatch.
-- `Deploy Dev Internal` only accepts `main -> dev` merges.
 - `Deploy Prod` only accepts `dev -> prod` merges.
 - Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
 - Prod deploys now auto-bump the Android release version inside CI only and create a tag like `android-prod-v0.1.2+3`.

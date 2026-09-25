@@ -9,6 +9,10 @@ on:
       terraform_environment:
         required: true
         type: string
+      deploy_infrastructure:
+        required: false
+        type: boolean
+        default: true
       android_config_environment:
         required: false
         type: string
@@ -53,9 +57,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          ref: ${{ github.event_name == 'workflow_run' && 'prod' || github.event.pull_request.base.ref || github.ref_name }}
 
       - name: Set up .NET
+        if: ${{ inputs.deploy_infrastructure }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
@@ -67,11 +72,13 @@ jobs:
           java-version: 17
 
       - name: Set up Terraform
+        if: ${{ inputs.deploy_infrastructure }}
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
 
       - name: Configure AWS credentials
+        if: ${{ inputs.deploy_infrastructure }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -89,6 +96,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Restore Terraform plugin cache
+        if: ${{ inputs.deploy_infrastructure }}
         uses: actions/cache@v4
         with:
           path: |
@@ -98,6 +106,7 @@ jobs:
             ${{ runner.os }}-terraform-
 
       - name: Prepare Terraform backend and variables
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         env:
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
@@ -166,6 +175,7 @@ jobs:
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
 
       - name: Show Terraform backend target
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: |
           Write-Host "Terraform environment: ${{ inputs.terraform_environment }}"
@@ -173,18 +183,22 @@ jobs:
           Get-Content "infra/terraform/environments/${{ inputs.terraform_environment }}/backend.ci.hcl"
 
       - name: Build API Lambda package
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-dotnet-lambda.ps1
 
       - name: Terraform init
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
 
       - name: Show Terraform state addresses
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} state list
 
       - name: Terraform apply
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} apply -auto-approve -var-file="ci.auto.tfvars"
 

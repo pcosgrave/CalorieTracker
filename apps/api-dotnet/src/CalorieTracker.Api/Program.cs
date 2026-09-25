@@ -49,7 +49,6 @@ app.MapFoodEndpoints();
 app.MapDiaryEndpoints();
 app.MapWeightEndpoints();
 app.MapSyncEndpoints();
-app.MapAiEndpoints();
 app.MapAccountEndpoints();
 app.MapV1Endpoints();
 

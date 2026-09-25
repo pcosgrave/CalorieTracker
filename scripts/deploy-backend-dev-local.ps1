@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$ProjectRoot = "",
+    [string]$CognitoDomainPrefix = "cosgravelabs-bitewise-dev",
     [switch]$PlanOnly,
     [switch]$SkipTerraformInit
 )
@@ -36,8 +37,11 @@ if (-not (Test-Path (Join-Path $terraformRoot "backend.hcl"))) {
 }
 
 $awsRegion = if ($env:AWS_REGION) { $env:AWS_REGION } else { "us-east-1" }
-$appName = if ($env:TF_APP_NAME) { $env:TF_APP_NAME } else { "calorie-tracker" }
-$cognitoDomainPrefix = if ($env:TF_COGNITO_DOMAIN_PREFIX) { $env:TF_COGNITO_DOMAIN_PREFIX } else { "" }
+$appName = if ($env:TF_APP_NAME) { $env:TF_APP_NAME } else { "bitewise" }
+$cognitoDomainPrefix = if ($env:TF_COGNITO_DOMAIN_PREFIX) { $env:TF_COGNITO_DOMAIN_PREFIX } else { $CognitoDomainPrefix }
+if ([string]::IsNullOrWhiteSpace($cognitoDomainPrefix) -or $cognitoDomainPrefix -match "replace-with|^cognito$") {
+    throw "Set TF_COGNITO_DOMAIN_PREFIX to a unique, non-reserved Cognito domain prefix before deploying."
+}
 $webCallbackUrl = if ($env:TF_WEB_CALLBACK_URL) { $env:TF_WEB_CALLBACK_URL } else { "http://localhost:3000/auth/callback" }
 $webLogoutUrl = if ($env:TF_WEB_LOGOUT_URL) { $env:TF_WEB_LOGOUT_URL } else { "http://localhost:3000/" }
 $geminiSecretArn = if ($env:TF_GEMINI_API_SECRET_ARN) { $env:TF_GEMINI_API_SECRET_ARN } else { "" }
@@ -62,7 +66,7 @@ $buildScript = Join-Path $ProjectRoot "scripts\build-api-dotnet-lambda.ps1"
 & powershell -ExecutionPolicy Bypass -File $buildScript
 if ($LASTEXITCODE -ne 0) { throw "Lambda package build failed." }
 
-$lines | Set-Content -Path $variablesPath -Encoding utf8NoBOM
+$lines | Set-Content -Path $variablesPath -Encoding UTF8
 try {
     Push-Location $ProjectRoot
     if (-not $SkipTerraformInit) {

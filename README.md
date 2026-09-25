@@ -146,13 +146,19 @@ Local Android debug builds use the `dev` flavor and the `CT_DEV_*` values in `ap
 .\scripts\build-android-dev.ps1
 ```
 
-The local development backend can be deployed from the current working tree, including uncommitted changes:
+The local development backend can be deployed from the current working tree, including uncommitted changes. Its defaults match the GitHub `dev` environment (`TF_APP_NAME=bitewise` and `TF_COGNITO_DOMAIN_PREFIX=cosgravelabs-bitewise-dev`):
 
 ```powershell
 .\scripts\deploy-backend-dev-local.ps1
 ```
 
 This builds the current .NET Lambda package, runs Terraform against the shared `dev` state, and applies the dev environment. It does not commit or push Git changes. Use `-PlanOnly` to preview changes. AWS credentials and Terraform access must already be configured locally.
+
+The script uses `cosgravelabs-bitewise-dev` as the default Cognito domain prefix, matching the GitHub `dev` environment. Override it if needed:
+
+```powershell
+.\scripts\deploy-backend-dev-local.ps1 -CognitoDomainPrefix cosgravelabs-bitewise-dev-philip
+```
 
 Play Store bundles use the `prod` Android flavor and should use `CT_PROD_*` values, including the production API and Cognito client:
 

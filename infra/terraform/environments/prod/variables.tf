@@ -82,6 +82,25 @@ variable "log_retention_days" {
   default     = 30
 }
 
+variable "web_hosting_repository" {
+  description = "GitHub repository URL for the production web app."
+  type        = string
+  default     = "https://github.com/pcosgrave/CalorieTracker"
+}
+
+variable "web_hosting_access_token" {
+  description = "GitHub token for AWS Amplify repository access. Set with TF_VAR_web_hosting_access_token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "web_hosting_branch" {
+  description = "Git branch deployed to the production web host."
+  type        = string
+  default     = "main"
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
@@ -101,9 +120,3 @@ variable "google_authorize_scopes" {
   default     = "openid email profile"
 }
 
-variable "gemini_api_secret_arn" {
-  description = "Optional Secrets Manager ARN for the Gemini API secret."
-  type        = string
-  default     = null
-  sensitive   = true
-}

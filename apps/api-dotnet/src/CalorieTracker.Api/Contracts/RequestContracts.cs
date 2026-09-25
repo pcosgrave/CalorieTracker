@@ -48,7 +48,3 @@ public sealed record UpdateWeightEntryRequest(
     double WeightKg,
     string? Source);
 
-public sealed record AiFoodLogParseRequest(
-    string Transcript,
-    DateOnly Date,
-    string FallbackMeal);
