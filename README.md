@@ -117,6 +117,57 @@ npm run typecheck --workspace @calorie-tracker/api
 
 Run the main repository checks from the root:
 
+## New-chat feature workflow
+
+Start each feature in its own chat and Git worktree. From a new chat, use:
+
+```text
+Start a feature called <feature-name>. Create a new worktree from main,
+use the codex/<feature-name> branch convention, and keep this chat dedicated
+to that feature.
+```
+
+The chat runs `scripts/start-feature.ps1`, which creates or discovers the worktree without copying uncommitted changes from the base checkout. Multiple chats can work concurrently in separate worktrees.
+
+When the feature is ready, say:
+
+```text
+Complete this feature. Run the required tests, commit the feature changes,
+push the branch, and open a PR targeting main. Do not merge it.
+```
+
+The completion workflow runs tests, typecheck, and lint before committing. Install and authenticate the GitHub CLI (`gh`) for automatic PR creation.
+
+## Development backend and Android environments
+
+Local Android debug builds use the `dev` flavor and the `CT_DEV_*` values in `apps/android/secure.properties`, so they target the development Cognito/API endpoints:
+
+```powershell
+.\scripts\build-android-dev.ps1
+```
+
+The local development backend can be deployed from the current working tree, including uncommitted changes. Its defaults match the GitHub `dev` environment (`TF_APP_NAME=bitewise` and `TF_COGNITO_DOMAIN_PREFIX=cosgravelabs-bitewise-dev`):
+
+```powershell
+.\scripts\deploy-backend-dev-local.ps1
+```
+
+This builds the current .NET Lambda package, runs Terraform against the shared `dev` state, and applies the dev environment. It does not commit or push Git changes. Use `-PlanOnly` to preview changes. AWS credentials and Terraform access must already be configured locally.
+
+The script uses `cosgravelabs-bitewise-dev` as the default Cognito domain prefix, matching the GitHub `dev` environment. Override it if needed:
+
+```powershell
+.\scripts\deploy-backend-dev-local.ps1 -CognitoDomainPrefix cosgravelabs-bitewise-dev-philip
+```
+
+Play Store bundles use the `prod` Android flavor and should use `CT_PROD_*` values, including the production API and Cognito client:
+
+```powershell
+.\scripts\build-android-release.ps1
+```
+
+The GitHub Actions Play Store workflows remain the release path: the internal testing workflow publishes the configured test release, and the production workflow publishes the production release. Keep `CT_PROD_SYNC_API_BASE_URL` pointed at the production API for any Play Store build.
+
 ```bash
 npm run typecheck
 git diff --check

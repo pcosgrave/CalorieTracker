@@ -26,6 +26,7 @@ data class Nutrients(
     val proteinGrams: Double = 0.0,
     val carbohydrateGrams: Double = 0.0,
     val fatGrams: Double = 0.0,
+    val additional: Map<String, Double> = emptyMap(),
 )
 
 data class FoodItem(
@@ -46,6 +47,16 @@ data class FoodItem(
     val lastUsedAt: String? = null,
     val lastUsedDaysAgo: Int = 0,
     val isUserCreated: Boolean = true,
+    val servingWeightGrams: Double? = null,
+    val photoPath: String? = null,
+    val instructions: List<String> = emptyList(),
+    val description: String = "",
+    val prepMinutes: Int? = null,
+    val totalMinutes: Int? = null,
+    val source: String? = null,
+    val sourceId: String? = null,
+    val sourceVersion: String? = null,
+    val servingOptions: List<ReferenceServing> = emptyList(),
 )
 
 data class RecipeComponent(
@@ -76,6 +87,12 @@ data class RecipeDraft(
     val servingQuantity: String = "1",
     val servingUnit: String = "serving",
     val components: List<RecipeComponent> = emptyList(),
+    val photoPath: String? = null,
+    val instructions: List<String> = emptyList(),
+    val description: String = "",
+    val unresolvedIngredients: List<String> = emptyList(),
+    val prepMinutes: Int? = null,
+    val totalMinutes: Int? = null,
 )
 
 data class Totals(

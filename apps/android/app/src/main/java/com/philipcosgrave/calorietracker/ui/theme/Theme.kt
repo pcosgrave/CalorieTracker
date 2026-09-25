@@ -19,6 +19,8 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme(
     primary = Colors.Primary,
     secondary = Colors.Secondary,
+    secondaryContainer = Color(0xFF123C2A),
+    onSecondaryContainer = Colors.Primary,
     tertiary = Colors.Tertiary,
     background = Colors.DarkBackground,
     surface = Colors.DarkSurface,
@@ -27,6 +29,9 @@ private val DarkColorScheme = darkColorScheme(
     onTertiary = Color.White,
     onBackground = Color.White,
     onSurface = Color.White,
+    surfaceVariant = Color(0xFF192128),
+    onSurfaceVariant = Color(0xFFAAB7C4),
+    outline = Color(0xFF52616F),
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -44,8 +49,8 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun CalorieTrackerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -60,6 +65,7 @@ fun CalorieTrackerTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            window.decorView.setBackgroundColor(colorScheme.background.toArgb())
             window.statusBarColor = colorScheme.background.toArgb()
             window.navigationBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).apply {

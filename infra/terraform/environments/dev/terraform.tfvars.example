@@ -23,7 +23,8 @@ android_logout_urls = [
 
 cognito_domain_prefix = "replace-with-a-unique-cognito-domain-prefix"
 
-lambda_runtime         = "nodejs22.x"
+lambda_runtime         = "dotnet8"
 lambda_memory_mb       = 512
 lambda_timeout_seconds = 15
 api_stage_name         = "dev"
+log_retention_days     = 30

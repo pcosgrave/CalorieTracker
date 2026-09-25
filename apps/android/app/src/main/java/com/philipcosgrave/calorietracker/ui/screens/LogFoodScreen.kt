@@ -1,27 +1,40 @@
 package com.philipcosgrave.calorietracker.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.Layout
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,6 +46,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.philipcosgrave.calorietracker.domain.amountInBaseUnits
+import com.philipcosgrave.calorietracker.domain.amountInGrams
+import com.philipcosgrave.calorietracker.domain.amountUnits
+import com.philipcosgrave.calorietracker.domain.formatAmount
 import com.philipcosgrave.calorietracker.domain.formatNumber
 import com.philipcosgrave.calorietracker.domain.compatibleMeasurementUnits
 import com.philipcosgrave.calorietracker.domain.createId
@@ -52,129 +69,192 @@ import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 @Composable
-fun LogFoodScreen(
-    food: FoodItem,
-    date: LocalDate,
-    existingEntry: DiaryEntry? = null,
-    onBack: () -> Unit,
-    onLog: (DiaryEntry, Boolean) -> Unit,
+@OptIn(ExperimentalMaterial3Api::class)
+fun LogFoodScreen(food: FoodItem, date: LocalDate, existingEntry: DiaryEntry? = null,
+    onBack: () -> Unit, onLog: suspend (DiaryEntry, Boolean) -> Unit,
+    onEditNutrition: () -> Unit = {}, destinationMeal: Meal? = null,
+    recipeDestination: Boolean = false, wholePortionOnly: Boolean = false, subtitle: String? = null,
+    leftoverPercentageMode: Boolean = false,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val isDarkTheme = colorScheme.background.luminance() < 0.5f
-    var amount by remember(food.id, existingEntry?.id) {
-        mutableStateOf(formatNumber(existingEntry?.loggedAmount ?: food.servingQuantity))
-    }
-    var unit by remember(food.id, existingEntry?.id) { mutableStateOf(existingEntry?.loggedUnit ?: food.servingUnit) }
-    var meal by remember(existingEntry?.id) { mutableStateOf(existingEntry?.meal ?: Meal.Breakfast) }
-    var selectedDate by remember(existingEntry?.id, date) { mutableStateOf(existingEntry?.date ?: date) }
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val recipe = food.kind == com.philipcosgrave.calorietracker.model.FoodKind.Recipe
+    var amount by rememberSaveable(food.id, existingEntry?.id) { mutableStateOf(logAmountText(existingEntry?.loggedAmount ?: if (recipe && !wholePortionOnly) 1.0 else food.servingQuantity)) }
+    var unit by rememberSaveable(food.id, existingEntry?.id) { mutableStateOf(existingEntry?.loggedUnit ?: food.servingUnit) }
+    val definedServingUnits = remember(food.id) { food.servingOptions.map { it.description } }
+    var servingMode by rememberSaveable(food.id, existingEntry?.id) { mutableStateOf(unit in definedServingUnits) }
+    var mealName by rememberSaveable(food.id, existingEntry?.id) { mutableStateOf((existingEntry?.meal ?: destinationMeal ?: com.philipcosgrave.calorietracker.domain.inferMealForTime(java.time.LocalTime.now())).name) }
+    var dateText by rememberSaveable(food.id, existingEntry?.id) { mutableStateOf((existingEntry?.date ?: date).toString()) }
+    val meal = Meal.valueOf(mealName)
     var components by remember(food.id) { mutableStateOf(food.components) }
-    val amountNumber = amount.toDoubleOrNull()?.coerceAtLeast(0.1) ?: food.servingQuantity
-    val availableUnits = remember(food.servingUnit) { compatibleMeasurementUnits(food.servingUnit) }
-    val adjustedFood = if (components.isEmpty()) food else food.withAdjustedComponents(components)
-    val convertedAmount =
-        convertAmount(amountNumber, unit, adjustedFood.servingUnit)
-            ?: if (unit == adjustedFood.servingUnit) amountNumber else adjustedFood.servingQuantity
-    val adjusted = adjustedFood.nutrients.scale(convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1))
-
-    fun updateComponent(index: Int, amountText: String? = null, unitValue: String? = null) {
-        components = components.mapIndexed { componentIndex, component ->
-            if (componentIndex != index) {
-                component
+    var instructionsVisible by rememberSaveable { mutableStateOf(false) }
+    var cookStep by rememberSaveable { mutableStateOf(-1) }
+    var nutritionExpanded by rememberSaveable { mutableStateOf(false) }
+    var leftoverPercentage by rememberSaveable(food.id) { mutableStateOf(100f) }
+    val number = if (leftoverPercentageMode) leftoverPercentage.toDouble() / 100.0 else amount.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }
+    val adjustedFood = if (wholePortionOnly || leftoverPercentageMode || components.isEmpty()) food else food.withAdjustedComponents(components)
+    val converted = number?.let { adjustedFood.amountInBaseUnits(it, unit) }
+    val multiplier = (converted ?: 0.0) / food.servingQuantity
+    val nutrients = adjustedFood.nutrients.scale(multiplier)
+    val totals = com.philipcosgrave.calorietracker.model.Totals(nutrients.calories, nutrients.proteinGrams, nutrients.carbohydrateGrams, nutrients.fatGrams)
+    if (instructionsVisible) {
+        androidx.activity.compose.BackHandler { if (cookStep >= 0) cookStep = -1 else instructionsVisible = false }
+        com.philipcosgrave.calorietracker.ui.components.Page(spacing = 8.dp) {
+            PageHeader(if (cookStep >= 0) "Cook Mode" else "Instructions", onBack = { if (cookStep >= 0) cookStep = -1 else instructionsVisible = false })
+            if (cookStep >= 0) {
+                Text("Step ${cookStep + 1} of ${food.instructions.size}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                com.philipcosgrave.calorietracker.ui.components.FoodPhoto(food.photoPath, Modifier.fillMaxWidth().height(200.dp))
+                Text(food.instructions[cookStep], style = MaterialTheme.typography.headlineSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(enabled = cookStep > 0, onClick = { cookStep-- }) { Text("Previous") }
+                    Button(onClick = { if (cookStep < food.instructions.lastIndex) cookStep++ else { cookStep = -1; instructionsVisible = false } }) { Text(if (cookStep < food.instructions.lastIndex) "Next Step" else "Done") }
+                }
             } else {
-                component.copy(
-                    amount = amountText?.toDoubleOrNull()?.coerceAtLeast(0.0) ?: component.amount,
-                    unit = unitValue ?: component.unit,
-                )
+                food.instructions.forEachIndexed { index, step -> com.philipcosgrave.calorietracker.ui.components.AppCardContainer { Text("${index + 1}. $step") } }
+                Button(onClick = { cookStep = 0 }, Modifier.fillMaxWidth()) { Text("Start cooking") }
             }
         }
+        return
     }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        PageHeader(if (existingEntry == null) "Add foods" else "Edit foods", onBack = onBack)
-        Text(food.name, style = MaterialTheme.typography.headlineSmall, color = colorScheme.onBackground)
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Serving size", color = colorScheme.onBackground)
-            OutlinedTextField(
-                amount,
-                {
-                    val normalized = normalizeDecimalNumberInput(it)
-                    if (isDecimalNumberInput(normalized)) {
-                        amount = normalized
+    com.philipcosgrave.calorietracker.ui.components.Page(spacing = 8.dp) {
+        PageHeader(if (existingEntry != null) "Edit Food" else if (recipe) "Add Recipe" else "Food Details", onBack = onBack)
+        com.philipcosgrave.calorietracker.ui.components.FoodPhoto(food.photoPath, Modifier.fillMaxWidth().height(120.dp))
+        Text(com.philipcosgrave.calorietracker.domain.foodTitle(food.name), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        if (food.description.isNotBlank()) Text(food.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        subtitle?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        com.philipcosgrave.calorietracker.ui.components.NutritionSummary(totals)
+        if (!recipeDestination) {
+            Text("Add to Meal", fontWeight = FontWeight.Bold)
+            MealPicker(meal, { mealName = it.name })
+        }
+        if (!wholePortionOnly && !leftoverPercentageMode) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (recipe) "Servings" else "Amount", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                if (!recipe && definedServingUnits.isNotEmpty()) TextButton(onClick = {
+                    val current = number ?: return@TextButton
+                    if (servingMode) {
+                        val base = food.amountInBaseUnits(current, unit) ?: return@TextButton
+                        amount = logAmountText(base); unit = food.servingUnit; servingMode = false
+                    } else {
+                        val serving = definedServingUnits.first()
+                        val base = food.amountInBaseUnits(current, unit) ?: return@TextButton
+                        val servingBase = food.amountInBaseUnits(1.0, serving) ?: return@TextButton
+                        amount = logAmountText(base / servingBase); unit = serving; servingMode = true
                     }
-                },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            )
-            UnitPicker(unit, { unit = it }, Modifier.weight(1f), availableUnits)
-            Text("${formatNumber(adjusted.calories)} cals.", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Meal & Snacks Time", style = MaterialTheme.typography.titleLarge, color = colorScheme.onBackground)
-            MealPicker(meal, { meal = it }, darkMode = isDarkTheme)
-        }
-        if (components.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Recipe ingredients", color = colorScheme.onBackground, fontWeight = FontWeight.Bold)
-                components.forEachIndexed { index, component ->
-                    EditableRecipeLogComponent(
-                        component = component,
-                        onAmountChange = { updateComponent(index, amountText = it) },
-                        onUnitChange = { updateComponent(index, unitValue = it) },
-                    )
+                }) { Text(if (servingMode) "⇄ Switch to units" else "⇄ Switch to servings") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), modifier = Modifier.width(40.dp), onClick = { amount = logAmountText(((number ?: 1.0) - 1.0).coerceAtLeast(.1)) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) { Text("−") }
+                OutlinedTextField(amount, { if (isDecimalNumberInput(it)) amount = it }, Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), modifier = Modifier.width(40.dp), onClick = { amount = logAmountText((number ?: 0.0) + 1) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)) { Text("+") }
+                UnitPicker(unit, { newUnit ->
+                    val current = number ?: return@UnitPicker
+                    val base = food.amountInBaseUnits(current, unit)
+                    val next = if (servingMode) {
+                        val servingBase = food.amountInBaseUnits(1.0, newUnit)
+                        base?.div(servingBase ?: return@UnitPicker)
+                    } else base?.let { convertAmount(it, food.servingUnit, newUnit) }
+                    if (next != null) { amount = logAmountText(next); unit = newUnit }
+                }, Modifier.weight(1f), if (servingMode) definedServingUnits else compatibleMeasurementUnits(food.servingUnit))
+            }
+            if (!recipe && !servingMode) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(1.0, 2.0, 4.0).forEach { count ->
+                    val baseAmount = food.servingQuantity * count
+                    OutlinedButton(onClick = { unit = food.servingUnit; amount = logAmountText(baseAmount) }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(6.dp)) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${formatNumber(baseAmount)} ${food.servingUnit}", style = MaterialTheme.typography.labelSmall)
+                            Text("${formatNumber(food.nutrients.calories * count)} kcal", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                 }
             }
-        }
-        DatePillsRow(
-            selectedDate = selectedDate,
-            today = LocalDate.now(),
-            onDateChange = { if (!it.isAfter(LocalDate.now())) selectedDate = it },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = {
-                    onLog(
-                        com.philipcosgrave.calorietracker.model.DiaryEntry(
-                            id = existingEntry?.id ?: createId("entry"),
-                            food = adjustedFood,
-                            date = selectedDate,
-                            meal = meal,
-                            servingMultiplier = convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1),
-                            loggedAmount = amountNumber,
-                            loggedUnit = unit,
-                        ),
-                        true,
-                    )
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(if (existingEntry == null) "Log & add more" else "Save & add more")
+        } else if (leftoverPercentageMode) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Use how much of this leftover?", fontWeight = FontWeight.Bold)
+                Text("${formatNumber(leftoverPercentage.toDouble())}%", fontWeight = FontWeight.Bold)
             }
-            Button(
-                onClick = {
-                    onLog(
-                        com.philipcosgrave.calorietracker.model.DiaryEntry(
-                            id = existingEntry?.id ?: createId("entry"),
-                            food = adjustedFood,
-                            date = selectedDate,
-                            meal = meal,
-                            servingMultiplier = convertedAmount / adjustedFood.servingQuantity.coerceAtLeast(0.1),
-                            loggedAmount = amountNumber,
-                            loggedUnit = unit,
-                        ),
-                        false,
-                    )
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(if (existingEntry == null) "Log this" else "Save")
+            Box(Modifier.fillMaxWidth().height(48.dp)) {
+                Slider(
+                    value = leftoverPercentage,
+                    onValueChange = { leftoverPercentage = ((it / 5f).roundToInt() * 5).toFloat() },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.fillMaxWidth(),
+                    track = { sliderState ->
+                        SliderDefaults.Track(sliderState = sliderState, drawStopIndicator = null)
+                    },
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .align(Alignment.Center),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    repeat(5) {
+                        Box(Modifier.size(4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
+                    }
+                }
+            }
+            LeftoverPercentageMarkers { leftoverPercentage = it.toFloat() }
+        } else Text("Use entire leftover", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (components.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Ingredients", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                if (!wholePortionOnly && !leftoverPercentageMode) TextButton(onClick = { components = food.components }) { Text("Reset") }
+            }
+            components.forEachIndexed { index, component ->
+                if (wholePortionOnly || leftoverPercentageMode) Row(Modifier.fillMaxWidth()) { Text(component.item.name, Modifier.weight(1f)); Text("${formatAmount(component.amount * multiplier)} ${component.unit}") }
+                else EditableRecipeLogComponent(component.copy(amount = component.amount * multiplier), onAmountChange = { text ->
+                    text.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 && multiplier > 0 }?.let { value -> components = components.mapIndexed { i, c -> if (i == index) c.copy(amount = value / multiplier) else c } }
+                }, onUnitChange = { newUnit ->
+                    val next = convertAmount(component.amount, component.unit, newUnit)
+                    if (next != null) components = components.mapIndexed { i, c -> if (i == index) c.copy(amount = next, unit = newUnit) else c }
+                })
+            }
+        }
+        if (food.instructions.isNotEmpty()) OutlinedButton(onClick = { instructionsVisible = true }, modifier = Modifier.fillMaxWidth()) { Text("Instructions ›") }
+        TextButton(onClick = { nutritionExpanded = !nutritionExpanded }) { Text(if (nutritionExpanded) "Hide nutrition details" else "View full nutrition details ⌄") }
+        if (nutritionExpanded) com.philipcosgrave.calorietracker.ui.components.AdditionalNutrition(nutrients)
+        if (!recipeDestination) DatePillsRow(LocalDate.parse(dateText), LocalDate.now(), { dateText = it.toString() })
+        if (!recipe && !wholePortionOnly && destinationMeal == null) TextButton(onClick = onEditNutrition) { Text("Edit food / scan nutrition label") }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Button(enabled = !saving && converted != null && converted > 0, onClick = { saving = true; scope.launch {
+            try { onLog(DiaryEntry(existingEntry?.id ?: createId("entry"), adjustedFood, LocalDate.parse(dateText), meal, multiplier, number!!, unit), false) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { error = "Could not save food. Please retry." }
+            finally { saving = false }
+        } }, modifier = Modifier.fillMaxWidth()) { Text(if (saving) "Saving…" else if (existingEntry != null) "Save changes" else if (recipeDestination) "Add ingredient" else "Add to ${meal.label}") }
+    }
+}
+
+@Composable
+private fun LeftoverPercentageMarkers(onSelect: (Int) -> Unit) {
+    val markers = listOf(0, 25, 50, 75, 100)
+    Layout(
+        content = {
+            markers.forEach { marker ->
+                Text(
+                    "$marker%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onSelect(marker) },
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+    ) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0)) }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        layout(constraints.maxWidth, height) {
+            placeables.forEachIndexed { index, placeable ->
+                val center = constraints.maxWidth * index / (markers.size - 1)
+                placeable.placeRelative(center - placeable.width / 2, 0)
             }
         }
     }
@@ -186,7 +266,7 @@ private fun EditableRecipeLogComponent(
     onAmountChange: (String) -> Unit,
     onUnitChange: (String) -> Unit,
 ) {
-    var amountText by remember(component.item.id) { mutableStateOf(formatNumber(component.amount)) }
+    var amountText by remember(component.item.id, component.amount, component.unit) { mutableStateOf(formatAmount(component.amount)) }
     val unitOptions = remember(component.unit, component.item.servingUnit) {
         buildList {
             if (component.unit.isNotBlank()) add(component.unit)
@@ -267,6 +347,13 @@ private fun CompactUnitPicker(
         }
     }
 }
+
+/** Keeps the editable portion field aligned with its two-decimal input rule. */
+private fun logAmountText(value: Double): String =
+    java.math.BigDecimal.valueOf(value)
+        .setScale(2, java.math.RoundingMode.HALF_UP)
+        .stripTrailingZeros()
+        .toPlainString()
 
 @Preview(showBackground = true, widthDp = 412, heightDp = 900)
 @Composable

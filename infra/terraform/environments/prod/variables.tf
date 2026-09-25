@@ -47,19 +47,19 @@ variable "cognito_domain_prefix" {
 }
 
 variable "lambda_runtime" {
-  description = "Lambda runtime for the API handlers."
+  description = "Lambda runtime for the API."
   type        = string
-  default     = "nodejs22.x"
+  default     = "dotnet8"
 }
 
 variable "lambda_memory_mb" {
-  description = "Memory size for API Lambda functions."
+  description = "Memory size for the API Lambda function."
   type        = number
   default     = 512
 }
 
 variable "lambda_timeout_seconds" {
-  description = "Execution timeout for API Lambda functions."
+  description = "Execution timeout for the API Lambda function."
   type        = number
   default     = 15
 }
@@ -82,6 +82,25 @@ variable "log_retention_days" {
   default     = 30
 }
 
+variable "web_hosting_repository" {
+  description = "GitHub repository URL for the production web app."
+  type        = string
+  default     = "https://github.com/pcosgrave/CalorieTracker"
+}
+
+variable "web_hosting_access_token" {
+  description = "GitHub token for AWS Amplify repository access. Set with TF_VAR_web_hosting_access_token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "web_hosting_branch" {
+  description = "Git branch deployed to the production web host."
+  type        = string
+  default     = "main"
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
@@ -100,3 +119,4 @@ variable "google_authorize_scopes" {
   type        = string
   default     = "openid email profile"
 }
+

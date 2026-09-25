@@ -23,6 +23,8 @@ This document covers both Android workflows for `BiteWise`:
 - Android logout URI: `bitewise://signout`
 - Suggested use: release bundle for Google Play
 
+The Play Store internal-test workflow deploys the `dev` backend infrastructure but uses the production Android/Cognito/API configuration for its bundle. Configure repository-level `ANDROID_PROD_*` variables for that workflow. Local `devDebug` builds continue to use `CT_DEV_*` values.
+
 ## One-Time Setup
 
 ### 1. Create a release keystore

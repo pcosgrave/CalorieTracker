@@ -67,7 +67,20 @@ data class SyncSettings(
     val calorieTargetMin: Int = 1800,
     val calorieTargetMax: Int = 2200,
     val weightUnit: WeightUnit = WeightUnit.Kilograms,
+    val heightUnit: HeightUnit = HeightUnit.Centimeters,
+    val foodUnitSystem: FoodUnitSystem = FoodUnitSystem.Metric,
     val goalWeightKg: Double? = null,
+    val goalTargetDate: String? = null,
+    val profilePhotoPath: String? = null,
+    val profileTimezone: String = "UTC-05:00 Toronto",
+    val notificationDaily: Boolean = true,
+    val notificationWeekly: Boolean = true,
+    val notificationInsights: Boolean = true,
+    val notificationProductUpdates: Boolean = false,
+    val healthImportActivity: Boolean = true,
+    val healthImportWeight: Boolean = true,
+    val healthImportNutrition: Boolean = true,
+    val dailyStepGoal: Int? = null,
 ) {
     enum class BackupMode {
         Disabled,
@@ -79,6 +92,9 @@ data class SyncSettings(
         Kilograms,
         Pounds,
     }
+
+    enum class HeightUnit { Centimeters, FeetInches }
+    enum class FoodUnitSystem { Metric, Imperial }
 }
 
 data class SyncChangeEnvelope<TPayload>(

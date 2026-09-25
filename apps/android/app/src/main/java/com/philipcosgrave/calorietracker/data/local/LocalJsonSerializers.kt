@@ -156,6 +156,13 @@ private fun FoodItem.toJson(): JSONObject {
         .put("barcode", barcode)
         .put("servingQuantity", servingQuantity)
         .put("servingUnit", servingUnit)
+        .put("servingWeightGrams", servingWeightGrams)
+        .put("photoPath", photoPath)
+        .put("instructions", JSONArray(instructions))
+        .put("description", description)
+        .put("prepMinutes", prepMinutes).put("totalMinutes", totalMinutes)
+        .put("source", source).put("sourceId", sourceId).put("sourceVersion", sourceVersion)
+        .put("servingOptions", JSONArray(servingOptions.map { option -> JSONObject().put("id", option.id).put("description", option.description).put("grams", option.grams).apply { option.amount?.let { put("amount", it) }; option.unit?.let { put("unit", it) } } }))
         .put("nutrients", nutrients.toJson())
         .put("components", componentsJson)
         .put("frequency", frequency)
@@ -180,6 +187,7 @@ private fun Nutrients.toJson(): JSONObject =
         .put("proteinGrams", proteinGrams)
         .put("carbohydrateGrams", carbohydrateGrams)
         .put("fatGrams", fatGrams)
+        .put("additional", JSONObject(additional))
 
 private fun foodItemFromJson(json: JSONObject): FoodItem {
     val componentsJson = json.optJSONArray("components") ?: JSONArray()
@@ -189,8 +197,18 @@ private fun foodItemFromJson(json: JSONObject): FoodItem {
         name = json.getString("name"),
         brand = json.optString("brand"),
         barcode = json.optString("barcode"),
-        servingQuantity = json.getDouble("servingQuantity"),
-        servingUnit = json.getString("servingUnit"),
+        servingQuantity = json.optDouble("servingQuantity", 100.0).takeIf { it.isFinite() && it > 0 } ?: 100.0,
+        servingUnit = json.optString("servingUnit", "g"),
+        servingWeightGrams = json.optDouble("servingWeightGrams").takeIf { it.isFinite() && it > 0 },
+        photoPath = json.optString("photoPath").takeIf { it.isNotBlank() && it != "null" },
+        instructions = json.optJSONArray("instructions")?.let { values -> List(values.length()) { values.getString(it) } }.orEmpty(),
+        description = json.optString("description"),
+        prepMinutes = json.optInt("prepMinutes").takeIf { it > 0 },
+        totalMinutes = json.optInt("totalMinutes").takeIf { it > 0 },
+        source = json.optString("source").takeIf { it.isNotBlank() && it != "null" },
+        sourceId = json.optString("sourceId").takeIf { it.isNotBlank() && it != "null" },
+        sourceVersion = json.optString("sourceVersion").takeIf { it.isNotBlank() && it != "null" },
+        servingOptions = json.optJSONArray("servingOptions")?.let { a -> List(a.length()) { i -> a.getJSONObject(i).let { option -> com.philipcosgrave.calorietracker.model.ReferenceServing(option.getString("id"), option.getString("description"), option.getDouble("grams"), option.optDouble("amount").takeUnless { option.isNull("amount") }, option.optString("unit").takeIf { it.isNotBlank() }) } } }.orEmpty(),
         nutrients = nutrientsFromJson(json.getJSONObject("nutrients")),
         components = List(componentsJson.length()) { index -> recipeComponentFromJson(componentsJson.getJSONObject(index)) },
         frequency = json.optInt("frequency"),
@@ -214,9 +232,10 @@ private fun recipeComponentFromJson(json: JSONObject): RecipeComponent =
 private fun nutrientsFromJson(json: JSONObject): Nutrients =
     Nutrients(
         calories = json.getDouble("calories"),
-        proteinGrams = json.optDouble("proteinGrams"),
-        carbohydrateGrams = json.optDouble("carbohydrateGrams"),
-        fatGrams = json.optDouble("fatGrams"),
+        proteinGrams = json.optDouble("proteinGrams", 0.0),
+        carbohydrateGrams = json.optDouble("carbohydrateGrams", 0.0),
+        fatGrams = json.optDouble("fatGrams", 0.0),
+        additional = json.optJSONObject("additional")?.let { obj -> obj.keys().asSequence().mapNotNull { key -> obj.optDouble(key).takeIf { it.isFinite() && it >= 0 }?.let { key to it } }.toMap() }.orEmpty(),
     )
 
 private fun weightEntryToJson(record: WeightEntryRecord): JSONObject =

@@ -36,17 +36,23 @@ import com.philipcosgrave.calorietracker.ui.components.PageHeader
 import com.philipcosgrave.calorietracker.ui.components.isDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.components.normalizeDecimalNumberInput
 import com.philipcosgrave.calorietracker.ui.preview.PreviewData
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
 fun QuickCaloriesScreen(
     date: LocalDate,
     onBack: () -> Unit,
-    onSave: (Double, Meal, LocalDate) -> Unit,
+    onSave: suspend (Double, Meal, LocalDate) -> Unit,
+    destinationMeal: Meal? = null,
+    recipeDestination: Boolean = false,
 ) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     val today = LocalDate.now()
     var calories by remember { mutableStateOf("") }
-    var meal by remember { mutableStateOf(Meal.Snack) }
+    var meal by remember { mutableStateOf(destinationMeal ?: com.philipcosgrave.calorietracker.domain.inferMealForTime(java.time.LocalTime.now())) }
     var selectedDate by remember { mutableStateOf(date) }
 
     Page {
@@ -66,15 +72,22 @@ fun QuickCaloriesScreen(
                         keyboardType = KeyboardType.Decimal
                     ),
                     modifier = Modifier.fillMaxWidth())
-                MealPicker(meal, { meal = it })
+                if (!recipeDestination) MealPicker(meal, { meal = it })
+                else Text(if (recipeDestination) "Add to recipe" else "${meal.label} · $selectedDate")
 
-                DatePillsRow(selectedDate,
+                if (!recipeDestination) DatePillsRow(selectedDate,
                     today = today,
                     onDateChange = { selectedDate = it })
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = { onSave(calories.toDoubleOrNull() ?: 0.0, meal, selectedDate) },
-                        enabled = (calories.toDoubleOrNull() ?: 0.0) > 0,
+                        onClick = { saving = true; scope.launch {
+                            try { onSave(calories.toDouble(), meal, selectedDate) }
+                            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                            catch (_: Exception) { error = "Could not add calories. Please retry." }
+                            finally { saving = false }
+                        } },
+                        enabled = !saving && calories.toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true,
                         modifier = Modifier.weight(1f),
                     ) {
                         Text("Log calories")

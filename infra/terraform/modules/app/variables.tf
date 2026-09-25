@@ -41,7 +41,7 @@ variable "create_api" {
 }
 
 variable "api_lambda_package_path" {
-  description = "Path to the Lambda deployment zip for the API handlers."
+  description = "Path to the Lambda deployment zip for the API."
   type        = string
   default     = ""
 }
@@ -53,19 +53,19 @@ variable "api_lambda_source_code_hash" {
 }
 
 variable "lambda_runtime" {
-  description = "Lambda runtime for the API handlers."
+  description = "Lambda runtime for the API."
   type        = string
-  default     = "nodejs22.x"
+  default     = "dotnet8"
 }
 
 variable "lambda_memory_mb" {
-  description = "Memory size for API Lambda functions."
+  description = "Memory size for the API Lambda function."
   type        = number
   default     = 512
 }
 
 variable "lambda_timeout_seconds" {
-  description = "Execution timeout for API Lambda functions."
+  description = "Execution timeout for the API Lambda function."
   type        = number
   default     = 15
 }
@@ -105,4 +105,23 @@ variable "manage_lambda_log_groups" {
   description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
   type        = bool
   default     = false
+}
+
+variable "web_hosting_repository" {
+  description = "Git repository URL for optional AWS Amplify web hosting."
+  type        = string
+  default     = null
+}
+
+variable "web_hosting_access_token" {
+  description = "GitHub access token used by AWS Amplify to read the web repository."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "web_hosting_branch" {
+  description = "Git branch deployed by AWS Amplify."
+  type        = string
+  default     = "main"
 }

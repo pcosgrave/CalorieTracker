@@ -10,6 +10,10 @@ output "cognito_user_pool_domain" {
   value = module.app.cognito_user_pool_domain
 }
 
+output "web_hosting_url" {
+  value = module.app.web_hosting_url
+}
+
 output "cognito_web_client_id" {
   value = module.app.cognito_web_client_id
 }

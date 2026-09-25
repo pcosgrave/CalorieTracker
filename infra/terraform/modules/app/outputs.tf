@@ -10,6 +10,10 @@ output "cognito_user_pool_domain" {
   value = aws_cognito_user_pool_domain.main.domain
 }
 
+output "web_hosting_url" {
+  value = try("https://${aws_amplify_app.web[0].default_domain}", null)
+}
+
 output "cognito_web_client_id" {
   value = aws_cognito_user_pool_client.web.id
 }
@@ -40,14 +44,6 @@ output "sync_changes_table_name" {
 
 output "events_bucket_name" {
   value = aws_s3_bucket.events.bucket
-}
-
-output "app_storage_kms_key_arn" {
-  value = aws_kms_key.app_storage.arn
-}
-
-output "app_storage_kms_alias" {
-  value = aws_kms_alias.app_storage.name
 }
 
 output "api_gateway_rest_api_id" {

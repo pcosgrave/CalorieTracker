@@ -2,7 +2,6 @@
 
 This repo now has three GitHub Actions workflows:
 
-- [`.github/workflows/deploy-dev-internal.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-dev-internal.yml)
 - [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml)
 - [`.github/workflows/_deploy-mobile-and-infra.yml`](/D:/Projects/CalorieTracker/.github/workflows/_deploy-mobile-and-infra.yml)
 
@@ -15,16 +14,20 @@ The intended branch model is:
 - `dev` branch
   - receives PRs from `main` only
   - when a PR into `dev` is merged, GitHub Actions automatically deploys dev
+  - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/dev`
-  - builds Android `devRelease`
-  - uploads `com.cosgravelabs.bitewise` to the Google Play `internal` track
+  - deploys backend and infrastructure only
+  - never uploads an Android build to Google Play
 
 - `prod` branch
   - receives PRs from `dev` only
   - when a PR into `prod` is merged, GitHub Actions automatically deploys prod
+  - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/prod`
   - builds Android `prodRelease`
   - uploads `com.cosgravelabs.bitewise` to the Google Play `production` track
+
+All Play Store builds, including internal or closed-test builds, must use the production backend and production Android/Cognito configuration. Local development builds use the `dev` flavor and are installed directly on an emulator or device.
 
 ## 1. Create The Branches
 
@@ -248,6 +251,7 @@ Create these secrets on environment `dev`:
 Create these variables on environment `dev`:
 
 - `AWS_REGION`
+- `TF_STATE_KEY`
 - `TF_APP_NAME`
 - `TF_COGNITO_DOMAIN_PREFIX`
 - `TF_WEB_CALLBACK_URL`
@@ -281,6 +285,7 @@ Create these secrets on environment `prod`:
 Create these variables on environment `prod`:
 
 - `AWS_REGION`
+- `TF_STATE_KEY`
 - `TF_APP_NAME`
 - `TF_COGNITO_DOMAIN_PREFIX`
 - `TF_WEB_CALLBACK_URL`
@@ -326,23 +331,23 @@ Paste that into:
 ## 8. First Dev Release Test
 
 1. Merge these workflow files into `main`.
-2. Open a PR from `main` into `dev`.
-3. Merge that PR.
-4. Open the Actions tab and watch `Deploy Dev Internal` run automatically.
+2. Either:
+   - open a PR from `main` into `dev` and merge it, or
+3. Watch the workflow run.
 
 Expected result:
 
 - Terraform `dev` applies
 - Lambda package is built
-- Android `devRelease` AAB is built
+- Android `prodRelease` AAB is built against the dev environment config
 - `com.cosgravelabs.bitewise` uploads to the Play internal testing track
 
 ## 9. First Prod Release Test
 
-1. Open a PR from `dev` into `prod`.
-2. Review it carefully.
-3. Merge that PR.
-4. Open the Actions tab and watch `Deploy Prod` run automatically.
+1. Either:
+   - open a PR from `dev` into `prod`, review it carefully, and merge it, or
+   - open the `Deploy Prod` workflow in the Actions tab and run it manually from the `prod` branch.
+2. Watch the workflow run.
 
 Expected result:
 
@@ -354,8 +359,7 @@ Expected result:
 
 - The prod workflow currently uploads directly to the `production` track.
 - If you want a safer first rollout, change [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
-- Deploys happen only when a pull request is merged into `dev` or `prod`, not when a PR is merely opened.
-- `Deploy Dev Internal` only accepts `main -> dev` merges.
+- Deploys can be triggered either by merging the expected PR flow or by manual workflow dispatch.
 - `Deploy Prod` only accepts `dev -> prod` merges.
 - Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
 - Prod deploys now auto-bump the Android release version inside CI only and create a tag like `android-prod-v0.1.2+3`.

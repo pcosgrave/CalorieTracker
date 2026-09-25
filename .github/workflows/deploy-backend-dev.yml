@@ -1,6 +1,7 @@
-name: Deploy Dev Internal
+name: Deploy Backend Dev
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - dev
@@ -8,13 +9,13 @@ on:
       - closed
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
 
 jobs:
   guard:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'pull_request'
     steps:
       - name: Ensure this workflow runs for main merged into dev
         run: |
@@ -29,17 +30,9 @@ jobs:
 
   deploy:
     needs: guard
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/_deploy-mobile-and-infra.yml
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true) && (github.event_name != 'pull_request' || needs.guard.result == 'success')
+    uses: ./.github/workflows/_deploy-backend-and-infra.yml
     with:
       github_environment: dev
       terraform_environment: dev
-      android_flavor: dev
-      android_package_name: com.cosgravelabs.bitewise
-      play_track: internal
-      play_status: completed
-      bump_release_version: true
-      create_release_tag: true
-      release_tag_prefix: android-dev
     secrets: inherit
-

@@ -9,6 +9,14 @@ on:
       terraform_environment:
         required: true
         type: string
+      deploy_infrastructure:
+        required: false
+        type: boolean
+        default: true
+      android_config_environment:
+        required: false
+        type: string
+        default: ""
       android_flavor:
         required: true
         type: string
@@ -49,13 +57,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          ref: ${{ github.event_name == 'workflow_run' && 'prod' || github.event.pull_request.base.ref || github.ref_name }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up .NET
+        if: ${{ inputs.deploy_infrastructure }}
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: 22
-          cache: npm
+          dotnet-version: 8.0.x
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -64,11 +72,13 @@ jobs:
           java-version: 17
 
       - name: Set up Terraform
+        if: ${{ inputs.deploy_infrastructure }}
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
 
       - name: Configure AWS credentials
+        if: ${{ inputs.deploy_infrastructure }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -86,6 +96,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Restore Terraform plugin cache
+        if: ${{ inputs.deploy_infrastructure }}
         uses: actions/cache@v4
         with:
           path: |
@@ -94,15 +105,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-terraform-
 
-      - name: Install npm dependencies
-        shell: pwsh
-        run: npm.cmd ci
-
       - name: Prepare Terraform backend and variables
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         env:
           TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
           TF_LOCK_TABLE: ${{ secrets.TF_LOCK_TABLE }}
+          TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
           TF_APP_NAME: ${{ vars.TF_APP_NAME }}
           TF_COGNITO_DOMAIN_PREFIX: ${{ vars.TF_COGNITO_DOMAIN_PREFIX }}
           TF_WEB_CALLBACK_URL: ${{ vars.TF_WEB_CALLBACK_URL }}
@@ -111,15 +120,17 @@ jobs:
           TF_GOOGLE_CLIENT_SECRET: ${{ secrets.TF_GOOGLE_CLIENT_SECRET }}
           TF_GOOGLE_AUTHORIZE_SCOPES: ${{ vars.TF_GOOGLE_AUTHORIZE_SCOPES }}
           TF_LOG_RETENTION_DAYS: ${{ vars.TF_LOG_RETENTION_DAYS }}
+          TF_GEMINI_API_SECRET_ARN: ${{ secrets.TF_VAR_GEMINI_API_SECRET_ARN }}
           AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           $tfDir = Join-Path $PWD "infra/terraform/environments/${{ inputs.terraform_environment }}"
           $backendPath = Join-Path $tfDir "backend.ci.hcl"
           $tfvarsPath = Join-Path $tfDir "ci.auto.tfvars"
+          $stateKey = if ($env:TF_STATE_KEY) { $env:TF_STATE_KEY } else { "$env:TF_APP_NAME/${{ inputs.terraform_environment }}/terraform.tfstate" }
 
           @"
           bucket = "$env:TF_STATE_BUCKET"
-          key    = "bitewise/${{ inputs.terraform_environment }}/terraform.tfstate"
+          key    = "$stateKey"
           region = "$env:AWS_REGION"
           dynamodb_table = "$env:TF_LOCK_TABLE"
           encrypt = true
@@ -157,18 +168,37 @@ jobs:
           if ($env:TF_LOG_RETENTION_DAYS) {
             $lines += "log_retention_days = $env:TF_LOG_RETENTION_DAYS"
           }
+          if ($env:TF_GEMINI_API_SECRET_ARN) {
+            $lines += "gemini_api_secret_arn = ""$env:TF_GEMINI_API_SECRET_ARN"""
+          }
 
           $lines | Set-Content -Path $tfvarsPath -Encoding utf8NoBOM
 
-      - name: Build API Lambda package
+      - name: Show Terraform backend target
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-lambda.ps1
+        run: |
+          Write-Host "Terraform environment: ${{ inputs.terraform_environment }}"
+          Write-Host "Backend file:"
+          Get-Content "infra/terraform/environments/${{ inputs.terraform_environment }}/backend.ci.hcl"
+
+      - name: Build API Lambda package
+        if: ${{ inputs.deploy_infrastructure }}
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-api-dotnet-lambda.ps1
 
       - name: Terraform init
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
 
+      - name: Show Terraform state addresses
+        if: ${{ inputs.deploy_infrastructure }}
+        shell: pwsh
+        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} state list
+
       - name: Terraform apply
+        if: ${{ inputs.deploy_infrastructure }}
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} apply -auto-approve -var-file="ci.auto.tfvars"
 
@@ -221,33 +251,47 @@ jobs:
           BW_UPLOAD_STORE_PASSWORD: ${{ secrets.BW_UPLOAD_STORE_PASSWORD }}
           BW_UPLOAD_KEY_ALIAS: ${{ secrets.BW_UPLOAD_KEY_ALIAS }}
           BW_UPLOAD_KEY_PASSWORD: ${{ secrets.BW_UPLOAD_KEY_PASSWORD }}
-          ANDROID_AWS_REGION: ${{ vars.ANDROID_AWS_REGION }}
-          ANDROID_COGNITO_DOMAIN: ${{ vars.ANDROID_COGNITO_DOMAIN }}
-          ANDROID_COGNITO_USER_POOL_ID: ${{ vars.ANDROID_COGNITO_USER_POOL_ID }}
-          ANDROID_COGNITO_ANDROID_CLIENT_ID: ${{ vars.ANDROID_COGNITO_ANDROID_CLIENT_ID }}
-          ANDROID_SYNC_API_BASE_URL: ${{ vars.ANDROID_SYNC_API_BASE_URL }}
-          ANDROID_COGNITO_ANDROID_REDIRECT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
-          ANDROID_COGNITO_ANDROID_LOGOUT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
+          ANDROID_AWS_REGION_DEFAULT: ${{ vars.ANDROID_AWS_REGION }}
+          ANDROID_COGNITO_DOMAIN_DEFAULT: ${{ vars.ANDROID_COGNITO_DOMAIN }}
+          ANDROID_COGNITO_USER_POOL_ID_DEFAULT: ${{ vars.ANDROID_COGNITO_USER_POOL_ID }}
+          ANDROID_COGNITO_ANDROID_CLIENT_ID_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_CLIENT_ID }}
+          ANDROID_SYNC_API_BASE_URL_DEFAULT: ${{ vars.ANDROID_SYNC_API_BASE_URL }}
+          ANDROID_COGNITO_ANDROID_REDIRECT_URI_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
+          ANDROID_COGNITO_ANDROID_LOGOUT_URI_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
+          ANDROID_AWS_REGION_PROD: ${{ vars.ANDROID_PROD_AWS_REGION }}
+          ANDROID_COGNITO_DOMAIN_PROD: ${{ vars.ANDROID_PROD_COGNITO_DOMAIN }}
+          ANDROID_COGNITO_USER_POOL_ID_PROD: ${{ vars.ANDROID_PROD_COGNITO_USER_POOL_ID }}
+          ANDROID_COGNITO_ANDROID_CLIENT_ID_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_CLIENT_ID }}
+          ANDROID_SYNC_API_BASE_URL_PROD: ${{ vars.ANDROID_PROD_SYNC_API_BASE_URL }}
+          ANDROID_COGNITO_ANDROID_REDIRECT_URI_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_REDIRECT_URI }}
+          ANDROID_COGNITO_ANDROID_LOGOUT_URI_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_LOGOUT_URI }}
         run: |
+          $configEnvironment = "${{ inputs.android_config_environment }}"
+          if (-not $configEnvironment) { $configEnvironment = "${{ inputs.terraform_environment }}" }
+          $suffix = if ($configEnvironment -eq "prod") { "_PROD" } else { "_DEFAULT" }
+          $env:ANDROID_AWS_REGION = (Get-Item "Env:ANDROID_AWS_REGION$suffix").Value
+          $env:ANDROID_COGNITO_DOMAIN = (Get-Item "Env:ANDROID_COGNITO_DOMAIN$suffix").Value
+          $env:ANDROID_COGNITO_USER_POOL_ID = (Get-Item "Env:ANDROID_COGNITO_USER_POOL_ID$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_CLIENT_ID = (Get-Item "Env:ANDROID_COGNITO_ANDROID_CLIENT_ID$suffix").Value
+          $env:ANDROID_SYNC_API_BASE_URL = (Get-Item "Env:ANDROID_SYNC_API_BASE_URL$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI = (Get-Item "Env:ANDROID_COGNITO_ANDROID_REDIRECT_URI$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI = (Get-Item "Env:ANDROID_COGNITO_ANDROID_LOGOUT_URI$suffix").Value
+
+          foreach ($prefix in @("CT_DEV", "CT_PROD")) {
+            Set-Item -Path "Env:${prefix}_AWS_REGION" -Value $env:ANDROID_AWS_REGION
+            Set-Item -Path "Env:${prefix}_COGNITO_DOMAIN" -Value $env:ANDROID_COGNITO_DOMAIN
+            Set-Item -Path "Env:${prefix}_COGNITO_USER_POOL_ID" -Value $env:ANDROID_COGNITO_USER_POOL_ID
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_CLIENT_ID" -Value $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
+            Set-Item -Path "Env:${prefix}_SYNC_API_BASE_URL" -Value $env:ANDROID_SYNC_API_BASE_URL
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_REDIRECT_URI" -Value $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
+            Set-Item -Path "Env:${prefix}_COGNITO_ANDROID_LOGOUT_URI" -Value $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
+          }
+
           if ("${{ inputs.android_flavor }}" -eq "dev") {
-            $env:CT_DEV_AWS_REGION = $env:ANDROID_AWS_REGION
-            $env:CT_DEV_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
-            $env:CT_DEV_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
-            $env:CT_DEV_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
-            $env:CT_DEV_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
-            $env:CT_DEV_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
-            $env:CT_DEV_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
             $bundleTask = ":app:bundleDevRelease"
             $bundlePath = "apps/android/app/build/outputs/bundle/devRelease/app-dev-release.aab"
             $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/devRelease"
           } else {
-            $env:CT_PROD_AWS_REGION = $env:ANDROID_AWS_REGION
-            $env:CT_PROD_COGNITO_DOMAIN = $env:ANDROID_COGNITO_DOMAIN
-            $env:CT_PROD_COGNITO_USER_POOL_ID = $env:ANDROID_COGNITO_USER_POOL_ID
-            $env:CT_PROD_COGNITO_ANDROID_CLIENT_ID = $env:ANDROID_COGNITO_ANDROID_CLIENT_ID
-            $env:CT_PROD_SYNC_API_BASE_URL = $env:ANDROID_SYNC_API_BASE_URL
-            $env:CT_PROD_COGNITO_ANDROID_REDIRECT_URI = $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI
-            $env:CT_PROD_COGNITO_ANDROID_LOGOUT_URI = $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI
             $bundleTask = ":app:bundleProdRelease"
             $bundlePath = "apps/android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
             $symbolsPath = "apps/android/app/build/outputs/native-debug-symbols/prodRelease"

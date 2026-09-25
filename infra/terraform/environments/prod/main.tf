@@ -12,7 +12,7 @@ terraform {
 }
 
 locals {
-  api_lambda_package_path   = abspath("${path.root}/../../../../apps/api/dist/lambda/api.zip")
+  api_lambda_package_path   = abspath("${path.root}/../../../../apps/api-dotnet/dist/lambda/api.zip")
   api_lambda_package_exists = fileexists(local.api_lambda_package_path)
 }
 
@@ -40,6 +40,9 @@ module "app" {
   lambda_timeout_seconds      = var.lambda_timeout_seconds
   api_stage_name              = var.api_stage_name
   log_retention_days          = var.log_retention_days
+  web_hosting_repository      = var.web_hosting_repository
+  web_hosting_access_token    = var.web_hosting_access_token
+  web_hosting_branch          = var.web_hosting_branch
   manage_lambda_log_groups    = var.manage_lambda_log_groups
   google_client_id            = var.google_client_id
   google_client_secret        = var.google_client_secret

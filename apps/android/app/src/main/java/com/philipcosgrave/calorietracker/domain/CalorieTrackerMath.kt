@@ -7,15 +7,20 @@ import com.philipcosgrave.calorietracker.model.Meal
 import com.philipcosgrave.calorietracker.model.Nutrients
 import com.philipcosgrave.calorietracker.model.RecipeComponent
 import com.philipcosgrave.calorietracker.model.RecipeDraft
+import com.philipcosgrave.calorietracker.model.ReferenceServing
 import com.philipcosgrave.calorietracker.model.Totals
 import java.util.UUID
 import kotlin.math.round
 
 private val volumeUnits = listOf("tsp", "tbsp", "fl oz", "cup", "pint", "quart", "ml", "liter")
 private val massUnits = listOf("milligram", "gram", "kg", "oz", "lb")
-private val itemUnits = listOf("bar", "bottle", "box", "can", "container", "jar", "package", "service", "serving")
+private val itemUnits = listOf("slice", "piece", "egg", "wrap", "clove", "medium", "bar", "bottle", "box", "can", "container", "jar", "package", "service", "serving")
 
-val measurementUnits = volumeUnits + massUnits + itemUnits
+/** Units for nutrition-label and equivalent-amount fields. */
+val nutritionMeasurementUnits = volumeUnits + massUnits
+/** Named portions for servings, kept separate from physical measurement units. */
+val servingUnits = itemUnits
+val measurementUnits = nutritionMeasurementUnits + servingUnits
 
 private val conversionGroups = listOf(
     mapOf("tsp" to 1.0, "tbsp" to 3.0, "fl oz" to 6.0, "cup" to 48.0, "pint" to 96.0, "quart" to 192.0, "ml" to 0.202884, "liter" to 202.884),
@@ -33,24 +38,49 @@ fun formatNumber(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else roundOne(value).toString()
 
 fun convertAmount(amount: Double, fromUnit: String, toUnit: String): Double? {
-    if (fromUnit == toUnit) return amount
-    val group = conversionGroups.firstOrNull { it.containsKey(fromUnit) && it.containsKey(toUnit) } ?: return null
-    return amount * (group[fromUnit] ?: return null) / (group[toUnit] ?: return null)
+    val from = canonicalMeasurementUnit(fromUnit)
+    val to = canonicalMeasurementUnit(toUnit)
+    if (from == to) return amount
+    val group = conversionGroups.firstOrNull { it.containsKey(from) && it.containsKey(to) } ?: return null
+    return amount * (group[from] ?: return null) / (group[to] ?: return null)
+}
+
+private fun canonicalMeasurementUnit(unit: String): String = when (val normalized = unit.trim().lowercase()) {
+    "g", "grams" -> "gram"
+    "mg", "milligrams" -> "milligram"
+    else -> normalized
 }
 
 fun compatibleMeasurementUnits(baseUnit: String): List<String> {
     if (baseUnit.isBlank()) return listOf("serving")
-    val group = conversionGroups.firstOrNull { it.containsKey(baseUnit) }
+    val canonical = canonicalMeasurementUnit(baseUnit)
+    val group = conversionGroups.firstOrNull { it.containsKey(canonical) }
     return if (group != null) {
         group.keys.sortedBy { unit -> measurementUnits.indexOf(unit).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+            .map { if (it == canonical) baseUnit else it }
     } else {
         listOf(baseUnit)
     }
 }
 
+/** CNF often lists ordinary quantities (for example, "125 mL chopped") beside genuine portions.
+ * Keep only named portions and make them natural multiplier labels such as "medium fruit". */
+fun normalizedCnfServingOptions(options: List<ReferenceServing>): List<ReferenceServing> {
+    val measurementOnly = Regex("""^\s*\d+(?:\.\d+)?\s*(?:ml|mL|millilit(?:er|re)s?|g|grams?|kg|oz|lb|tsp|tbsp|cup|pint|quart|fl\s*oz)\b""", RegexOption.IGNORE_CASE)
+    val leadingOne = Regex("""^\s*1\s+""")
+    val parenthetical = Regex("""\s*\([^)]*\)""")
+    return options
+        .asSequence()
+        .filterNot { measurementOnly.containsMatchIn(it.description) }
+        .map { option -> option.copy(description = option.description.replace(leadingOne, "").replace(parenthetical, "").trim()) }
+        .filter { it.description.isNotBlank() }
+        .distinctBy { it.description.lowercase() }
+        .toList()
+}
+
 fun totalComponents(components: List<RecipeComponent>): Totals =
     components.fold(Totals()) { total, component ->
-        val converted = convertAmount(component.amount, component.unit, component.item.servingUnit) ?: component.amount
+        val converted = component.item.amountInBaseUnits(component.amount, component.unit) ?: component.amount
         val nutrients = component.item.nutrients.scale(converted / component.item.servingQuantity.coerceAtLeast(0.1))
         Totals(
             calories = total.calories + nutrients.calories,
@@ -76,6 +106,7 @@ fun Nutrients.scale(multiplier: Double): Nutrients = Nutrients(
     proteinGrams = roundOne(proteinGrams * multiplier),
     carbohydrateGrams = roundOne(carbohydrateGrams * multiplier),
     fatGrams = roundOne(fatGrams * multiplier),
+    additional = additional.mapValues { (_, value) -> value * multiplier },
 )
 
 fun Totals.rounded(): Totals = Totals(
@@ -100,7 +131,7 @@ fun FoodItem.withAdjustedComponents(updatedComponents: List<RecipeComponent>): F
     if (kind != FoodKind.Recipe) return this
     val totals = totalComponents(updatedComponents)
     return copy(
-        nutrients = Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat),
+        nutrients = Nutrients(totals.calories, totals.protein, totals.carbs, totals.fat, componentAdditionalNutrients(updatedComponents)),
         components = updatedComponents,
     )
 }
@@ -111,19 +142,56 @@ fun RecipeDraft.toFoodItem(existingId: String? = null): FoodItem {
     return FoodItem(
         id = existingId ?: createId("recipe"),
         kind = FoodKind.Recipe,
-        name = name.trim(),
+        name = foodTitle(name),
         brand = brand.trim(),
         servingQuantity = quantity,
         servingUnit = servingUnit,
-        nutrients = Nutrients(nutrients.calories, nutrients.protein, nutrients.carbs, nutrients.fat),
-        components = components,
+        nutrients = Nutrients(nutrients.calories, nutrients.protein, nutrients.carbs, nutrients.fat, componentAdditionalNutrients(components)),
+        components = components, photoPath = photoPath, instructions = instructions, description = description, prepMinutes = prepMinutes, totalMinutes = totalMinutes,
     )
 }
 
 fun FoodItem.toRecipeDraft(): RecipeDraft = RecipeDraft(
     name = name,
     brand = brand,
-    servingQuantity = formatNumber(servingQuantity),
+    servingQuantity = formatAmount(servingQuantity),
     servingUnit = servingUnit,
-    components = components,
+    components = components, photoPath = photoPath, instructions = instructions, description = description, prepMinutes = prepMinutes, totalMinutes = totalMinutes,
 )
+
+/** Converts physical weight only when this food defines an equivalent weight. */
+fun FoodItem.amountInBaseUnits(amount: Double, unit: String): Double? {
+    convertAmount(amount, unit, servingUnit)?.let { return it }
+    servingOptions.firstOrNull { it.description == unit }?.let { option ->
+        option.amount?.let { equivalent -> option.unit?.let { equivalentUnit ->
+            convertAmount(amount * equivalent, equivalentUnit, servingUnit)?.let { return it }
+        } }
+    }
+    val grams = servingOptions.firstOrNull { it.description == unit }?.let { amount * it.grams } ?: convertAmount(amount, unit, "g") ?: return null
+    convertAmount(grams, "g", servingUnit)?.let { return it }
+    return servingWeightGrams?.takeIf { it > 0 }?.let { grams / it * servingQuantity }
+}
+fun FoodItem.amountInGrams(amount: Double, unit: String): Double? {
+    servingOptions.firstOrNull { it.description == unit }?.let { option ->
+        option.amount?.let { equivalent -> option.unit?.let { equivalentUnit ->
+            convertAmount(amount * equivalent, equivalentUnit, "g")?.let { return it }
+        } }
+        if (option.grams > 0) return amount * option.grams
+    }
+    convertAmount(amount, unit, "g")?.let { return it }
+    val base = convertAmount(amount, unit, servingUnit) ?: return null
+    return servingWeightGrams?.let { base / servingQuantity * it }
+}
+fun FoodItem.amountUnits(): List<String> = (servingOptions.map { it.description } + compatibleMeasurementUnits(servingUnit) +
+    if (servingWeightGrams != null) listOf("g") else emptyList()).distinct()
+
+fun formatAmount(value: Double): String = java.math.BigDecimal.valueOf(value).setScale(6, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+
+/** Only show an optional recipe total when every component supplies it; absent is not zero. */
+fun componentAdditionalNutrients(components: List<RecipeComponent>): Map<String, Double> {
+    if (components.isEmpty()) return emptyMap()
+    val common = components.map { it.item.nutrients.additional.keys }.reduce { a, b -> a.intersect(b) }
+    return common.associateWith { key -> components.sumOf { c ->
+        c.item.nutrients.additional.getValue(key) * (c.item.amountInBaseUnits(c.amount, c.unit) ?: 0.0) / c.item.servingQuantity
+    } }
+}

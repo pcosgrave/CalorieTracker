@@ -100,14 +100,14 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
 
-            val redirectUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_REDIRECT_URI")
-            val logoutUri = configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_LOGOUT_URI")
+            val redirectUri = configForFlavor("CT_DEV", "COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_DEV", "COGNITO_ANDROID_LOGOUT_URI")
 
-            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_DEV", "CT_AWS_REGION")}\"")
-            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_DEV", "CT_COGNITO_DOMAIN")}\"")
-            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_USER_POOL_ID")}\"")
-            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_DEV", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
-            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_DEV", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_DEV", "AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_DEV", "COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_DEV", "COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_DEV", "COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_DEV", "SYNC_API_BASE_URL")}\"")
             buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
             buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
             manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
@@ -118,14 +118,14 @@ android {
         create("prod") {
             dimension = "environment"
 
-            val redirectUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_REDIRECT_URI")
-            val logoutUri = configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_LOGOUT_URI")
+            val redirectUri = configForFlavor("CT_PROD", "COGNITO_ANDROID_REDIRECT_URI")
+            val logoutUri = configForFlavor("CT_PROD", "COGNITO_ANDROID_LOGOUT_URI")
 
-            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_PROD", "CT_AWS_REGION")}\"")
-            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_PROD", "CT_COGNITO_DOMAIN")}\"")
-            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_USER_POOL_ID")}\"")
-            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_PROD", "CT_COGNITO_ANDROID_CLIENT_ID")}\"")
-            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_PROD", "CT_SYNC_API_BASE_URL")}\"")
+            buildConfigField("String", "AWS_REGION", "\"${configForFlavor("CT_PROD", "AWS_REGION")}\"")
+            buildConfigField("String", "COGNITO_DOMAIN", "\"${configForFlavor("CT_PROD", "COGNITO_DOMAIN")}\"")
+            buildConfigField("String", "COGNITO_USER_POOL_ID", "\"${configForFlavor("CT_PROD", "COGNITO_USER_POOL_ID")}\"")
+            buildConfigField("String", "COGNITO_ANDROID_CLIENT_ID", "\"${configForFlavor("CT_PROD", "COGNITO_ANDROID_CLIENT_ID")}\"")
+            buildConfigField("String", "SYNC_API_BASE_URL", "\"${configForFlavor("CT_PROD", "SYNC_API_BASE_URL")}\"")
             buildConfigField("String", "COGNITO_ANDROID_REDIRECT_URI", "\"$redirectUri\"")
             buildConfigField("String", "COGNITO_ANDROID_LOGOUT_URI", "\"$logoutUri\"")
             manifestPlaceholders["authRedirectScheme"] = schemeFromUri(redirectUri)
@@ -204,6 +204,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.0")
     implementation("androidx.room:room-runtime:2.7.0")
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
     ksp("androidx.room:room-compiler:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 debugImplementation("androidx.arch.core:core-testing:2.2.0")
@@ -211,6 +213,7 @@ debugImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
 // Test dependencies
 testImplementation("junit:junit:4.13.2")
+testImplementation("org.json:json:20240303")
 testImplementation("org.mockito:mockito-core:5.15.2")
 testImplementation("org.mockito:mockito-inline:5.2.0")
 testImplementation("org.mockito:mockito-android:5.15.2")

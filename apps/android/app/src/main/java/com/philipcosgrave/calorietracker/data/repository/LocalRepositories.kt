@@ -3,6 +3,7 @@ package com.philipcosgrave.calorietracker.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.Room
 import com.philipcosgrave.calorietracker.data.readDiaryEntries
@@ -50,6 +51,7 @@ private const val DATABASE_NAME = "calorie-tracker.db"
 object LocalRepositoryFactory {
     fun database(context: Context): CalorieTrackerDatabase =
         Room.databaseBuilder(context, CalorieTrackerDatabase::class.java, DATABASE_NAME)
+            .addMigrations(com.philipcosgrave.calorietracker.data.local.LeftoverMigration)
             .fallbackToDestructiveMigration()
             .build()
 }
@@ -269,7 +271,20 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
     private fun calorieTargetMinKey(userId: String) = stringPreferencesKey("calorie_target_min.$userId")
     private fun calorieTargetMaxKey(userId: String) = stringPreferencesKey("calorie_target_max.$userId")
     private fun weightUnitKey(userId: String) = stringPreferencesKey("weight_unit.$userId")
+    private fun heightUnitKey(userId: String) = stringPreferencesKey("height_unit.$userId")
+    private fun foodUnitSystemKey(userId: String) = stringPreferencesKey("food_unit_system.$userId")
+    private fun dailyStepGoalKey(userId: String) = intPreferencesKey("daily_step_goal.$userId")
     private fun goalWeightKgKey(userId: String) = stringPreferencesKey("goal_weight_kg.$userId")
+    private fun goalTargetDateKey(userId: String) = stringPreferencesKey("goal_target_date.$userId")
+    private fun profilePhotoPathKey(userId: String) = stringPreferencesKey("profile_photo_path.$userId")
+    private fun profileTimezoneKey(userId: String) = stringPreferencesKey("profile_timezone.$userId")
+    private fun notificationDailyKey(userId: String) = booleanPreferencesKey("notification_daily.$userId")
+    private fun notificationWeeklyKey(userId: String) = booleanPreferencesKey("notification_weekly.$userId")
+    private fun notificationInsightsKey(userId: String) = booleanPreferencesKey("notification_insights.$userId")
+    private fun notificationProductUpdatesKey(userId: String) = booleanPreferencesKey("notification_product_updates.$userId")
+    private fun healthImportActivityKey(userId: String) = booleanPreferencesKey("health_import_activity.$userId")
+    private fun healthImportWeightKey(userId: String) = booleanPreferencesKey("health_import_weight.$userId")
+    private fun healthImportNutritionKey(userId: String) = booleanPreferencesKey("health_import_nutrition.$userId")
     private fun lastPulledAtKey(userId: String) = stringPreferencesKey("last_pulled_at.$userId")
     private fun lastAcknowledgedChangeIdKey(userId: String) = stringPreferencesKey("last_acknowledged_change_id.$userId")
 
@@ -306,7 +321,22 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             calorieTargetMax = prefs[calorieTargetMaxKey(userId)]?.toIntOrNull() ?: 2200,
             weightUnit = prefs[weightUnitKey(userId)]?.let { SyncSettings.WeightUnit.valueOf(it) }
                 ?: SyncSettings.WeightUnit.Kilograms,
+            heightUnit = prefs[heightUnitKey(userId)]?.let { SyncSettings.HeightUnit.valueOf(it) }
+                ?: SyncSettings.HeightUnit.Centimeters,
+            foodUnitSystem = prefs[foodUnitSystemKey(userId)]?.let { SyncSettings.FoodUnitSystem.valueOf(it) }
+                ?: SyncSettings.FoodUnitSystem.Metric,
             goalWeightKg = prefs[goalWeightKgKey(userId)]?.toDoubleOrNull(),
+            goalTargetDate = prefs[goalTargetDateKey(userId)],
+            profilePhotoPath = prefs[profilePhotoPathKey(userId)],
+            profileTimezone = prefs[profileTimezoneKey(userId)] ?: "UTC-05:00 Toronto",
+            notificationDaily = prefs[notificationDailyKey(userId)] ?: true,
+            notificationWeekly = prefs[notificationWeeklyKey(userId)] ?: true,
+            notificationInsights = prefs[notificationInsightsKey(userId)] ?: true,
+            notificationProductUpdates = prefs[notificationProductUpdatesKey(userId)] ?: false,
+            healthImportActivity = prefs[healthImportActivityKey(userId)] ?: true,
+            healthImportWeight = prefs[healthImportWeightKey(userId)] ?: true,
+            healthImportNutrition = prefs[healthImportNutritionKey(userId)] ?: true,
+            dailyStepGoal = prefs[dailyStepGoalKey(userId)]?.takeIf { it > 0 },
         )
     }
 
@@ -323,11 +353,27 @@ class DataStoreSyncStateRepository(private val context: Context) : SyncStateRepo
             prefs[calorieTargetMinKey(userId)] = settings.calorieTargetMin.toString()
             prefs[calorieTargetMaxKey(userId)] = settings.calorieTargetMax.toString()
             prefs[weightUnitKey(userId)] = settings.weightUnit.name
+            prefs[heightUnitKey(userId)] = settings.heightUnit.name
+            prefs[foodUnitSystemKey(userId)] = settings.foodUnitSystem.name
+            if (settings.dailyStepGoal == null) prefs.remove(dailyStepGoalKey(userId))
+            else prefs[dailyStepGoalKey(userId)] = settings.dailyStepGoal
             if (settings.goalWeightKg == null) {
                 prefs.remove(goalWeightKgKey(userId))
             } else {
                 prefs[goalWeightKgKey(userId)] = settings.goalWeightKg.toString()
             }
+            if (settings.goalTargetDate == null) prefs.remove(goalTargetDateKey(userId))
+            else prefs[goalTargetDateKey(userId)] = settings.goalTargetDate
+            if (settings.profilePhotoPath == null) prefs.remove(profilePhotoPathKey(userId))
+            else prefs[profilePhotoPathKey(userId)] = settings.profilePhotoPath
+            prefs[profileTimezoneKey(userId)] = settings.profileTimezone
+            prefs[notificationDailyKey(userId)] = settings.notificationDaily
+            prefs[notificationWeeklyKey(userId)] = settings.notificationWeekly
+            prefs[notificationInsightsKey(userId)] = settings.notificationInsights
+            prefs[notificationProductUpdatesKey(userId)] = settings.notificationProductUpdates
+            prefs[healthImportActivityKey(userId)] = settings.healthImportActivity
+            prefs[healthImportWeightKey(userId)] = settings.healthImportWeight
+            prefs[healthImportNutritionKey(userId)] = settings.healthImportNutrition
             settings.lastSuccessfulSyncAt?.let { prefs[lastSuccessfulSyncAtKey(userId)] = it }
         }
     }
