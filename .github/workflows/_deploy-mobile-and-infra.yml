@@ -9,6 +9,10 @@ on:
       terraform_environment:
         required: true
         type: string
+      android_config_environment:
+        required: false
+        type: string
+        default: ""
       android_flavor:
         required: true
         type: string
@@ -233,14 +237,32 @@ jobs:
           BW_UPLOAD_STORE_PASSWORD: ${{ secrets.BW_UPLOAD_STORE_PASSWORD }}
           BW_UPLOAD_KEY_ALIAS: ${{ secrets.BW_UPLOAD_KEY_ALIAS }}
           BW_UPLOAD_KEY_PASSWORD: ${{ secrets.BW_UPLOAD_KEY_PASSWORD }}
-          ANDROID_AWS_REGION: ${{ vars.ANDROID_AWS_REGION }}
-          ANDROID_COGNITO_DOMAIN: ${{ vars.ANDROID_COGNITO_DOMAIN }}
-          ANDROID_COGNITO_USER_POOL_ID: ${{ vars.ANDROID_COGNITO_USER_POOL_ID }}
-          ANDROID_COGNITO_ANDROID_CLIENT_ID: ${{ vars.ANDROID_COGNITO_ANDROID_CLIENT_ID }}
-          ANDROID_SYNC_API_BASE_URL: ${{ vars.ANDROID_SYNC_API_BASE_URL }}
-          ANDROID_COGNITO_ANDROID_REDIRECT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
-          ANDROID_COGNITO_ANDROID_LOGOUT_URI: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
+          ANDROID_AWS_REGION_DEFAULT: ${{ vars.ANDROID_AWS_REGION }}
+          ANDROID_COGNITO_DOMAIN_DEFAULT: ${{ vars.ANDROID_COGNITO_DOMAIN }}
+          ANDROID_COGNITO_USER_POOL_ID_DEFAULT: ${{ vars.ANDROID_COGNITO_USER_POOL_ID }}
+          ANDROID_COGNITO_ANDROID_CLIENT_ID_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_CLIENT_ID }}
+          ANDROID_SYNC_API_BASE_URL_DEFAULT: ${{ vars.ANDROID_SYNC_API_BASE_URL }}
+          ANDROID_COGNITO_ANDROID_REDIRECT_URI_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_REDIRECT_URI }}
+          ANDROID_COGNITO_ANDROID_LOGOUT_URI_DEFAULT: ${{ vars.ANDROID_COGNITO_ANDROID_LOGOUT_URI }}
+          ANDROID_AWS_REGION_PROD: ${{ vars.ANDROID_PROD_AWS_REGION }}
+          ANDROID_COGNITO_DOMAIN_PROD: ${{ vars.ANDROID_PROD_COGNITO_DOMAIN }}
+          ANDROID_COGNITO_USER_POOL_ID_PROD: ${{ vars.ANDROID_PROD_COGNITO_USER_POOL_ID }}
+          ANDROID_COGNITO_ANDROID_CLIENT_ID_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_CLIENT_ID }}
+          ANDROID_SYNC_API_BASE_URL_PROD: ${{ vars.ANDROID_PROD_SYNC_API_BASE_URL }}
+          ANDROID_COGNITO_ANDROID_REDIRECT_URI_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_REDIRECT_URI }}
+          ANDROID_COGNITO_ANDROID_LOGOUT_URI_PROD: ${{ vars.ANDROID_PROD_COGNITO_ANDROID_LOGOUT_URI }}
         run: |
+          $configEnvironment = "${{ inputs.android_config_environment }}"
+          if (-not $configEnvironment) { $configEnvironment = "${{ inputs.terraform_environment }}" }
+          $suffix = if ($configEnvironment -eq "prod") { "_PROD" } else { "_DEFAULT" }
+          $env:ANDROID_AWS_REGION = (Get-Item "Env:ANDROID_AWS_REGION$suffix").Value
+          $env:ANDROID_COGNITO_DOMAIN = (Get-Item "Env:ANDROID_COGNITO_DOMAIN$suffix").Value
+          $env:ANDROID_COGNITO_USER_POOL_ID = (Get-Item "Env:ANDROID_COGNITO_USER_POOL_ID$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_CLIENT_ID = (Get-Item "Env:ANDROID_COGNITO_ANDROID_CLIENT_ID$suffix").Value
+          $env:ANDROID_SYNC_API_BASE_URL = (Get-Item "Env:ANDROID_SYNC_API_BASE_URL$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_REDIRECT_URI = (Get-Item "Env:ANDROID_COGNITO_ANDROID_REDIRECT_URI$suffix").Value
+          $env:ANDROID_COGNITO_ANDROID_LOGOUT_URI = (Get-Item "Env:ANDROID_COGNITO_ANDROID_LOGOUT_URI$suffix").Value
+
           foreach ($prefix in @("CT_DEV", "CT_PROD")) {
             Set-Item -Path "Env:${prefix}_AWS_REGION" -Value $env:ANDROID_AWS_REGION
             Set-Item -Path "Env:${prefix}_COGNITO_DOMAIN" -Value $env:ANDROID_COGNITO_DOMAIN

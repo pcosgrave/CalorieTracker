@@ -138,6 +138,30 @@ push the branch, and open a PR targeting main. Do not merge it.
 
 The completion workflow runs tests, typecheck, and lint before committing. Install and authenticate the GitHub CLI (`gh`) for automatic PR creation.
 
+## Development backend and Android environments
+
+Local Android debug builds use the `dev` flavor and the `CT_DEV_*` values in `apps/android/secure.properties`, so they target the development Cognito/API endpoints:
+
+```powershell
+.\scripts\build-android-dev.ps1
+```
+
+The local development backend can be deployed from the current working tree, including uncommitted changes:
+
+```powershell
+.\scripts\deploy-backend-dev-local.ps1
+```
+
+This builds the current .NET Lambda package, runs Terraform against the shared `dev` state, and applies the dev environment. It does not commit or push Git changes. Use `-PlanOnly` to preview changes. AWS credentials and Terraform access must already be configured locally.
+
+Play Store bundles use the `prod` Android flavor and should use `CT_PROD_*` values, including the production API and Cognito client:
+
+```powershell
+.\scripts\build-android-release.ps1
+```
+
+The GitHub Actions Play Store workflows remain the release path: the internal testing workflow publishes the configured test release, and the production workflow publishes the production release. Keep `CT_PROD_SYNC_API_BASE_URL` pointed at the production API for any Play Store build.
+
 ```bash
 npm run typecheck
 git diff --check

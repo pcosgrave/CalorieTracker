@@ -27,3 +27,7 @@ obj/
 apps/api-dotnet/.nuget-appdata/
 apps/api-dotnet/.vs
 infra/terraform/environments/prod/.terraform.lock.hcl
+apps/api-dotnet/tests/CalorieTracker.Api.Tests/bin
+apps/api-dotnet/tests/CalorieTracker.Api.Tests/obj
+apps/api-dotnet/src/CalorieTracker.Api/bin
+apps/api-dotnet/src/CalorieTracker.Api/obj

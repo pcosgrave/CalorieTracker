@@ -36,6 +36,7 @@ jobs:
       github_environment: dev
       terraform_environment: dev
       android_flavor: prod
+      android_config_environment: prod
       android_package_name: com.cosgravelabs.bitewise
       play_track: internal
       play_status: completed
