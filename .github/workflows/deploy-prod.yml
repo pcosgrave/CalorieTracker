@@ -23,8 +23,8 @@ jobs:
             echo "The backend production deployment did not succeed."
             exit 1
           fi
-          if [ "${{ github.event.workflow_run.head_branch }}" != "dev" ]; then
-            echo "The backend deployment was not triggered by the expected dev -> prod promotion. Branch: ${{ github.event.workflow_run.head_branch }}"
+          if [ "${{ github.event.workflow_run.head_branch }}" != "prod" ]; then
+            echo "The backend deployment did not run from prod. Branch: ${{ github.event.workflow_run.head_branch }}"
             exit 1
           fi
 
