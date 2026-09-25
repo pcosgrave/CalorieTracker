@@ -82,12 +82,6 @@ variable "log_retention_days" {
   default     = 30
 }
 
-variable "database_backup_retention_period" {
-  description = "RDS automated backup retention period in days. Free Tier dev accounts should use 1."
-  type        = number
-  default     = 1
-}
-
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
@@ -107,9 +101,3 @@ variable "google_authorize_scopes" {
   default     = "openid email profile"
 }
 
-variable "gemini_api_secret_arn" {
-  description = "Optional Secrets Manager ARN for the Gemini API secret."
-  type        = string
-  default     = null
-  sensitive   = true
-}

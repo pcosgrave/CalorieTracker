@@ -117,7 +117,6 @@ Copy-Item infra\terraform\environments\dev\terraform.tfvars.example infra\terraf
 
 8. Edit `infra/terraform/environments/dev/terraform.tfvars` with your real values.
    - At minimum, set `aws_region` and `cognito_domain_prefix`
-   - Set `gemini_api_secret_arn` if you want the AI endpoint to resolve its key from Secrets Manager
 
 9. Build the Lambda deployment zip:
 

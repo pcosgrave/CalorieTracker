@@ -1,13 +1,12 @@
 using Amazon.DynamoDBv2;
 using Amazon.CognitoIdentityProvider;
-using Amazon.SecretsManager;
 using CalorieTracker.Api.Services.Account;
-using CalorieTracker.Api.Services.Ai;
 using CalorieTracker.Api.Services.Diary;
 using Microsoft.Extensions.Options;
 using CalorieTracker.Api.Services.Foods;
 using CalorieTracker.Api.Services.Sync;
 using CalorieTracker.Api.Services.Weights;
+using CalorieTracker.Api.Services.Households;
 using CalorieTracker.Api.Infrastructure;
 
 namespace CalorieTracker.Api.Configuration;
@@ -18,9 +17,6 @@ public static class ApiConfiguration
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName).PostConfigure(options => options.ConnectionString ??= configuration.GetConnectionString("Postgres") ?? configuration["DATABASE_CONNECTION_STRING"]);
-        services.AddSingleton(sp => sp.GetRequiredService<IOptions<DatabaseOptions>>().Value);
-        services.AddSingleton<DatabaseConnectionFactory>();
         services
             .AddOptions<StorageOptions>()
             .BindConfiguration(StorageOptions.SectionName)
@@ -31,6 +27,7 @@ public static class ApiConfiguration
                 options.DiaryEntriesTableName ??= configuration["DIARY_ENTRIES_TABLE_NAME"];
                 options.WeightEntriesTableName ??= configuration["WEIGHT_ENTRIES_TABLE_NAME"];
                 options.SyncChangesTableName ??= configuration["SYNC_CHANGES_TABLE_NAME"];
+                options.HouseholdsTableName ??= configuration["HOUSEHOLDS_TABLE_NAME"];
             })
             .ValidateDataAnnotations()
             .ValidateOnStart();
@@ -45,25 +42,15 @@ public static class ApiConfiguration
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services
-            .AddOptions<AiOptions>()
-            .BindConfiguration(AiOptions.SectionName)
-            .PostConfigure(options =>
-            {
-                options.GeminiApiSecretArn ??= configuration["GEMINI_API_SECRET_ARN"];
-            });
-
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<StorageOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<CognitoOptions>>().Value);
-        services.AddSingleton(sp => sp.GetRequiredService<IOptions<AiOptions>>().Value);
         services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
         services.AddSingleton<IAmazonCognitoIdentityProvider>(_ => new AmazonCognitoIdentityProviderClient());
-        services.AddSingleton<IAmazonSecretsManager>(_ => new AmazonSecretsManagerClient());
-        services.AddHttpClient<AiFoodLogService>();
         services.AddSingleton<IFoodRepository, DynamoDbFoodRepository>();
         services.AddSingleton<IDiaryRepository, DynamoDbDiaryRepository>();
         services.AddSingleton<IWeightRepository, DynamoDbWeightRepository>();
         services.AddSingleton<ISyncChangeRepository, DynamoDbSyncChangeRepository>();
+        services.AddSingleton<HouseholdService>();
         services.AddSingleton<FoodService>();
         services.AddSingleton<DiaryService>();
         services.AddSingleton<WeightService>();

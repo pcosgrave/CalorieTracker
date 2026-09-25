@@ -95,13 +95,6 @@ variable "google_authorize_scopes" {
   default     = "openid email profile"
 }
 
-variable "gemini_api_secret_arn" {
-  description = "Optional Secrets Manager ARN for the Gemini API secret."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
 variable "log_retention_days" {
   description = "Retention period for Lambda CloudWatch log groups."
   type        = number
@@ -112,30 +105,6 @@ variable "manage_lambda_log_groups" {
   description = "Whether Terraform should create and manage encrypted Lambda CloudWatch log groups."
   type        = bool
   default     = false
-}
-
-variable "database_instance_class" {
-  description = "RDS PostgreSQL instance class."
-  type        = string
-  default     = "db.t4g.micro"
-}
-
-variable "database_allocated_storage_gb" {
-  description = "Initial encrypted RDS storage in GiB."
-  type        = number
-  default     = 20
-}
-
-variable "database_name" {
-  description = "Initial PostgreSQL database name."
-  type        = string
-  default     = "bitewise"
-}
-
-variable "database_backup_retention_period" {
-  description = "RDS automated backup retention period in days."
-  type        = number
-  default     = 7
 }
 
 variable "web_hosting_repository" {

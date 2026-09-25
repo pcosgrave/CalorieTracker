@@ -15,12 +15,9 @@ locals {
       DIARY_ENTRIES_TABLE_NAME   = aws_dynamodb_table.diary_entries.name
       WEIGHT_ENTRIES_TABLE_NAME  = aws_dynamodb_table.weight_entries.name
       SYNC_CHANGES_TABLE_NAME    = aws_dynamodb_table.sync_changes.name
+      HOUSEHOLDS_TABLE_NAME      = aws_dynamodb_table.households.name
       USER_POOL_ID               = aws_cognito_user_pool.main.id
-      DATABASE_SECRET_ARN        = aws_db_instance.main.master_user_secret[0].secret_arn
-    },
-    var.gemini_api_secret_arn != null && trimspace(var.gemini_api_secret_arn) != "" ? {
-      GEMINI_API_SECRET_ARN = var.gemini_api_secret_arn
-    } : {}
+    }
   )
 
   managed_api_lambda_log_group_names = var.create_api && var.manage_lambda_log_groups ? toset([local.api_lambda_function_name]) : toset([])
@@ -94,60 +91,6 @@ data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
-  }
-}
-
-resource "aws_kms_key" "app_storage" {
-  description             = "Customer managed KMS key for ${local.name_prefix} application storage"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.app_storage_kms.json
-
-  tags = local.tags
-}
-
-resource "aws_kms_alias" "app_storage" {
-  name          = "alias/${local.name_prefix}-storage"
-  target_key_id = aws_kms_key.app_storage.key_id
-}
-
-data "aws_iam_policy_document" "app_storage_kms" {
-  statement {
-    sid    = "EnableRootPermissions"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
-    }
-
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowCloudWatchLogsUseOfKey"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
-    }
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey",
-    ]
-    resources = ["*"]
-
-    condition {
-      test     = "ArnLike"
-      variable = "kms:EncryptionContext:aws:logs:arn"
-      values   = ["arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.name_prefix}-*"]
-    }
   }
 }
 
@@ -274,11 +217,6 @@ resource "aws_dynamodb_table" "products" {
     enabled = true
   }
 
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.app_storage.arn
-  }
-
   tags = local.tags
 }
 
@@ -300,11 +238,6 @@ resource "aws_dynamodb_table" "barcode_aliases" {
 
   point_in_time_recovery {
     enabled = true
-  }
-
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.app_storage.arn
   }
 
   tags = local.tags
@@ -330,11 +263,6 @@ resource "aws_dynamodb_table" "diary_entries" {
     enabled = true
   }
 
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.app_storage.arn
-  }
-
   tags = local.tags
 }
 
@@ -356,11 +284,6 @@ resource "aws_dynamodb_table" "weight_entries" {
 
   point_in_time_recovery {
     enabled = true
-  }
-
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.app_storage.arn
   }
 
   tags = local.tags
@@ -386,9 +309,27 @@ resource "aws_dynamodb_table" "sync_changes" {
     enabled = true
   }
 
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.app_storage.arn
+  tags = local.tags
+}
+
+resource "aws_dynamodb_table" "households" {
+  name         = "${local.name_prefix}-households"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "ownerUserId"
+  range_key    = "householdId"
+
+  attribute {
+    name = "ownerUserId"
+    type = "S"
+  }
+
+  attribute {
+    name = "householdId"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
   }
 
   tags = local.tags
@@ -413,8 +354,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "events" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.app_storage.arn
+      sse_algorithm = "AES256"
     }
   }
 }
@@ -424,16 +364,7 @@ resource "aws_cloudwatch_log_group" "api_lambdas" {
 
   name              = "/aws/lambda/${each.value}"
   retention_in_days = var.log_retention_days
-  kms_key_id        = aws_kms_key.app_storage.arn
-
-  tags = local.tags
-}
-
-resource "aws_security_group" "database" {
-  name_prefix = "${local.name_prefix}-db-"
-  description = "Allow API Lambda access to PostgreSQL"
-  vpc_id      = data.aws_vpc.default.id
-  tags        = local.tags
+  tags              = local.tags
 }
 
 resource "aws_security_group" "api_lambda" {
@@ -447,43 +378,6 @@ resource "aws_security_group" "api_lambda" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = local.tags
-}
-
-resource "aws_security_group_rule" "database_from_lambda" {
-  type                     = "ingress"
-  security_group_id        = aws_security_group.database.id
-  source_security_group_id = aws_security_group.api_lambda.id
-  protocol                 = "tcp"
-  from_port                = 5432
-  to_port                  = 5432
-}
-
-resource "aws_db_subnet_group" "main" {
-  name       = "${local.name_prefix}-db"
-  subnet_ids = data.aws_subnets.default.ids
-  tags       = local.tags
-}
-
-resource "aws_db_instance" "main" {
-  identifier                  = "${local.name_prefix}-postgres"
-  engine                      = "postgres"
-  instance_class              = var.database_instance_class
-  allocated_storage           = var.database_allocated_storage_gb
-  max_allocated_storage       = 100
-  db_name                     = var.database_name
-  username                    = "bitewise_admin"
-  manage_master_user_password = true
-  db_subnet_group_name        = aws_db_subnet_group.main.name
-  vpc_security_group_ids      = [aws_security_group.database.id]
-  publicly_accessible         = false
-  multi_az                    = false
-  storage_encrypted           = true
-  kms_key_id                  = aws_kms_key.app_storage.arn
-  backup_retention_period     = var.database_backup_retention_period
-  skip_final_snapshot         = var.environment != "prod"
-  deletion_protection         = var.environment == "prod"
-  apply_immediately           = var.environment != "prod"
-  tags                        = local.tags
 }
 
 resource "aws_iam_role" "api_lambda" {
@@ -548,30 +442,15 @@ resource "aws_iam_role_policy" "api_lambda" {
         },
         {
           Effect = "Allow"
-          Action = [
-            "dynamodb:GetItem",
-            "dynamodb:DeleteItem",
-            "dynamodb:PutItem",
-            "dynamodb:Query",
-            "dynamodb:UpdateItem",
-          ]
+          Action = ["dynamodb:GetItem", "dynamodb:DeleteItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"]
           Resource = [
             aws_dynamodb_table.products.arn,
             aws_dynamodb_table.barcode_aliases.arn,
             aws_dynamodb_table.diary_entries.arn,
             aws_dynamodb_table.weight_entries.arn,
             aws_dynamodb_table.sync_changes.arn,
+            aws_dynamodb_table.households.arn,
           ]
-        },
-        {
-          Effect = "Allow"
-          Action = [
-            "kms:Decrypt",
-            "kms:Encrypt",
-            "kms:GenerateDataKey",
-            "kms:DescribeKey",
-          ]
-          Resource = aws_kms_key.app_storage.arn
         },
         {
           Effect = "Allow"
@@ -581,22 +460,7 @@ resource "aws_iam_role_policy" "api_lambda" {
           Resource = aws_cognito_user_pool.main.arn
         }
       ],
-      var.gemini_api_secret_arn != null && trimspace(var.gemini_api_secret_arn) != "" ? [
-        {
-          Effect = "Allow"
-          Action = [
-            "secretsmanager:GetSecretValue",
-          ]
-          Resource = var.gemini_api_secret_arn
-        }
-      ] : [],
-      [
-        {
-          Effect   = "Allow"
-          Action   = ["secretsmanager:GetSecretValue"]
-          Resource = aws_db_instance.main.master_user_secret[0].secret_arn
-        }
-      ]
+      []
     )
   })
 }

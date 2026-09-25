@@ -9,7 +9,7 @@ public static class ApiEnvironment
         "DIARY_ENTRIES_TABLE_NAME",
         "WEIGHT_ENTRIES_TABLE_NAME",
         "SYNC_CHANGES_TABLE_NAME",
+        "HOUSEHOLDS_TABLE_NAME",
         "USER_POOL_ID",
-        "DATABASE_CONNECTION_STRING",
     ];
 }

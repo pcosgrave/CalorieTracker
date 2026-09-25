@@ -82,12 +82,6 @@ variable "log_retention_days" {
   default     = 30
 }
 
-variable "database_backup_retention_period" {
-  description = "RDS automated backup retention period in days."
-  type        = number
-  default     = 7
-}
-
 variable "web_hosting_repository" {
   description = "GitHub repository URL for the production web app."
   type        = string
@@ -126,9 +120,3 @@ variable "google_authorize_scopes" {
   default     = "openid email profile"
 }
 
-variable "gemini_api_secret_arn" {
-  description = "Optional Secrets Manager ARN for the Gemini API secret."
-  type        = string
-  default     = null
-  sensitive   = true
-}

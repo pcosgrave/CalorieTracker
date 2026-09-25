@@ -20,4 +20,7 @@ public sealed class StorageOptions
 
     [Required]
     public string? SyncChangesTableName { get; set; }
+
+    [Required]
+    public string? HouseholdsTableName { get; set; }
 }
