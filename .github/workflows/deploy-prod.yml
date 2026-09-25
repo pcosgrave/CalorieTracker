@@ -29,7 +29,7 @@ jobs:
       deploy_infrastructure: false
       android_flavor: prod
       android_package_name: com.cosgravelabs.bitewise
-      play_track: production
+      play_track: internal
       play_status: completed
       bump_release_version: true
       create_release_tag: true

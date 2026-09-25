@@ -25,7 +25,7 @@ The intended branch model is:
   - can also be run manually from the Actions tab for testing
   - applies `infra/terraform/environments/prod`
   - builds Android `prodRelease`
-  - uploads `com.cosgravelabs.bitewise` to the Google Play `production` track
+  - uploads `com.cosgravelabs.bitewise` to the Google Play `internal` testing track
 
 All Play Store builds, including internal or closed-test builds, must use the production backend and production Android/Cognito configuration. Local development builds use the `dev` flavor and are installed directly on an emulator or device.
 
@@ -357,8 +357,8 @@ Expected result:
 
 ## 10. Important Notes
 
-- The prod workflow currently uploads directly to the `production` track.
-- If you want a safer first rollout, change the `play_track` input in [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
+- The prod workflow currently uploads to the `internal` testing track.
+- Change the `play_track` input in [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to `closed` or `production` when you are ready to promote releases.
 - Deploys can be triggered either by merging the expected PR flow or by manual workflow dispatch.
 - `Deploy Prod` only deploys from the `prod` branch after the `dev -> prod` promotion.
 - Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
