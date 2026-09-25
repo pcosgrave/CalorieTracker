@@ -36,10 +36,6 @@ data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
 
-data "aws_vpc" "default" {
-  default = true
-}
-
 resource "aws_amplify_app" "web" {
   count = var.web_hosting_repository != null && var.web_hosting_access_token != null ? 1 : 0
 
@@ -85,13 +81,6 @@ resource "aws_amplify_branch" "web" {
   app_id      = aws_amplify_app.web[0].id
   branch_name = var.web_hosting_branch
   stage       = var.environment == "prod" ? "PRODUCTION" : "DEVELOPMENT"
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
 }
 
 resource "aws_cognito_user_pool" "main" {
@@ -367,19 +356,6 @@ resource "aws_cloudwatch_log_group" "api_lambdas" {
   tags              = local.tags
 }
 
-resource "aws_security_group" "api_lambda" {
-  name_prefix = "${local.name_prefix}-api-"
-  description = "API Lambda network access"
-  vpc_id      = data.aws_vpc.default.id
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  tags = local.tags
-}
-
 resource "aws_iam_role" "api_lambda" {
   count = var.create_api ? 1 : 0
 
@@ -476,11 +452,6 @@ resource "aws_lambda_function" "api" {
   source_code_hash = var.api_lambda_source_code_hash
   timeout          = var.lambda_timeout_seconds
   memory_size      = var.lambda_memory_mb
-
-  vpc_config {
-    subnet_ids         = data.aws_subnets.default.ids
-    security_group_ids = [aws_security_group.api_lambda.id]
-  }
 
   environment {
     variables = local.lambda_environment
