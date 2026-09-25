@@ -82,6 +82,31 @@ variable "log_retention_days" {
   default     = 30
 }
 
+variable "database_backup_retention_period" {
+  description = "RDS automated backup retention period in days."
+  type        = number
+  default     = 7
+}
+
+variable "web_hosting_repository" {
+  description = "GitHub repository URL for the production web app."
+  type        = string
+  default     = "https://github.com/pcosgrave/CalorieTracker"
+}
+
+variable "web_hosting_access_token" {
+  description = "GitHub token for AWS Amplify repository access. Set with TF_VAR_web_hosting_access_token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "web_hosting_branch" {
+  description = "Git branch deployed to the production web host."
+  type        = string
+  default     = "main"
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string

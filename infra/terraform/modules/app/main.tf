@@ -43,6 +43,53 @@ data "aws_vpc" "default" {
   default = true
 }
 
+resource "aws_amplify_app" "web" {
+  count = var.web_hosting_repository != null && var.web_hosting_access_token != null ? 1 : 0
+
+  name         = "${local.name_prefix}-web"
+  repository   = var.web_hosting_repository
+  access_token = var.web_hosting_access_token
+  platform     = "WEB_COMPUTE"
+
+  build_spec = <<-EOT
+    version: 1
+    applications:
+      - appRoot: apps/web
+        frontend:
+          phases:
+            preBuild:
+              commands:
+                - cd ../..
+                - npm ci
+            build:
+              commands:
+                - npm run build --workspace @calorie-tracker/web
+          artifacts:
+            baseDirectory: apps/web/.next
+            files:
+              - '**/*'
+          cache:
+            paths:
+              - node_modules/**
+              - apps/web/.next/cache/**
+  EOT
+
+  environment_variables = {
+    NEXT_PUBLIC_AWS_REGION           = data.aws_region.current.name
+    NEXT_PUBLIC_COGNITO_DOMAIN       = local.cognito_domain_prefix
+    NEXT_PUBLIC_COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
+    NEXT_PUBLIC_SYNC_API_BASE_URL    = var.create_api ? "https://${aws_api_gateway_rest_api.main[0].id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${aws_api_gateway_stage.main[0].stage_name}" : ""
+  }
+}
+
+resource "aws_amplify_branch" "web" {
+  count = length(aws_amplify_app.web)
+
+  app_id      = aws_amplify_app.web[0].id
+  branch_name = var.web_hosting_branch
+  stage       = var.environment == "prod" ? "PRODUCTION" : "DEVELOPMENT"
+}
+
 data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
@@ -432,7 +479,7 @@ resource "aws_db_instance" "main" {
   multi_az                    = false
   storage_encrypted           = true
   kms_key_id                  = aws_kms_key.app_storage.arn
-  backup_retention_period     = 7
+  backup_retention_period     = var.database_backup_retention_period
   skip_final_snapshot         = var.environment != "prod"
   deletion_protection         = var.environment == "prod"
   apply_immediately           = var.environment != "prod"
@@ -474,6 +521,15 @@ resource "aws_iam_role_policy" "api_lambda" {
           Effect = "Allow"
           Action = [
             "logs:CreateLogGroup",
+          ]
+          Resource = "*"
+        },
+        {
+          Effect = "Allow"
+          Action = [
+            "ec2:CreateNetworkInterface",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface",
           ]
           Resource = "*"
         },

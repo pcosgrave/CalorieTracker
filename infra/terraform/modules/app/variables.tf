@@ -131,3 +131,28 @@ variable "database_name" {
   type        = string
   default     = "bitewise"
 }
+
+variable "database_backup_retention_period" {
+  description = "RDS automated backup retention period in days."
+  type        = number
+  default     = 7
+}
+
+variable "web_hosting_repository" {
+  description = "Git repository URL for optional AWS Amplify web hosting."
+  type        = string
+  default     = null
+}
+
+variable "web_hosting_access_token" {
+  description = "GitHub access token used by AWS Amplify to read the web repository."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "web_hosting_branch" {
+  description = "Git branch deployed by AWS Amplify."
+  type        = string
+  default     = "main"
+}

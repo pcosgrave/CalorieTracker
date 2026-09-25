@@ -82,6 +82,12 @@ variable "log_retention_days" {
   default     = 30
 }
 
+variable "database_backup_retention_period" {
+  description = "RDS automated backup retention period in days. Free Tier dev accounts should use 1."
+  type        = number
+  default     = 1
+}
+
 variable "google_client_id" {
   description = "Optional Google OAuth client ID for Cognito federation."
   type        = string
