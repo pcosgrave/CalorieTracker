@@ -358,9 +358,9 @@ Expected result:
 ## 10. Important Notes
 
 - The prod workflow currently uploads directly to the `production` track.
-- If you want a safer first rollout, change [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
+- If you want a safer first rollout, change the `play_track` input in [`.github/workflows/deploy-prod.yml`](/D:/Projects/CalorieTracker/.github/workflows/deploy-prod.yml) to use `internal` or `closed` first.
 - Deploys can be triggered either by merging the expected PR flow or by manual workflow dispatch.
-- `Deploy Prod` only accepts `dev -> prod` merges.
+- `Deploy Prod` only deploys from the `prod` branch after the `dev -> prod` promotion.
 - Dev deploys now auto-bump the Android release version inside CI only and create a tag like `android-dev-v0.1.2+3`.
 - Prod deploys now auto-bump the Android release version inside CI only and create a tag like `android-prod-v0.1.2+3`.
 - The workflows generate temporary Terraform backend and tfvars files during the run.

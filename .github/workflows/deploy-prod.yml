@@ -1,36 +1,27 @@
-name: Deploy Android Prod
+name: Deploy Prod
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Deploy Backend Prod
-    types:
-      - completed
+  push:
+    branches:
+      - prod
 
 permissions:
   contents: write
   id-token: write
 
 jobs:
-  guard:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
-    steps:
-      - name: Ensure the backend deployment succeeded on prod
-        run: |
-          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-            echo "The backend production deployment did not succeed."
-            exit 1
-          fi
-          if [ "${{ github.event.workflow_run.head_branch }}" != "prod" ]; then
-            echo "The backend deployment did not run from prod. Branch: ${{ github.event.workflow_run.head_branch }}"
-            exit 1
-          fi
+  backend:
+    name: Deploy production backend
+    uses: ./.github/workflows/_deploy-backend-and-infra.yml
+    with:
+      github_environment: prod
+      terraform_environment: prod
+    secrets: inherit
 
-  deploy:
-    needs: guard
-    if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && needs.guard.result == 'success'))
+  android:
+    name: Publish production Android build
+    needs: backend
     uses: ./.github/workflows/_deploy-mobile-and-infra.yml
     with:
       github_environment: prod
@@ -44,4 +35,3 @@ jobs:
       create_release_tag: true
       release_tag_prefix: android-prod
     secrets: inherit
-
