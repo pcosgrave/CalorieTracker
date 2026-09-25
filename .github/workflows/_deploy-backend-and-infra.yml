@@ -155,10 +155,6 @@ jobs:
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} init -backend-config="backend.ci.hcl"
 
-      - name: Show Terraform state addresses
-        shell: pwsh
-        run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} state list
-
       - name: Terraform apply
         shell: pwsh
         run: terraform -chdir=infra/terraform/environments/${{ inputs.terraform_environment }} apply -auto-approve -var-file="ci.auto.tfvars"
