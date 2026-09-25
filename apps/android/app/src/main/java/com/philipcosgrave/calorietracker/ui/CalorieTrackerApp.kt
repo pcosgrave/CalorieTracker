@@ -1187,7 +1187,8 @@ fun CalorieTrackerApp(
         if (callback.startsWith(BuildConfig.COGNITO_ANDROID_REDIRECT_URI)) {
             runCatching {
                 authRepository.completeSignIn(android.net.Uri.parse(callback))
-            }.onSuccess {
+            }.onSuccess { session ->
+                authSession = session
                 resetTo(AppScreen.SyncSettings)
             }.onFailure { error ->
                 Log.e("AuthCallback", "Sign in failed for callback: $callback", error)
