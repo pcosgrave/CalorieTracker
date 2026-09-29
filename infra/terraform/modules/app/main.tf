@@ -307,6 +307,13 @@ resource "aws_dynamodb_table" "households" {
   hash_key     = "ownerUserId"
   range_key    = "householdId"
 
+  global_secondary_index {
+    name            = "householdId-index"
+    hash_key        = "householdId"
+    range_key       = "memberUserId"
+    projection_type = "ALL"
+  }
+
   attribute {
     name = "ownerUserId"
     type = "S"
@@ -314,6 +321,11 @@ resource "aws_dynamodb_table" "households" {
 
   attribute {
     name = "householdId"
+    type = "S"
+  }
+
+  attribute {
+    name = "memberUserId"
     type = "S"
   }
 

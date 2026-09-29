@@ -52,5 +52,6 @@ app.MapWeightEndpoints();
 app.MapSyncEndpoints();
 app.MapAccountEndpoints();
 app.MapV1Endpoints();
+app.MapV1HouseholdEndpoints();
 
 app.Run();

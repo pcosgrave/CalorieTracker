@@ -116,6 +116,8 @@ import com.philipcosgrave.calorietracker.ui.screens.AddIngredientScreen
 import com.philipcosgrave.calorietracker.ui.screens.QuickCaloriesScreen
 import com.philipcosgrave.calorietracker.ui.screens.RecipeBuilderScreen
 import com.philipcosgrave.calorietracker.ui.screens.SyncSettingsScreen
+import com.philipcosgrave.calorietracker.ui.screens.HouseholdScreen
+import com.philipcosgrave.calorietracker.ui.screens.HouseholdSettingsScreen
 import com.philipcosgrave.calorietracker.ui.screens.WeightScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -197,6 +199,7 @@ fun CalorieTrackerApp(
     }
     val scope = rememberCoroutineScope()
     val syncService = remember { ApiSyncService(localStore) }
+    val householdApiService = remember { com.philipcosgrave.calorietracker.data.sync.HouseholdApiService(localStore) }
     val photoAnalyzer = remember { com.philipcosgrave.calorietracker.data.local.LocalPhotoFoodAnalyzer() }
     val canadianNutrientFileLookupService = remember { CanadianNutrientFileLookupService() }
     val cloudFoodCatalogService = remember { CloudFoodCatalogService(localStore) }
@@ -247,6 +250,9 @@ fun CalorieTrackerApp(
     var localWeightCount by remember { mutableStateOf(0) }
     var localBarcodeCount by remember { mutableStateOf(0) }
     var authSession by remember { mutableStateOf<AuthSession?>(null) }
+    var activeHousehold by remember { mutableStateOf<com.philipcosgrave.calorietracker.data.sync.RemoteHousehold?>(null) }
+    var householdMembers by remember { mutableStateOf<List<com.philipcosgrave.calorietracker.data.sync.RemoteHouseholdMember>>(emptyList()) }
+    var householdLoading by remember { mutableStateOf(true) }
     var healthConnectAvailability by remember { mutableStateOf(HealthConnectAvailability.Unavailable) }
     var healthConnectPermissionGranted by remember { mutableStateOf(false) }
     var healthConnectExportEnabled by remember { mutableStateOf(false) }
@@ -324,6 +330,14 @@ fun CalorieTrackerApp(
         navigateTo(AppScreen.SearchFood)
     }
 
+    suspend fun refreshHouseholdState() {
+        householdLoading = true
+        val households = runCatching { householdApiService.list() }.getOrDefault(emptyList())
+        activeHousehold = households.firstOrNull()
+        householdMembers = activeHousehold?.let { runCatching { householdApiService.members(it.householdId) }.getOrDefault(emptyList()) } ?: emptyList()
+        householdLoading = false
+    }
+
     suspend fun refreshState() {
         leftovers = database.leftoverDao().list(localStore.currentOwnerUserId()).map { it.toLeftover() }
         val foodRecords = localStore.foodRepository.list().filter { it.sync.deletedAt == null }
@@ -339,6 +353,7 @@ fun CalorieTrackerApp(
         localWeightCount = localStore.weightRepository.list(localStore.currentOwnerUserId()).size
         localBarcodeCount = localStore.barcodeAliasRepository.list().count { it.sync.deletedAt == null }
         authSession = localStore.currentAuthSession()
+        refreshHouseholdState()
         personalCloudFoods =
             if (!localOnly && authSession != null) {
                 runCatching { cloudFoodCatalogService.listPersonalFoods() }.getOrDefault(emptyList())
@@ -1709,6 +1724,7 @@ fun CalorieTrackerApp(
 
             AppScreen.SyncSettings -> SyncSettingsScreen(
                 onManageFoods = { navigateTo(AppScreen.ManageFoods) },
+                onOpenHousehold = { navigateTo(AppScreen.Household) },
                 settings = syncSettings,
                 pendingChangeCount = pendingChangeCount,
                 localFoodCount = localFoodCount,
@@ -1818,6 +1834,8 @@ fun CalorieTrackerApp(
                     }
                 },
             )
+            AppScreen.Household -> HouseholdScreen(household = activeHousehold, members = householdMembers, loading = householdLoading, onCreate = { name -> scope.launch { runCatching { householdApiService.create(name) }.onSuccess { refreshHouseholdState() }.onFailure { error -> Log.e("Household", "Create household failed", error); Toast.makeText(context, error.message ?: "Could not create household", Toast.LENGTH_LONG).show() } } }, onBack = { popScreen() }, onOpenSettings = { navigateTo(AppScreen.HouseholdSettings) })
+            AppScreen.HouseholdSettings -> HouseholdSettingsScreen(onBack = { popScreen() })
 
             AppScreen.QuickCalories -> QuickCaloriesScreen(
                 date = selectedDate, destinationMeal = if (acquisitionActive) acquisition.meal else null,

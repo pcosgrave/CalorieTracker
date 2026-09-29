@@ -96,6 +96,7 @@ fun SyncSettingsScreen(
     onImportWeightHistory: () -> Unit,
     onImportNutritionHistory: () -> Unit,
     onManageFoods: () -> Unit = {},
+    onOpenHousehold: () -> Unit = {},
 ) {
     return SettingsOverviewScreen(
         settings = settings,
@@ -116,6 +117,7 @@ fun SyncSettingsScreen(
         onConnectHealthConnect = onConnectHealthConnect,
         onSetHealthConnectExportEnabled = onSetHealthConnectExportEnabled,
         onManageFoods = onManageFoods,
+        onOpenHousehold = onOpenHousehold,
     )
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -801,6 +803,7 @@ private fun SettingsOverviewScreen(
     onConnectHealthConnect: () -> Unit,
     onSetHealthConnectExportEnabled: (Boolean) -> Unit,
     onManageFoods: () -> Unit,
+    onOpenHousehold: () -> Unit,
 ) {
     var editor by remember { mutableStateOf<SettingsEditor?>(null) }
     var savedProfileName by remember { mutableStateOf(authSession?.name.orEmpty()) }
@@ -839,6 +842,7 @@ private fun SettingsOverviewScreen(
         }
         SettingsGroup("Account") {
             SettingsRow("Profile", "Profile", savedProfileEmail.ifBlank { "Sign in to manage your profile" }) { profileName = savedProfileName; profileEmail = savedProfileEmail; profilePhoto = savedProfilePhoto; timezone = savedTimezone; editor = SettingsEditor.Profile }
+            SettingsRow("Home", "Household", "Share meals and leftovers") { onOpenHousehold() }
             SettingsRow("Subscription", "Subscription", "BiteWise Free") { editor = SettingsEditor.Subscription }
         }
         SettingsGroup("Preferences") {
