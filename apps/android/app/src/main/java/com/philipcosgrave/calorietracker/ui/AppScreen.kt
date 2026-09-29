@@ -10,6 +10,8 @@ enum class AppScreen {
     LogWeight,
     SearchFood,
     SyncSettings,
+    Household,
+    HouseholdSettings,
     QuickCalories,
     AddIngredient,
     RecipeBuilder,

@@ -30,7 +30,6 @@ public static class V1Endpoints
         v1.MapGet("/devices", (HttpContext context) => Results.Ok(Array.Empty<object>()));
         v1.MapMethods("/recipes", ["GET", "POST", "PUT", "DELETE"], () => EndpointResponses.NotImplemented("Recipes"));
         v1.MapMethods("/meals", ["GET", "POST", "PUT", "DELETE"], () => EndpointResponses.NotImplemented("Meals"));
-        v1.MapMethods("/households", ["GET", "POST", "PUT", "DELETE"], () => EndpointResponses.NotImplemented("Households"));
         v1.MapMethods("/leftovers", ["GET", "POST", "PUT", "DELETE"], () => EndpointResponses.NotImplemented("Leftovers"));
         v1.MapMethods("/pantry", ["GET", "POST", "PUT", "DELETE"], () => EndpointResponses.NotImplemented("Pantry"));
     }
