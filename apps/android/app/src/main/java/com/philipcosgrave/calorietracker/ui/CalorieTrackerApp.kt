@@ -242,6 +242,10 @@ fun CalorieTrackerApp(
         )
     }
     var pendingChangeCount by remember { mutableStateOf(0) }
+    var localFoodCount by remember { mutableStateOf(0) }
+    var localDiaryCount by remember { mutableStateOf(0) }
+    var localWeightCount by remember { mutableStateOf(0) }
+    var localBarcodeCount by remember { mutableStateOf(0) }
     var authSession by remember { mutableStateOf<AuthSession?>(null) }
     var healthConnectAvailability by remember { mutableStateOf(HealthConnectAvailability.Unavailable) }
     var healthConnectPermissionGranted by remember { mutableStateOf(false) }
@@ -330,6 +334,10 @@ fun CalorieTrackerApp(
         hiddenSeedIds = localStore.hiddenSeedIds()
         syncSettings = localStore.syncStateRepository.getSettings()
         pendingChangeCount = localStore.syncOutboxRepository.listPendingChanges().size
+        localFoodCount = localStore.foodRepository.list().count { it.sync.deletedAt == null }
+        localDiaryCount = localStore.diaryRepository.list().count { it.sync.deletedAt == null }
+        localWeightCount = localStore.weightRepository.list(localStore.currentOwnerUserId()).size
+        localBarcodeCount = localStore.barcodeAliasRepository.list().count { it.sync.deletedAt == null }
         authSession = localStore.currentAuthSession()
         personalCloudFoods =
             if (!localOnly && authSession != null) {
@@ -1703,6 +1711,10 @@ fun CalorieTrackerApp(
                 onManageFoods = { navigateTo(AppScreen.ManageFoods) },
                 settings = syncSettings,
                 pendingChangeCount = pendingChangeCount,
+                localFoodCount = localFoodCount,
+                localDiaryCount = localDiaryCount,
+                localWeightCount = localWeightCount,
+                localBarcodeCount = localBarcodeCount,
                 authSession = authSession,
                 healthConnectAvailability = healthConnectAvailability,
                 healthConnectPermissionGranted = healthConnectPermissionGranted,

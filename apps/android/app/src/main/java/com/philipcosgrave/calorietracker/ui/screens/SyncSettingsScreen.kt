@@ -76,6 +76,10 @@ import android.app.DatePickerDialog
 fun SyncSettingsScreen(
     settings: SyncSettings,
     pendingChangeCount: Int,
+    localFoodCount: Int = 0,
+    localDiaryCount: Int = 0,
+    localWeightCount: Int = 0,
+    localBarcodeCount: Int = 0,
     authSession: AuthSession?,
     healthConnectAvailability: HealthConnectAvailability,
     healthConnectPermissionGranted: Boolean,
@@ -96,6 +100,11 @@ fun SyncSettingsScreen(
     return SettingsOverviewScreen(
         settings = settings,
         authSession = authSession,
+        pendingChangeCount = pendingChangeCount,
+        localFoodCount = localFoodCount,
+        localDiaryCount = localDiaryCount,
+        localWeightCount = localWeightCount,
+        localBarcodeCount = localBarcodeCount,
         healthConnectAvailability = healthConnectAvailability,
         healthConnectPermissionGranted = healthConnectPermissionGranted,
         healthConnectExportEnabled = healthConnectExportEnabled,
@@ -294,6 +303,25 @@ fun SyncSettingsScreen(
             }
             Text("Pending local changes: $pendingChangeCount", color = AppMuted)
             Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}", color = AppMuted)
+            SectionDivider()
+            Text("Cloud sync overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                when {
+                    !syncEnabled -> "Cloud sync is disabled"
+                    authSession == null -> "Sign in to back up this device"
+                    pendingChangeCount > 0 -> "${pendingChangeCount} change${if (pendingChangeCount == 1) "" else "s"} waiting to upload"
+                    else -> "This device is up to date"
+                },
+                color = if (pendingChangeCount > 0) AppBlue else AppMuted,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SyncCountCard("Foods", localFoodCount, Modifier.weight(1f))
+                SyncCountCard("Diary", localDiaryCount, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SyncCountCard("Weights", localWeightCount, Modifier.weight(1f))
+                SyncCountCard("Barcodes", localBarcodeCount, Modifier.weight(1f))
+            }
 
             if (authSession == null) {
                 AppPrimaryButton(
@@ -346,6 +374,21 @@ fun SyncSettingsScreen(
     }
 }
 
+@Composable
+private fun SyncCountCard(label: String, count: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = appSoftColor(),
+        border = BorderStroke(1.dp, appCardColor()),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(count.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(label, color = AppMuted)
+        }
+    }
+}
+
 private enum class SettingsEditor { Calories, Weight, HealthConnect, Fitbit, Profile, Subscription, Units, Notifications }
 private data class NotificationToggles(val daily: Boolean = true, val weekly: Boolean = true, val insights: Boolean = true, val productUpdates: Boolean = false)
 private data class HealthImportToggles(val activity: Boolean = true, val weight: Boolean = true, val nutrition: Boolean = true)
@@ -355,6 +398,11 @@ private fun ReferenceSettingsEditorPage(
     editor: SettingsEditor,
     settings: SyncSettings,
     authSession: AuthSession?,
+    pendingChangeCount: Int,
+    localFoodCount: Int,
+    localDiaryCount: Int,
+    localWeightCount: Int,
+    localBarcodeCount: Int,
     healthConnectAvailability: HealthConnectAvailability,
     healthConnectPermissionGranted: Boolean,
     calorieMin: String,
@@ -453,6 +501,27 @@ private fun ReferenceSettingsEditorPage(
                 ReferenceField("Email", profileEmail, onValueChange = onProfileEmailChange)
                 ReferenceTimezoneField(timezone, onTimezoneChange)
                 if (authSession == null) TextButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in to sync profile") } else TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+                ReferencePanel {
+                    Text("Cloud sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        when {
+                            authSession == null -> "Sign in to back up this device"
+                            pendingChangeCount > 0 -> "$pendingChangeCount change${if (pendingChangeCount == 1) "" else "s"} waiting to upload"
+                            else -> "This device is up to date"
+                        },
+                        color = AppMuted,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SyncCountCard("Foods", localFoodCount, Modifier.weight(1f))
+                        SyncCountCard("Diary", localDiaryCount, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SyncCountCard("Weights", localWeightCount, Modifier.weight(1f))
+                        SyncCountCard("Barcodes", localBarcodeCount, Modifier.weight(1f))
+                    }
+                    Text("Last successful sync: ${settings.lastSuccessfulSyncAt ?: "Never"}", color = AppMuted, style = MaterialTheme.typography.bodySmall)
+                    AppPrimaryButton("Sync now", onSyncNow, modifier = Modifier.fillMaxWidth())
+                }
                 Spacer(Modifier.height(8.dp))
             }
             SettingsEditor.Subscription -> {
@@ -579,14 +648,14 @@ private fun SettingsEditorPage(
     editor: SettingsEditor,
     settings: SyncSettings,
     authSession: AuthSession?,
-    heightUnit: SyncSettings.HeightUnit,
-    foodUnitSystem: SyncSettings.FoodUnitSystem,
     healthConnectAvailability: HealthConnectAvailability,
     healthConnectPermissionGranted: Boolean,
     calorieMin: String,
     calorieMax: String,
     weightText: String,
     weightUnit: SyncSettings.WeightUnit,
+    heightUnit: SyncSettings.HeightUnit,
+    foodUnitSystem: SyncSettings.FoodUnitSystem,
     profileName: String,
     profileEmail: String,
     notificationsEnabled: Boolean,
@@ -594,11 +663,11 @@ private fun SettingsEditorPage(
     onBack: () -> Unit,
     onSave: () -> Unit,
     onCalorieMinChange: (String) -> Unit,
-    onHeightUnitChange: (SyncSettings.HeightUnit) -> Unit,
-    onFoodUnitSystemChange: (SyncSettings.FoodUnitSystem) -> Unit,
     onCalorieMaxChange: (String) -> Unit,
     onWeightChange: (String) -> Unit,
     onWeightUnitChange: (SyncSettings.WeightUnit) -> Unit,
+    onHeightUnitChange: (SyncSettings.HeightUnit) -> Unit,
+    onFoodUnitSystemChange: (SyncSettings.FoodUnitSystem) -> Unit,
     onProfileNameChange: (String) -> Unit,
     onProfileEmailChange: (String) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
@@ -676,8 +745,18 @@ private fun SettingsEditorPage(
                     Button(onClick = { onWeightUnitChange(SyncSettings.WeightUnit.Kilograms) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (weightUnit == SyncSettings.WeightUnit.Kilograms) MaterialTheme.colorScheme.primary else appCardColor())) { Text("kg") }
                     Button(onClick = { onWeightUnitChange(SyncSettings.WeightUnit.Pounds) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (weightUnit == SyncSettings.WeightUnit.Pounds) MaterialTheme.colorScheme.primary else appCardColor())) { Text("lb") }
                 }
-                Text("Height\ncm", color = AppMuted)
-                Text("Food quantities\nMetric (g, ml)", color = AppMuted)
+                Text("Height", fontWeight = FontWeight.Bold)
+                ReferenceSegment(
+                    listOf("cm", "ft/in"),
+                    if (heightUnit == SyncSettings.HeightUnit.Centimeters) 0 else 1,
+                    { onHeightUnitChange(if (it == 0) SyncSettings.HeightUnit.Centimeters else SyncSettings.HeightUnit.FeetInches) },
+                )
+                Text("Food quantities", fontWeight = FontWeight.Bold)
+                ReferenceSegment(
+                    listOf("Metric (g, ml)", "Imperial (oz, cups)"),
+                    if (foodUnitSystem == SyncSettings.FoodUnitSystem.Metric) 0 else 1,
+                    { onFoodUnitSystemChange(if (it == 0) SyncSettings.FoodUnitSystem.Metric else SyncSettings.FoodUnitSystem.Imperial) },
+                )
             }
             SettingsEditor.Notifications -> AppCardContainer {
                 SettingsToggleRow("Daily reminder", "Log your meals", notificationsEnabled, onNotificationsChange)
@@ -706,6 +785,11 @@ private fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean,
 private fun SettingsOverviewScreen(
     settings: SyncSettings,
     authSession: AuthSession?,
+    pendingChangeCount: Int,
+    localFoodCount: Int,
+    localDiaryCount: Int,
+    localWeightCount: Int,
+    localBarcodeCount: Int,
     healthConnectAvailability: HealthConnectAvailability,
     healthConnectPermissionGranted: Boolean,
     healthConnectExportEnabled: Boolean,
@@ -768,6 +852,11 @@ private fun SettingsOverviewScreen(
             editor = currentEditor,
             settings = settings,
             authSession = authSession,
+            pendingChangeCount = pendingChangeCount,
+            localFoodCount = localFoodCount,
+            localDiaryCount = localDiaryCount,
+            localWeightCount = localWeightCount,
+            localBarcodeCount = localBarcodeCount,
             healthConnectAvailability = healthConnectAvailability,
             healthConnectPermissionGranted = healthConnectPermissionGranted,
             calorieMin = calorieMin,
