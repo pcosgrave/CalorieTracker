@@ -502,7 +502,7 @@ private fun ReferenceSettingsEditorPage(
                 ReferenceField("Name", profileName, onValueChange = onProfileNameChange)
                 ReferenceField("Email", profileEmail, onValueChange = onProfileEmailChange)
                 ReferenceTimezoneField(timezone, onTimezoneChange)
-                if (authSession == null) TextButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in to sync profile") } else TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+                if (authSession == null) TextButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in to sync profile") }
                 ReferencePanel {
                     Text("Cloud sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
@@ -554,7 +554,16 @@ private fun ReferenceSettingsEditorPage(
                 Spacer(Modifier.height(8.dp))
             }
         }
-        AppPrimaryButton("Save", onSave, modifier = Modifier.fillMaxWidth())
+        if (editor == SettingsEditor.Profile && authSession != null) {
+            AppPrimaryButton(
+                "Sign out",
+                onSignOut,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+            )
+        } else if (editor != SettingsEditor.Profile) {
+            AppPrimaryButton("Save", onSave, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -731,7 +740,7 @@ private fun SettingsEditorPage(
                     OutlinedTextField(profileName, onProfileNameChange, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(profileEmail, onProfileEmailChange, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
                     Text("Time zone\nUTC-05:00 Toronto", color = AppMuted)
-                    if (authSession == null) TextButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in") } else TextButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+                    if (authSession == null) TextButton(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Sign in") }
                 }
             }
             SettingsEditor.Subscription -> AppCardContainer {
@@ -767,10 +776,15 @@ private fun SettingsEditorPage(
                 SettingsToggleRow("Product updates", "New features and news", notificationsEnabled, onNotificationsChange)
             }
         }
-        if (editor != SettingsEditor.HealthConnect || !healthConnectPermissionGranted) {
+        if (editor != SettingsEditor.Profile) {
             AppPrimaryButton("Save", onClick = onSave, modifier = Modifier.fillMaxWidth())
-        } else {
-            AppPrimaryButton("Save", onClick = onSave, modifier = Modifier.fillMaxWidth())
+        } else if (authSession != null) {
+            AppPrimaryButton(
+                "Sign out",
+                onClick = onSignOut,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+            )
         }
     }
 }
