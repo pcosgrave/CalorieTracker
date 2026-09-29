@@ -20,6 +20,23 @@ export interface PublicRequest<TBody = unknown> {
   body: TBody;
 }
 
+type LogLevel = "info" | "warn" | "error";
+
+function requestId(event: SupportedGatewayEvent): string {
+  const headers = event.headers ?? {};
+  return headers["x-correlation-id"] ?? headers["X-Correlation-Id"] ?? crypto.randomUUID();
+}
+
+function log(level: LogLevel, eventName: string, event: SupportedGatewayEvent, fields: Record<string, unknown> = {}, error?: unknown) {
+  const record = {
+    timestamp: new Date().toISOString(), level, service: "calorie-tracker-api",
+    event: eventName, requestId: requestId(event), route: ("rawPath" in event ? event.rawPath : event.path) ?? "unknown",
+    ...fields,
+    ...(error instanceof Error ? { errorName: error.name, errorMessage: error.message, stack: error.stack } : {}),
+  };
+  (level === "error" ? console.error : level === "warn" ? console.warn : console.info)(JSON.stringify(record));
+}
+
 export type Handler<TBody = unknown> = (
   request: AuthedRequest<TBody>,
 ) => Promise<SupportedGatewayResult>;
@@ -36,6 +53,15 @@ export function json(statusCode: number, body: unknown): SupportedGatewayResult 
     },
     body: JSON.stringify(body),
   };
+}
+
+function withObservabilityHeaders(result: SupportedGatewayResult, event: SupportedGatewayEvent): SupportedGatewayResult {
+  if (typeof result !== "object" || result === null) return result;
+  return { ...result, headers: { ...(typeof result.headers === "object" ? result.headers : {}), "x-correlation-id": requestId(event) } } as SupportedGatewayResult;
+}
+
+function response(statusCode: number, message: string, event: SupportedGatewayEvent, extra: Record<string, unknown> = {}) {
+  return json(statusCode, { message, requestId: requestId(event), ...extra });
 }
 
 class UnauthorizedError extends Error {}
@@ -64,23 +90,26 @@ export function route<TBody>(
 ) {
   return async (event: SupportedGatewayEvent): Promise<SupportedGatewayResult> => {
     try {
-      return await handler({
+      return withObservabilityHeaders(await handler({
         event,
         userId: getUserId(event),
         body: parseJson(event, schema),
-      });
+      }), event);
     } catch (error) {
       if (error instanceof UnauthorizedError) {
-        return json(401, { message: error.message });
+        log("warn", "request.unauthorized", event, { statusCode: 401 });
+        return response(401, error.message, event);
       }
       if (error instanceof SyntaxError) {
-        return json(400, { message: "Request body must be valid JSON" });
+        log("warn", "request.invalid_json", event, { statusCode: 400 });
+        return response(400, "Request body must be valid JSON", event);
       }
       if (error instanceof ZodError) {
-        return json(400, { message: "Request validation failed", issues: error.issues });
+        log("warn", "request.validation_failed", event, { statusCode: 400, issueCount: error.issues.length });
+        return response(400, "Request validation failed", event, { issues: error.issues });
       }
-      console.error(error);
-      return json(500, { message: "Internal server error" });
+      log("error", "request.failed", event, { statusCode: 500 }, error);
+      return response(500, "Internal server error", event);
     }
   };
 }
@@ -91,19 +120,21 @@ export function publicRoute<TBody>(
 ) {
   return async (event: SupportedGatewayEvent): Promise<SupportedGatewayResult> => {
     try {
-      return await handler({
+      return withObservabilityHeaders(await handler({
         event,
         body: parseJson(event, schema),
-      });
+      }), event);
     } catch (error) {
       if (error instanceof SyntaxError) {
-        return json(400, { message: "Request body must be valid JSON" });
+        log("warn", "request.invalid_json", event, { statusCode: 400 });
+        return response(400, "Request body must be valid JSON", event);
       }
       if (error instanceof ZodError) {
-        return json(400, { message: "Request validation failed", issues: error.issues });
+        log("warn", "request.validation_failed", event, { statusCode: 400, issueCount: error.issues.length });
+        return response(400, "Request validation failed", event, { issues: error.issues });
       }
-      console.error(error);
-      return json(500, { message: "Internal server error" });
+      log("error", "request.failed", event, { statusCode: 500 }, error);
+      return response(500, "Internal server error", event);
     }
   };
 }

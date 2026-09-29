@@ -1,5 +1,6 @@
 using CalorieTracker.Api.Configuration;
 using CalorieTracker.Api.Endpoints;
+using CalorieTracker.Api.Infrastructure;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using System.Text.Json.Serialization;
 
@@ -20,7 +21,7 @@ builder.Services
 var app = builder.Build();
 
 app.UseExceptionHandler();
-app.Use(async (context, next) => { context.Response.Headers["X-Correlation-Id"] = context.TraceIdentifier; await next(); });
+app.UseMiddleware<ObservabilityMiddleware>();
 
 app.MapGet("/", () => Results.Ok(new
 {
